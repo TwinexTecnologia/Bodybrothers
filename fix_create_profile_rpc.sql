@@ -1,0 +1,38 @@
+-- Função segura para criar perfil ignorando RLS
+-- Security Definer faz a função rodar com permissões de Super Admin
+CREATE OR REPLACE FUNCTION public.create_profile_as_admin(
+  p_id uuid,
+  p_email text,
+  p_role text,
+  p_full_name text,
+  p_phone text,
+  p_brand_name text,
+  p_logo_url text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER 
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, role, full_name, data)
+  VALUES (
+    p_id,
+    p_email,
+    p_role,
+    p_full_name,
+    jsonb_build_object(
+      'phone', p_phone,
+      'branding', jsonb_build_object(
+        'brandName', p_brand_name,
+        'logoUrl', p_logo_url
+      )
+    )
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    role = EXCLUDED.role,
+    full_name = EXCLUDED.full_name,
+    data = EXCLUDED.data;
+END;
+$$;

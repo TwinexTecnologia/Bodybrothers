@@ -1,0 +1,38 @@
+:root {
+  --student-bg: #f8fafc;
+  --student-text: #111827;
+  
+  /* Sidebar Colors (Inspirado no Personal mas adaptável) */
+  --sidebar-bg: #0f172a;
+  --sidebar-hover: #1e293b;
+  --sidebar-text: #e2e8f0;
+  --sidebar-active-bg: rgba(59, 130, 246, 0.15); /* Azul translúcido */
+  --sidebar-active-text: #60a5fa; /* Azul claro */
+  
+  --student-card: #ffffff;
+  --student-border: #e2e8f0;
+}
+
+body {
+  background-color: var(--student-bg);
+  color: var(--student-text);
+  margin: 0;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+/* Responsivo para mobile */
+@media (max-width: 768px) {
+  .app-shell {
+    grid-template-columns: 1fr; /* Sidebar vira menu hamburguer ou bottom bar se preferir */
+    /* Mas como o usuário pediu "estilo o do personal", vamos manter sidebar no desktop e adaptar no mobile depois se precisar.
+       Por enquanto, vou fazer responsivo básico escondendo a sidebar ou transformando. 
+       Mas o usuário disse "deixa esses menus no meio da tela mais modernizado" antes, agora "barra lateral".
+       Vou focar no desktop com sidebar fixa.
+    */
+  }
+}

@@ -1,0 +1,857 @@
+import { useEffect, useState, useRef } from 'react'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../auth/useAuth'
+import { Dumbbell, ChevronRight, PlayCircle, Clock, X, StopCircle, CheckCircle, Calendar, MessageSquare, History, TrendingUp, ChevronLeft, Play, ArrowRight, Flame, BarChart2 } from 'lucide-react'
+import { startSession, finishSession, getWeeklyFrequency, getWeeklyActivity } from '../../store/history'
+
+// Tipos atualizados para refletir nova estrutura do Personal
+type ExerciseSet = {
+    type: 'warmup' | 'feeder' | 'working' | 'custom'
+    customLabel?: string
+    series: string
+    reps: string
+    load: string
+    rest: string
+}
+
+type Exercise = {
+  name: string
+  group: string
+  
+  // Nova estrutura de sets
+  sets?: ExerciseSet[] // Se existir, usa isso. Se não, usa fallback.
+
+  // Mantidos para compatibilidade com dados antigos
+  series: string
+  reps: string
+  load: string
+  rest: string
+  warmupSeries?: string
+  warmupReps?: string
+  warmupLoad?: string
+  warmupRest?: string
+  feederSeries?: string
+  feederReps?: string
+  feederLoad?: string
+  feederRest?: string
+
+  notes?: string
+  videoUrl?: string
+}
+
+type Workout = {
+  id: string
+  personal_id?: string
+  title: string
+  data: {
+    goal?: string
+    notes?: string
+    validUntil?: string
+    exercises: Exercise[]
+  }
+  updated_at: string
+}
+
+type SessionState = {
+    active: boolean
+    sessionId?: string
+    workout?: Workout
+    startTime?: Date
+    elapsedSeconds: number
+}
+
+const DAYS_MAP: Record<string, string> = {
+    'seg': 'Segunda-feira',
+    'ter': 'Terça-feira',
+    'qua': 'Quarta-feira',
+    'qui': 'Quinta-feira',
+    'sex': 'Sexta-feira',
+    'sab': 'Sábado',
+    'dom': 'Domingo'
+}
+
+const DAYS_ORDER = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom']
+
+export default function ListWorkouts() {
+  const { user } = useAuth()
+  const [workouts, setWorkouts] = useState<Workout[]>([])
+  const [schedule, setSchedule] = useState<Record<string, string[]>>({})
+  const [loading, setLoading] = useState(true)
+  const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null)
+  
+  // Frequência
+  const [weeklyFreq, setWeeklyFreq] = useState(0)
+  const [activeDays, setActiveDays] = useState<number[]>([])
+
+  // Sessão
+  const [session, setSession] = useState<SessionState>({ active: false, elapsedSeconds: 0 })
+  const [showFinishModal, setShowFinishModal] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [showSummaryModal, setShowSummaryModal] = useState(false)
+  const [sessionNotes, setSessionNotes] = useState('')
+  const timerRef = useRef<any>(null)
+
+  useEffect(() => {
+    if (user) {
+        loadData()
+        loadFrequency()
+    }
+    return () => clearInterval(timerRef.current)
+  }, [user])
+
+  useEffect(() => {
+    if (session.active) {
+        timerRef.current = setInterval(() => {
+            setSession(prev => ({ ...prev, elapsedSeconds: prev.elapsedSeconds + 1 }))
+        }, 1000)
+    } else {
+        clearInterval(timerRef.current)
+    }
+    return () => clearInterval(timerRef.current)
+  }, [session.active])
+
+  async function loadFrequency() {
+      if (!user) return
+      const count = await getWeeklyFrequency(user.id)
+      const days = await getWeeklyActivity(user.id)
+      setWeeklyFreq(count)
+      setActiveDays(days)
+  }
+
+  async function loadData() {
+    try {
+        setLoading(true)
+        const { data: profile } = await supabase.from('profiles').select('data').eq('id', user?.id).single()
+        
+        const linkedIds = profile?.data?.workoutIds || []
+        const sched = profile?.data?.workoutSchedule || {}
+        setSchedule(sched)
+
+        let query = supabase.from('protocols').select('*').eq('type', 'workout').eq('status', 'active')
+        
+        if (linkedIds.length > 0) {
+            query = query.or(`student_id.eq.${user?.id},id.in.(${linkedIds.join(',')})`)
+        } else {
+            query = query.eq('student_id', user?.id)
+        }
+
+        const { data, error } = await query
+        if (error) throw error
+        setWorkouts(data || [])
+    } catch (error) {
+        console.error('Erro ao carregar treinos:', error)
+    } finally {
+        setLoading(false)
+    }
+  }
+
+  const handleStartSession = async (w: Workout) => {
+      if (!user) return
+      
+      const todayIndex = new Date().getDay()
+      
+      // Bloqueia se já tiver treino registrado hoje
+      if (activeDays.includes(todayIndex)) {
+          alert('Você já registrou um treino hoje! Descanse para amanhã. 💪')
+          return
+      }
+
+      // Bloqueia se o treino for de um dia anterior (Opcional, mas parece ser o que você pediu)
+      // Se a ideia é bloquear clicar no treino de "ontem" para iniciar hoje, precisamos checar o agendamento
+      // Mas como a lista de treinos já filtra por dia, o usuário só vê os treinos de hoje ou gerais.
+      // Se a intenção é "Não deixa eu registrar OUTRO treino se eu já treinei hoje", a lógica acima já resolve.
+      
+      // Se a intenção é "Não deixar clicar nas bolinhas passadas", elas não são clicáveis para iniciar treino.
+      
+      try {
+          const s = await startSession(w.id, w.title, user.id)
+          setSession({
+              active: true,
+              sessionId: s.id,
+              workout: w,
+              startTime: new Date(),
+              elapsedSeconds: 0
+          })
+          setSelectedWorkout(null)
+          window.scrollTo(0,0)
+      } catch (err) {
+          alert('Erro ao iniciar treino.')
+      }
+  }
+
+  const handleConfirmFinish = async () => {
+      if (!session.sessionId) return
+      try {
+          await finishSession(session.sessionId, session.elapsedSeconds, sessionNotes)
+          setSession({ active: false, elapsedSeconds: 0 })
+          setShowFinishModal(false)
+          setSessionNotes('')
+          loadFrequency()
+          setShowSuccessModal(true)
+      } catch (err) {
+          console.error(err)
+          alert('Erro ao salvar treino.')
+      }
+  }
+
+  // DEBUG: Função para resetar o treino de hoje (Para Testes)
+  const handleDebugReset = async () => {
+      if (!user) return
+      if (!confirm('Isso vai apagar o ÚLTIMO treino registrado para você testar novamente. Confirmar?')) return
+      
+      // Busca o último treino registrado
+      const { data: lastWorkout, error: fetchError } = await supabase
+          .from('workout_history')
+          .select('id')
+          .eq('student_id', user.id)
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .single()
+
+      if (fetchError || !lastWorkout) {
+          alert('Nenhum treino encontrado para apagar.')
+          return
+      }
+
+      console.log('Apagando treino ID:', lastWorkout.id)
+
+      const { error } = await supabase
+          .from('workout_history')
+          .delete()
+          .eq('id', lastWorkout.id)
+      
+      if (!error) {
+          alert('Último treino apagado com sucesso! Atualizando...')
+          window.location.reload()
+      } else {
+          console.error('Erro ao resetar:', error)
+          alert('Erro ao resetar. Verifique o console.')
+      }
+  }
+
+  const formatTime = (seconds: number) => {
+      const h = Math.floor(seconds / 3600)
+      const m = Math.floor((seconds % 3600) / 60)
+      const s = seconds % 60
+      return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }
+
+  // Agrupamento
+  const workoutsByDay = DAYS_ORDER.map(dayKey => {
+      const workoutIdsForDay: string[] = []
+      if (schedule) {
+        Object.entries(schedule).forEach(([wId, days]) => {
+            if (Array.isArray(days)) {
+                const normalizedDays = days.map(d => d.toLowerCase())
+                if (normalizedDays.includes(dayKey)) workoutIdsForDay.push(wId)
+            }
+        })
+      }
+      const dayWorkouts = workouts.filter(w => workoutIdsForDay.includes(w.id))
+      return { dayKey, label: DAYS_MAP[dayKey], workouts: dayWorkouts }
+  }).filter(group => group.workouts.length > 0)
+
+  const unscheduledWorkouts = workouts.filter(w => {
+      const days = schedule ? schedule[w.id] : undefined
+      return !days || !Array.isArray(days) || days.length === 0
+  })
+
+  // --- Renderização ---
+
+  if (session.active && session.workout) {
+      // Modo Sessão (Mantido com melhorias sutis)
+      return (
+          <div style={{ padding: 24, minHeight: '80vh', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif' }}>
+              <header style={{ textAlign: 'center', marginBottom: 24 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                      <div style={{ display: 'inline-block', background: '#dcfce7', color: '#166534', padding: '6px 16px', borderRadius: 30, fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                          Treino em Andamento
+                      </div>
+                      <button 
+                          onClick={() => setShowFinishModal(true)}
+                          style={{ 
+                              padding: '10px 20px', borderRadius: 20, border: 'none', 
+                              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#fff', 
+                              fontSize: '0.9rem', fontWeight: 700, letterSpacing: '0.5px',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer',
+                              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)', transition: 'transform 0.2s'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                          <StopCircle size={18} /> FINALIZAR
+                      </button>
+                  </div>
+                  <h1 style={{ fontSize: '2rem', color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>{session.workout.title}</h1>
+                  <div style={{ fontSize: '3.5rem', fontWeight: 800, color: '#3b82f6', fontFamily: 'monospace', letterSpacing: '-2px', lineHeight: 1 }}>
+                      {formatTime(session.elapsedSeconds)}
+                  </div>
+              </header>
+
+              <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 24 }}>
+                  {session.workout.data.exercises.map((ex, i) => (
+                      <div key={i} style={{ marginBottom: 16, borderRadius: 20, padding: 20, background: '#fff', border: '1px solid #f1f5f9', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'flex-start' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                  <span style={{ fontSize: '1rem', fontWeight: 800, color: '#94a3b8', background: '#f8fafc', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', flexShrink: 0 }}>{i + 1}</span>
+                                  <strong style={{ color: '#0f172a', fontSize: '1.2rem', lineHeight: 1.2 }}>{ex.name}</strong>
+                              </div>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 44 }}>
+                              
+                              {(() => {
+                                  // Normaliza sets: usa o do banco se existir, ou constrói a partir dos campos antigos
+                                  let setsToRender: ExerciseSet[] = ex.sets || []
+                                  
+                                  if (setsToRender.length === 0) {
+                                      if (ex.warmupSeries || ex.warmupReps) {
+                                          setsToRender.push({ type: 'warmup', series: ex.warmupSeries || '', reps: ex.warmupReps || '', load: ex.warmupLoad || '', rest: ex.warmupRest || '' })
+                                      }
+                                      if (ex.feederSeries || ex.feederReps) {
+                                          setsToRender.push({ type: 'feeder', series: ex.feederSeries || '', reps: ex.feederReps || '', load: ex.feederLoad || '', rest: ex.feederRest || '' })
+                                      }
+                                      // Sempre tem trabalho (exceto se for vazio mesmo)
+                                      if (ex.series || ex.reps) {
+                                          setsToRender.push({ type: 'working', series: ex.series || '', reps: ex.reps || '', load: ex.load || '', rest: ex.rest || '' })
+                                      }
+                                  }
+
+                                  if (setsToRender.length > 0) {
+                                      return (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                              {setsToRender.map((set, setIdx) => {
+                                                  let color = '#334155'
+                                                  let bg = 'transparent'
+                                                  let label = ''
+
+                                                  if (set.type === 'warmup') {
+                                                      color = '#ea580c'
+                                                      bg = '#fff7ed'
+                                                      label = 'Aquecimento'
+                                                  } else if (set.type === 'feeder') {
+                                                      color = '#0284c7'
+                                                      bg = '#f0f9ff'
+                                                      label = 'Preparação'
+                                                  } else if (set.type === 'working') {
+                                                      color = '#16a34a'
+                                                      bg = '#f0fdf4'
+                                                      label = 'Trabalho'
+                                                  } else if (set.type === 'custom') {
+                                                      color = '#7c3aed'
+                                                      bg = '#f5f3ff'
+                                                      label = set.customLabel || 'Específico'
+                                                  }
+
+                                                  return (
+                                                      <div key={setIdx} style={{ display: 'flex', flexDirection: 'column', gap: 4, background: bg, padding: '8px 12px', borderRadius: 8, border: `1px solid ${color}20` }}>
+                                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
+                                                              <span style={{ fontWeight: 700, color: color, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>{label}</span>
+                                                              <span style={{ fontWeight: 600, color: '#334155' }}>{set.series} x {set.reps}</span>
+                                                              {set.load && <span style={{ color: '#64748b' }}>({set.load})</span>}
+                                                          </div>
+                                                          {set.rest && (
+                                                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#64748b' }}>
+                                                                   <Clock size={12} />
+                                                                   <span>Descanso: {set.rest}</span>
+                                                               </div>
+                                                          )}
+                                                      </div>
+                                                  )
+                                              })}
+                                          </div>
+                                      )
+                                  } else {
+                                      // Fallback final se realmente não tiver nada
+                                      return <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>Sem séries definidas.</div>
+                                  }
+                              })()}
+                              
+                              {/* Notas (Comuns a ambos) */}
+                              {ex.notes && (
+                                  <div style={{ fontSize: '0.85rem', color: '#64748b', background: '#fff7ed', padding: '8px 12px', borderRadius: 8, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
+                                      <MessageSquare size={16} style={{ marginTop: 2, flexShrink: 0, color: '#f97316' }} /> 
+                                      <span style={{ color: '#c2410c' }}>{ex.notes}</span>
+                                  </div>
+                              )}
+
+                              {/* Video Player OTIMIZADO */}
+                              {ex.videoUrl && (
+                                  <div style={{ width: '100%', maxWidth: 280, aspectRatio: '9/16', borderRadius: 12, overflow: 'hidden', background: '#000', marginTop: 16, position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', alignSelf: 'center' }}>
+                                      {(() => {
+                                          const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
+                                          
+                                          if (isYoutube) {
+                                              const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
+                                              return (
+                                                  <>
+                                                      <iframe 
+                                                          src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&controls=1`} 
+                                                          title={ex.name}
+                                                          style={{ width: '100%', height: '100%', border: 'none', objectFit: 'cover' }}
+                                                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                                          allowFullScreen
+                                                      />
+                                                  </>
+                                              );
+                                          } else {
+                                              return (
+                                                  <video 
+                                                      src={ex.videoUrl} 
+                                                      controls 
+                                                      playsInline
+                                                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                  />
+                                              );
+                                          }
+                                      })()}
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+                  ))}
+              </div>
+
+              <button 
+                  onClick={() => setShowFinishModal(true)}
+                  style={{ 
+                      marginTop: 16, padding: 20, borderRadius: 20, border: 'none', 
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#fff', 
+                      fontSize: '1.1rem', fontWeight: 700, letterSpacing: '0.5px',
+                      display: 'none', alignItems: 'center', justifyContent: 'center', gap: 12, cursor: 'pointer',
+                      boxShadow: '0 10px 20px -5px rgba(239, 68, 68, 0.4)', transition: 'transform 0.2s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                  <StopCircle size={24} /> FINALIZAR TREINO
+              </button>
+
+              {showSummaryModal && (
+                  <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(8px)' }} onClick={() => setShowSummaryModal(false)}>
+                      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', width: '100%', maxWidth: 500, maxHeight: '80vh', borderRadius: 24, padding: 0, display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+                          <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>Resumo do Treino</h2>
+                              <button onClick={() => setShowSummaryModal(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 36, height: 36, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={20}/></button>
+                          </div>
+                          <div style={{ padding: 24, overflowY: 'auto' }}>
+                              <div style={{ display: 'grid', gap: 16 }}>
+                                  {session.workout.data.exercises.map((ex, i) => (
+                                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f8fafc', paddingBottom: 12 }}>
+                                          <div>
+                                              <div style={{ fontWeight: 600, color: '#334155', marginBottom: 4 }}>{ex.name}</div>
+                                              <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{ex.series} séries x {ex.reps} reps</div>
+                                          </div>
+                                          <div style={{ textAlign: 'right', fontSize: '0.85rem', color: '#64748b' }}>
+                                              <div style={{ fontWeight: 600, color: '#3b82f6' }}>{ex.load}</div>
+                                              <div>{ex.rest}</div>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                          <div style={{ padding: 24, borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
+                              <button onClick={() => setShowSummaryModal(false)} style={{ width: '100%', padding: 16, background: '#0f172a', color: '#fff', border: 'none', borderRadius: 16, fontWeight: 700, cursor: 'pointer' }}>Voltar ao Treino</button>
+                          </div>
+                      </div>
+                  </div>
+              )}
+
+              {showFinishModal && (
+                  <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(8px)' }}>
+                      <div style={{ background: '#fff', width: '100%', maxWidth: 400, borderRadius: 24, padding: 32, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+                          <h2 style={{ marginTop: 0, color: '#0f172a', fontSize: '1.5rem', letterSpacing: '-0.5px' }}>Treino Finalizado?</h2>
+                          <p style={{ color: '#64748b', marginBottom: 24, lineHeight: 1.5 }}>Registre como você se sentiu para seu personal acompanhar sua evolução.</p>
+                          
+                          <textarea 
+                              value={sessionNotes} 
+                              onChange={e => setSessionNotes(e.target.value)} 
+                              placeholder="Ex: Aumentei carga no supino, senti o ombro..." 
+                              style={{ 
+                                  width: '100%', minHeight: 120, padding: 16, borderRadius: 16, 
+                                  border: '1px solid #e2e8f0', marginBottom: 24, fontFamily: 'inherit', 
+                                  fontSize: '1rem', resize: 'vertical', boxSizing: 'border-box',
+                                  background: '#f8fafc', color: '#334155'
+                              }} 
+                          />
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                              <button onClick={() => setShowFinishModal(false)} style={{ padding: '16px', borderRadius: 16, border: 'none', background: '#f1f5f9', fontWeight: 700, cursor: 'pointer', color: '#64748b' }}>Cancelar</button>
+                              <button onClick={handleConfirmFinish} style={{ padding: '16px', borderRadius: 16, border: 'none', background: '#10b981', color: '#fff', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}>Salvar e Finalizar</button>
+                          </div>
+                      </div>
+                  </div>
+              )}
+          </div>
+      )
+  }
+
+  // --- Renderização da Lista (Design Moderno & Clean) ---
+
+  return (
+    <>
+      <div style={{ padding: 24, maxWidth: 800, margin: '0 auto', fontFamily: 'Inter, system-ui, sans-serif' }}>
+        
+        {/* Frequência de Treinos */}
+        <div style={{ background: '#fff', borderRadius: 24, padding: '24px', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.05)', marginBottom: 32, border: '1px solid rgba(0,0,0,0.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h2 style={{ fontSize: '1.1rem', color: '#0f172a', margin: 0, fontWeight: 800, letterSpacing: '-0.5px' }}>Frequência Semanal</h2>
+                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>{weeklyFreq} / {Object.keys(schedule).length || 5} treinos</span>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', marginTop: 12 }}>
+                {/* Linha de conexão sutil */}
+                <div style={{ position: 'absolute', top: 22, left: 24, right: 24, height: 3, background: '#f1f5f9', zIndex: 0, borderRadius: 2 }} />
+                
+                {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, i) => {
+                    const isActive = activeDays.includes(i)
+                    const todayIndex = new Date().getDay()
+                    const isToday = i === todayIndex
+                    const isPast = i < todayIndex
+
+                    let bg = '#fff'
+                    let border = '2px solid #e2e8f0'
+                    let color = '#94a3b8'
+                    let content = null
+                    let shadow = 'none'
+                    let scale = 1
+
+                    if (isActive) {
+                        bg = '#10b981'
+                        border = '2px solid #10b981'
+                        color = '#fff'
+                        content = <CheckCircle size={20} strokeWidth={3} />
+                        shadow = '0 4px 12px rgba(16, 185, 129, 0.4)'
+                        scale = 1.1
+                    } else if (isPast) {
+                        bg = '#fff'
+                        border = '2px solid #fecaca'
+                        color = '#ef4444'
+                        content = <X size={20} strokeWidth={3} />
+                    } else if (isToday) {
+                        bg = '#fff'
+                        border = '2px solid #3b82f6'
+                        color = '#3b82f6'
+                        content = <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#3b82f6' }} />
+                        shadow = '0 0 0 4px rgba(59, 130, 246, 0.15)'
+                        scale = 1.1
+                    }
+
+                    return (
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, zIndex: 1, position: 'relative', flex: 1 }}>
+                            <div style={{ 
+                                width: 48, height: 48, borderRadius: '50%', 
+                                border: border, background: bg, 
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: color, boxShadow: shadow, 
+                                transform: `scale(${scale})`,
+                                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                            }}>
+                                {content}
+                            </div>
+                            <span style={{ fontSize: '0.8rem', color: isToday ? '#3b82f6' : '#64748b', fontWeight: isToday ? 800 : 600 }}>{day}</span>
+                        </div>
+                    )
+                })}
+            </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+            <h1 style={{ fontSize: '1.5rem', color: '#0f172a', margin: 0, fontWeight: 800, letterSpacing: '-0.5px' }}>Seus Treinos</h1>
+            <div style={{ fontSize: '0.9rem', color: '#64748b' }}>{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric' })}</div>
+        </div>
+
+        {workouts.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8', background: '#f8fafc', borderRadius: 24, border: '2px dashed #e2e8f0' }}>
+                <Dumbbell size={48} style={{ opacity: 0.2, marginBottom: 16 }} />
+                <p>Nenhum treino encontrado para hoje.</p>
+            </div>
+        ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                {workoutsByDay.map(group => (
+                    <div key={group.dayKey} style={{ background: '#fff', borderRadius: 24, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ padding: '24px', borderBottom: '1px solid #f8fafc' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '1.4rem', color: '#0f172a', fontWeight: 700, letterSpacing: '-0.5px' }}>{group.label}</h3>
+                                    {group.workouts[0]?.data.goal && (
+                                        <p style={{ margin: '6px 0 0 0', color: '#64748b', fontSize: '0.95rem' }}>
+                                            Foco: <span style={{ color: '#3b82f6', fontWeight: 600 }}>{group.workouts[0].data.goal}</span>
+                                        </p>
+                                    )}
+                                </div>
+                                <div style={{ background: '#f1f5f9', padding: '8px 12px', borderRadius: 12, fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>
+                                    {group.workouts.length} {group.workouts.length === 1 ? 'treino' : 'treinos'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style={{ padding: 24 }}>
+                            {group.workouts.map(w => (
+                                <div key={w.id} style={{ marginBottom: 16 }}>
+                                    <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', color: '#334155' }}>{w.title}</h4>
+                                    <button 
+                                        onClick={() => setSelectedWorkout(w)}
+                                        style={{ 
+                                            width: '100%', padding: '18px', borderRadius: 16, border: 'none', 
+                                            background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)', color: '#fff', 
+                                            fontSize: '1rem', fontWeight: 700, cursor: 'pointer', 
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                            boxShadow: '0 8px 16px -4px rgba(14, 165, 233, 0.3)',
+                                            transition: 'transform 0.2s'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                                    >
+                                        VER TREINO
+                                        <div style={{ background: 'rgba(255,255,255,0.2)', padding: 6, borderRadius: 8, display: 'flex' }}>
+                                            <ArrowRight size={18} />
+                                        </div>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+                
+                {/* Outros Treinos */}
+                {unscheduledWorkouts.length > 0 && (
+                    <div style={{ marginTop: 24 }}>
+                         <h3 style={{ fontSize: '1.1rem', color: '#64748b', margin: '0 0 20px 0', fontWeight: 600 }}>Outros Treinos Disponíveis</h3>
+                         <div style={{ display: 'grid', gap: 16 }}>
+                            {unscheduledWorkouts.map(w => (
+                                <div key={w.id} style={{ background: '#fff', padding: 20, borderRadius: 20, border: '1px solid #f1f5f9', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h4 style={{ margin: 0, color: '#0f172a', fontSize: '1.1rem' }}>{w.title}</h4>
+                                        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>{w.data.exercises.length} exercícios</span>
+                                    </div>
+                                    <button 
+                                        onClick={() => setSelectedWorkout(w)}
+                                        style={{ padding: '12px 20px', background: '#f8fafc', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 12, fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}
+                                    >
+                                        Ver
+                                    </button>
+                                </div>
+                            ))}
+                         </div>
+                    </div>
+                )}
+            </div>
+        )}
+
+        {/* Modal de Detalhes Estilo MFIT (Clean & Modern) */}
+        {selectedWorkout && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#f8fafc', zIndex: 2000, display: 'flex', flexDirection: 'column' }}>
+                {/* Header Azul Moderno - Ponta a Ponta Compacto */}
+                <div style={{ 
+                    background: 'linear-gradient(135deg, #1e3a8a 0%, #172554 100%)', 
+                    padding: '12px 20px 20px 20px', color: '#fff',
+                    borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
+                    boxShadow: '0 4px 12px -2px rgba(30, 58, 138, 0.3)',
+                    flexShrink: 0
+                }}>
+                    <div>
+                        <button onClick={() => setSelectedWorkout(null)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', cursor: 'pointer', marginBottom: 32, padding: '6px 12px', borderRadius: 20, width: 'fit-content' }}>
+                            <ChevronLeft size={16} /> Voltar
+                        </button>
+                        
+                        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1.1 }}>{selectedWorkout.title}</h1>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12, opacity: 0.9 }}>
+                            {selectedWorkout.data.goal && <span style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)', padding: '4px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)' }}>{selectedWorkout.data.goal}</span>}
+                            <span style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)', padding: '4px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)' }}>{selectedWorkout.data.exercises.length} exercícios</span>
+                        </div>
+                        
+                        <div style={{ marginTop: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+                            <div style={{ width: 90, height: 90, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(10px)', boxShadow: '0 8px 32px rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.2)', marginTop: -50, marginBottom: 16 }}>
+                                <Dumbbell size={44} color="#fff" strokeWidth={1.5} />
+                            </div>
+
+                            {activeDays.includes(new Date().getDay()) ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <div style={{ 
+                                        background: '#fff', padding: '12px 28px', borderRadius: 30, 
+                                        textAlign: 'center', fontWeight: 700, color: '#15803d', 
+                                        boxShadow: '0 4px 20px rgba(0,0,0,0.08)', width: 'fit-content', margin: '0 auto',
+                                        display: 'flex', alignItems: 'center', gap: 10, minWidth: 220, justifyContent: 'center', fontSize: '0.9rem',
+                                        border: '1px solid #f0fdf4'
+                                    }}>
+                                        <CheckCircle size={18} color="#16a34a" strokeWidth={2.5} />
+                                        TREINO REALIZADO
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ textAlign: 'center' }}>
+                                    <button 
+                                        onClick={() => handleStartSession(selectedWorkout)}
+                                        style={{ 
+                                            width: '100%', 
+                                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                                            color: '#fff', border: 'none', 
+                                            padding: '16px 32px', borderRadius: 16, fontSize: '1rem', fontWeight: 800, 
+                                            textTransform: 'uppercase', cursor: 'pointer', 
+                                            boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.4), 0 4px 10px -5px rgba(16, 185, 129, 0.2)',
+                                            letterSpacing: '1px', transition: 'all 0.2s ease', maxWidth: 320,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12
+                                        }}
+                                        onMouseEnter={e => {
+                                            e.currentTarget.style.transform = 'translateY(-2px)'
+                                            e.currentTarget.style.boxShadow = '0 15px 30px -5px rgba(16, 185, 129, 0.5)'
+                                        }}
+                                        onMouseLeave={e => {
+                                            e.currentTarget.style.transform = 'translateY(0)'
+                                            e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(16, 185, 129, 0.4)'
+                                        }}
+                                    >
+                                        <Play size={20} fill="currentColor" /> INICIAR TREINO
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Lista de Exercícios OTIMIZADA */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+                    <div style={{ maxWidth: 800, margin: '0 auto' }}>
+                        {selectedWorkout.data.exercises.map((ex, i) => (
+                            <div key={i} style={{ background: '#fff', borderRadius: 16, padding: '16px 16px 16px 24px', marginBottom: 16, display: 'flex', alignItems: 'stretch', gap: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden' }}>
+                                
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 20 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                                        <span style={{ fontSize: '1rem', fontWeight: 800, color: '#94a3b8', background: '#f8fafc', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', flexShrink: 0 }}>{i + 1}</span>
+                                        <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a', fontWeight: 800, lineHeight: 1.2 }}>{ex.name}</h3>
+                                    </div>
+                                    
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 44 }}>
+                                        {/* Aquecimento */}
+                                        {(ex.warmupSeries || ex.warmupReps) && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', color: '#64748b' }}>
+                                                    <span style={{ fontWeight: 600, color: '#ea580c' }}>Aquecimento:</span>
+                                                    <span style={{ fontWeight: 500 }}>{ex.warmupSeries} Séries {ex.warmupReps} Reps {ex.warmupLoad && `(${ex.warmupLoad})`}</span>
+                                                </div>
+                                                {ex.warmupRest && (
+                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: '#64748b', marginLeft: 16 }}>
+                                                         <Clock size={14} />
+                                                         <span>Descanso: {ex.warmupRest}</span>
+                                                     </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Feeder */}
+                                        {(ex.feederSeries || ex.feederReps) && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', color: '#64748b' }}>
+                                                    <span style={{ fontWeight: 600, color: '#0284c7' }}>Preparação:</span>
+                                                    <span style={{ fontWeight: 500 }}>{ex.feederSeries} Séries {ex.feederReps} Reps {ex.feederLoad && `(${ex.feederLoad})`}</span>
+                                                </div>
+                                                {ex.feederRest && (
+                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: '#64748b', marginLeft: 16 }}>
+                                                         <Clock size={14} />
+                                                         <span>Descanso: {ex.feederRest}</span>
+                                                     </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Working Sets */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1.1rem', color: '#334155' }}>
+                                            <span style={{ fontWeight: 800, color: '#0f172a' }}>Trabalho:</span>
+                                            <span style={{ fontWeight: 600 }}>{ex.series} Séries {ex.reps} Reps</span> 
+                                        </div>
+                                        
+                                        {ex.load && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1.1rem', color: '#334155' }}>
+                                                <span style={{ fontWeight: 800, color: '#0f172a' }}>Carga:</span>
+                                                <span style={{ fontWeight: 600 }}>{ex.load}</span>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Descanso/Obs */}
+                                        {(ex.rest || ex.notes) && (
+                                            <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                {ex.rest && (
+                                                    <div style={{ fontSize: '0.9rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <Clock size={16} /> 
+                                                        <span>Descanso: {ex.rest}</span>
+                                                    </div>
+                                                )}
+                                                {ex.notes && (
+                                                    <div style={{ fontSize: '0.85rem', color: '#64748b', background: '#fff7ed', padding: '8px 12px', borderRadius: 8, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                                        <MessageSquare size={16} style={{ marginTop: 2, flexShrink: 0, color: '#f97316' }} /> 
+                                                        <span style={{ color: '#c2410c' }}>{ex.notes}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {/* Video Player Vertical Maior */}
+                                {ex.videoUrl ? (
+                                    <div style={{ width: 180, height: 240, borderRadius: 12, overflow: 'hidden', background: '#000', flexShrink: 0, position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                                        {(() => {
+                                            const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
+                                            
+                                            if (isYoutube) {
+                                                const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
+                                                return (
+                                                    <>
+                                                        <iframe 
+                                                            src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&controls=0`} 
+                                                            title={ex.name}
+                                                            style={{ width: '100%', height: '100%', border: 'none', objectFit: 'cover' }}
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                                            allowFullScreen
+                                                        />
+                                                        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', background: 'rgba(0,0,0,0.3)', borderRadius: '50%', padding: 12 }}>
+                                                            <Play size={32} fill="#fff" color="#fff" />
+                                                        </div>
+                                                    </>
+                                                );
+                                            } else {
+                                                return (
+                                                    <video 
+                                                        src={ex.videoUrl} 
+                                                        controls 
+                                                        playsInline
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                    />
+                                                );
+                                            }
+                                        })()}
+                                    </div>
+                                ) : (
+                                    <div style={{ 
+                                        width: 180, height: 240, borderRadius: 12, overflow: 'hidden', position: 'relative',
+                                        background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        border: '1px solid #e2e8f0', flexShrink: 0
+                                    }}>
+                                        <Dumbbell size={40} color="#cbd5e1" />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        <div style={{ height: 40 }} /> {/* Espaço extra no final */}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {showSuccessModal && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(4px)' }}>
+                <div style={{ background: '#fff', width: '100%', maxWidth: 360, borderRadius: 24, padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', animation: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
+                    <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+                        <div style={{ fontSize: '2.5rem' }}>🎉</div>
+                    </div>
+                    <h2 style={{ margin: '0 0 8px 0', color: '#0f172a', fontSize: '1.5rem' }}>Treino Concluído!</h2>
+                    <p style={{ margin: '0 0 24px 0', color: '#64748b', fontSize: '1rem', lineHeight: 1.5 }}>Parabéns! Mais um passo em direção ao seu objetivo. Continue assim! 💪</p>
+                    <button onClick={() => setShowSuccessModal(false)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '14px 32px', borderRadius: 16, fontSize: '1rem', fontWeight: 700, cursor: 'pointer', width: '100%', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.4)' }}>Fechar</button>
+                </div>
+                <style>{`@keyframes popIn { from { opacity: 0; transform: scale(0.8) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }`}</style>
+            </div>
+        )}
+      </div>
+    </>
+  )
+}
