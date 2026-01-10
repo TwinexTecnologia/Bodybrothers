@@ -85,7 +85,7 @@ export default function Login() {
             borderRadius: 16, 
             background: '#fff', 
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', 
-            marginTop: -60, // Ajustado para a nova proporção
+            marginTop: -100, // Subi de -60 para -100 para grudar mais
             zIndex: 10, 
             position: 'relative',
             boxSizing: 'border-box'
