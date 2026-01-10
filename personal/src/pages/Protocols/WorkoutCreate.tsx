@@ -304,7 +304,7 @@ export default function WorkoutCreate() {
 
       {/* Card de Informações Gerais */}
       <div className="form-card" style={{ padding: 20, marginBottom: 24, borderLeft: '4px solid var(--personal-primary)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 16 }}>
+        <div className="workout-header-grid">
             <label className="label">
                 Nome do Treino
                 <input className="input" style={{ fontSize: '1.1em', fontWeight: 600 }} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Treino A - Peito e Tríceps" />
@@ -313,7 +313,7 @@ export default function WorkoutCreate() {
                 Objetivo
                 <input className="input" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Ex: Hipertrofia" />
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div className="form-grid">
                 <label className="label">
                     Data
                     <input className="input" type="date" value={createdAt} onChange={(e) => setCreatedAt(e.target.value)} />

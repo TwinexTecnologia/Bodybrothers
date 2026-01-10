@@ -43,6 +43,12 @@ body { margin: 0; background: var(--personal-bg); color: var(--personal-text); f
     border-bottom: 1px solid #f1f5f9;
 }
 
+.workout-header-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 16px;
+}
+
 @media (max-width: 900px) {
   /* Tablet: Sidebar compacta (se não for mobile) */
   .app-shell { grid-template-columns: 70px 1fr }
@@ -81,7 +87,7 @@ body { margin: 0; background: var(--personal-bg); color: var(--personal-text); f
   .content { padding: 12px; } /* Menos padding no mobile */
   
   /* Ajuste de formulários e cards para mobile */
-  .form-grid, .form-grid-3, .diet-header, .food-row, .food-header, .supplement-row {
+  .form-grid, .form-grid-3, .diet-header, .food-row, .food-header, .supplement-row, .workout-header-grid {
       grid-template-columns: 1fr !important;
       gap: 8px;
   }
