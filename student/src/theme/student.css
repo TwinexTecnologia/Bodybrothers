@@ -2,12 +2,12 @@
   --student-bg: #f8fafc;
   --student-text: #111827;
   
-  /* Sidebar Colors (Inspirado no Personal mas adaptável) */
+  /* Sidebar Colors */
   --sidebar-bg: #0f172a;
   --sidebar-hover: #1e293b;
   --sidebar-text: #e2e8f0;
-  --sidebar-active-bg: rgba(59, 130, 246, 0.15); /* Azul translúcido */
-  --sidebar-active-text: #60a5fa; /* Azul claro */
+  --sidebar-active-bg: rgba(59, 130, 246, 0.15);
+  --sidebar-active-text: #60a5fa;
   
   --student-card: #ffffff;
   --student-border: #e2e8f0;
@@ -17,22 +17,168 @@ body {
   background-color: var(--student-bg);
   color: var(--student-text);
   margin: 0;
+  font-family: 'Inter', sans-serif;
 }
 
+/* Estrutura Desktop */
 .app-shell {
-  display: grid;
-  grid-template-columns: 260px 1fr;
+  display: flex;
   min-height: 100vh;
 }
 
-/* Responsivo para mobile */
+.sidebar {
+  width: 260px;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--student-border);
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  transition: transform 0.3s ease;
+}
+
+.main-content {
+  margin-left: 260px;
+  flex: 1;
+  padding: 32px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mobile-topbar {
+  display: none; /* Escondido no Desktop */
+}
+
+/* Exercise Card Responsive */
+.exercise-card-content {
+  display: flex;
+  align-items: stretch;
+  gap: 24px;
+}
+
+.video-container {
+  width: 180px;
+  height: 240px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  flex-shrink: 0;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.frequency-scroll {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.mobile-stack {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+/* Responsivo Mobile */
 @media (max-width: 768px) {
   .app-shell {
-    grid-template-columns: 1fr; /* Sidebar vira menu hamburguer ou bottom bar se preferir */
-    /* Mas como o usuário pediu "estilo o do personal", vamos manter sidebar no desktop e adaptar no mobile depois se precisar.
-       Por enquanto, vou fazer responsivo básico escondendo a sidebar ou transformando. 
-       Mas o usuário disse "deixa esses menus no meio da tela mais modernizado" antes, agora "barra lateral".
-       Vou focar no desktop com sidebar fixa.
-    */
+    display: block;
   }
+
+  .sidebar {
+    transform: translateX(-100%); /* Esconde sidebar */
+    width: 280px;
+    box-shadow: 4px 0 16px rgba(0,0,0,0.2);
+  }
+
+  .sidebar.open {
+    transform: translateX(0); /* Mostra sidebar */
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 16px;
+    padding-top: 80px; /* Espaço para a topbar fixa */
+  }
+
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: #fff;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--student-border);
+    z-index: 900;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+
+  /* Ajustes gerais de layout mobile */
+  h1 { font-size: 1.5rem !important; }
+  h2 { font-size: 1.25rem !important; }
+  
+  /* Tabelas com scroll */
+  .table-container {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+  }
+
+  /* Exercise Card Stack */
+  .exercise-card-content {
+      flex-direction: column-reverse;
+  }
+  
+  .video-container {
+      width: 100% !important;
+      height: auto !important;
+      aspect-ratio: 16/9;
+      max-height: 300px;
+  }
+
+  .frequency-scroll {
+      overflow-x: auto;
+      padding-bottom: 12px;
+      justify-content: flex-start;
+      gap: 16px;
+  }
+  
+  .frequency-scroll > div {
+      min-width: 60px;
+  }
+  
+  /* Timer gigante no modo treino */
+  .timer-display {
+      font-size: 2.5rem !important;
+  }
+
+  /* Mobile Stack (Financial, etc) */
+  .mobile-stack {
+      flex-direction: column;
+      align-items: flex-start !important;
+      gap: 16px;
+  }
+  
+  .mobile-stack > div:last-child {
+      text-align: left !important;
+  }
+}
+
+/* Overlay para mobile */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 999;
+  backdrop-filter: blur(2px);
 }

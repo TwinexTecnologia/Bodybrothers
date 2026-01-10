@@ -55,42 +55,34 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
   ]
 
   return (
-    <div className="app-shell" style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+    <div className="app-shell">
       
-      {/* Top Right Actions */}
-      <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999, display: 'flex', gap: 16, alignItems: 'center' }}>
+      {/* Mobile Topbar */}
+      <div className="mobile-topbar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button 
+                onClick={() => setMobileOpen(true)}
+                style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer' }}
+              >
+                  <Menu size={24} color="#111827" />
+              </button>
+              <span style={{ fontWeight: 600, fontSize: '1.1rem', color: '#111827' }}>
+                  BodyBrothers
+              </span>
+          </div>
           <NotificationBell />
-          
-          <button 
-            className="mobile-toggle"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            style={{ 
-                background: 'transparent', border: 'none', padding: 8, cursor: 'pointer',
-                color: '#64748b'
-            }}
-          >
-            {mobileOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
       </div>
 
-      <PaymentAlert />
-      <AnamnesisAlert />
+      {/* Overlay Mobile */}
+      {mobileOpen && (
+          <div 
+            className="sidebar-overlay"
+            onClick={() => setMobileOpen(false)}
+          />
+      )}
 
       {/* Sidebar */}
-      <aside 
-        style={{ 
-            width: 260, 
-            background: 'var(--sidebar-bg)', 
-            color: 'var(--sidebar-text)',
-            display: 'flex', flexDirection: 'column',
-            borderRight: '1px solid #e2e8f0',
-            position: 'fixed', top: 0, bottom: 0, left: 0,
-            zIndex: 1000,
-            transition: 'transform 0.3s ease',
-            // No mobile, transform translate se fechado. No desktop sempre visível.
-            // Vou simplificar assumindo desktop-first aqui como pedido "estilo personal"
-        }}
-      >
+      <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
         <div style={{ padding: 24, display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#fff', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(255,255,255,0.2)' }}>
                 {brandLogo ? (
@@ -99,7 +91,6 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
                         alt="Avatar"
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                         onError={(e) => {
-                            console.log('Erro ao carregar imagem:', brandLogo);
                             e.currentTarget.style.display = 'none';
                             e.currentTarget.parentElement!.innerText = '👤';
                         }}
@@ -111,6 +102,17 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
             <span style={{ fontWeight: 600, fontSize: '1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {brandTitle}
             </span>
+            {/* Fechar Mobile */}
+            <button 
+                className="mobile-close-btn"
+                onClick={() => setMobileOpen(false)}
+                style={{ 
+                    marginLeft: 'auto', background: 'transparent', border: 'none', 
+                    color: '#fff', cursor: 'pointer', display: 'none' // CSS controla display no mobile
+                }}
+            >
+                <X size={24} />
+            </button>
         </div>
 
         <nav style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -120,6 +122,7 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
                     <NavLink 
                         key={item.path} 
                         to={item.path}
+                        onClick={() => setMobileOpen(false)} // Fecha ao clicar
                         style={{
                             display: 'flex', alignItems: 'center', gap: 12,
                             padding: '12px 16px', borderRadius: 8,
@@ -148,8 +151,6 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
                     transition: 'background 0.2s',
                     textAlign: 'left'
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
                 <LogOut size={20} />
                 Sair
@@ -158,16 +159,26 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
       </aside>
 
       {/* Main Content Area */}
-      <main style={{ 
-          marginLeft: 260, // Largura da sidebar
-          flex: 1, 
-          padding: 32,
-          maxWidth: 1200,
-          width: '100%'
-      }}>
+      <main className="main-content">
+        <PaymentAlert />
+        <AnamnesisAlert />
+        
+        {/* Desktop Notification (escondido no mobile pois já está na topbar) */}
+        <div style={{ position: 'absolute', top: 20, right: 20, display: 'none' }} className="desktop-notification">
+             <NotificationBell />
+        </div>
+        
         {children || <Outlet />}
       </main>
 
+      <style>{`
+        @media (min-width: 769px) {
+            .desktop-notification { display: block !important; }
+        }
+        @media (max-width: 768px) {
+            .mobile-close-btn { display: block !important; }
+        }
+      `}</style>
     </div>
   )
 }

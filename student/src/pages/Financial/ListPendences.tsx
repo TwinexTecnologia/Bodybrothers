@@ -55,7 +55,7 @@ export default function ListPendences() {
                         </span>
                     </div>
                     <div style={{ padding: 24 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
+                        <div className="mobile-stack" style={{ marginBottom: 24 }}>
                             <div>
                                 <h3 style={{ margin: '0 0 4px 0', fontSize: '1.5rem', color: '#0f172a' }}>{plan.title}</h3>
                                 <p style={{ margin: 0, color: '#64748b' }}>Cobrança {freqLabel.toLowerCase()}</p>

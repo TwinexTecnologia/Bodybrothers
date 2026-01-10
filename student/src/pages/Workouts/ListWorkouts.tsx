@@ -292,7 +292,7 @@ export default function ListWorkouts() {
                       </button>
                   </div>
                   <h1 style={{ fontSize: '2rem', color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>{session.workout.title}</h1>
-                  <div style={{ fontSize: '3.5rem', fontWeight: 800, color: '#3b82f6', fontFamily: 'monospace', letterSpacing: '-2px', lineHeight: 1 }}>
+                  <div className="timer-display" style={{ fontSize: '3.5rem', fontWeight: 800, color: '#3b82f6', fontFamily: 'monospace', letterSpacing: '-2px', lineHeight: 1 }}>
                       {formatTime(session.elapsedSeconds)}
                   </div>
               </header>
@@ -524,7 +524,7 @@ export default function ListWorkouts() {
                 <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>{weeklyFreq} / {Object.keys(schedule).length || 5} treinos</span>
             </div>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', marginTop: 12 }}>
+            <div className="frequency-scroll">
                 {/* Linha de conexão sutil */}
                 <div style={{ position: 'absolute', top: 22, left: 24, right: 24, height: 3, background: '#f1f5f9', zIndex: 0, borderRadius: 2 }} />
                 
@@ -848,14 +848,14 @@ export default function ListWorkouts() {
                                         })()}
                                     </div>
                                 ) : (
-                                    <div style={{ 
-                                        width: 180, height: 240, borderRadius: 12, overflow: 'hidden', position: 'relative',
+                                    <div className="video-container" style={{ 
                                         background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         border: '1px solid #e2e8f0', flexShrink: 0
                                     }}>
                                         <Dumbbell size={40} color="#cbd5e1" />
                                     </div>
                                 )}
+                                </div>
                             </div>
                         ))}
                         <div style={{ height: 40 }} /> {/* Espaço extra no final */}
