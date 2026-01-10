@@ -184,7 +184,7 @@ export default function Login() {
                 </form>
             )}
         </div>
-        <div style={{ color: '#64748b', fontSize: '0.875rem', marginTop: 30 }}>
+        <div style={{ color: '#64748b', fontSize: '0.875rem', marginTop: 10 }}>
             &copy; {new Date().getFullYear()} Twinex Tecnologia. Todos os direitos reservados.
         </div>
       </div>
