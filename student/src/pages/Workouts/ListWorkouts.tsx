@@ -856,7 +856,6 @@ export default function ListWorkouts() {
                                         <Dumbbell size={40} color="#cbd5e1" />
                                     </div>
                                 )}
-                                </div>
                             </div>
                         ))}
                         <div style={{ height: 40 }} /> {/* Espaço extra no final */}
