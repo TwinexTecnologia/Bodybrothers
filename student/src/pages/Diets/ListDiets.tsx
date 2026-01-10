@@ -51,6 +51,9 @@ export default function ListDiets() {
   // Estado para acordeão de refeições (índices abertos)
   const [openMeals, setOpenMeals] = useState<number[]>([])
   
+  // Bloqueio de inativos
+  const [isBlocked, setIsBlocked] = useState(false)
+  
   const printRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -64,10 +67,16 @@ export default function ListDiets() {
         // 1. Busca perfil para ver IDs vinculados
         const { data: profile } = await supabase
             .from('profiles')
-            .select('data')
+            .select('data, status')
             .eq('id', user?.id)
             .single()
         
+        if (profile?.status !== 'active') {
+            setIsBlocked(true)
+            setLoading(false)
+            return
+        }
+
         const linkedIds = profile?.data?.dietIds || []
 
         // 2. Monta query
@@ -180,6 +189,23 @@ export default function ListDiets() {
   }, [selectedDiet])
 
   if (loading) return <div style={{ padding: 24 }}>Carregando dietas...</div>
+
+  if (isBlocked) {
+      return (
+          <div style={{ padding: 40, textAlign: 'center', marginTop: 60 }}>
+              <div style={{ background: '#fef2f2', padding: 32, borderRadius: 24, border: '1px solid #fee2e2' }}>
+                  <div style={{ background: '#fee2e2', width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto' }}>
+                      <X size={32} color="#dc2626" />
+                  </div>
+                  <h2 style={{ color: '#991b1b', marginBottom: 12 }}>Acesso Bloqueado</h2>
+                  <p style={{ color: '#b91c1c', lineHeight: 1.6 }}>
+                      Sua conta está inativa no momento.<br/>
+                      Entre em contato com seu personal trainer para regularizar seu acesso à dieta.
+                  </p>
+              </div>
+          </div>
+      )
+  }
 
   return (
     <>

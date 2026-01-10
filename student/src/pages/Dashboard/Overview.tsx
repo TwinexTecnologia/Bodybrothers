@@ -17,6 +17,9 @@ export default function Overview() {
     name: ''
   })
   
+  // Bloqueio de inativos
+  const [isBlocked, setIsBlocked] = useState(false)
+  
   const [showModal, setShowModal] = useState(false)
 
   useEffect(() => {
@@ -34,9 +37,13 @@ export default function Overview() {
         // 1. Perfil (Nome) e Dados JSON
         const { data: profile } = await supabase
             .from('profiles')
-            .select('full_name, data')
+            .select('full_name, data, status')
             .eq('id', user?.id)
             .single()
+        
+        if (profile?.status !== 'active') {
+            setIsBlocked(true)
+        }
 
         // 2. Contagem REAL de Treinos e Dietas (Sincronizado com a listagem)
         const workoutIds = profile?.data?.workoutIds || []
@@ -151,6 +158,14 @@ export default function Overview() {
     </div>
   )
 
+  const handleNavigate = (path: string) => {
+      if (isBlocked) {
+          alert('Acesso restrito. Sua conta está inativa. Contate seu personal.')
+          return
+      }
+      navigate(path)
+  }
+
   return (
     <>
       <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
@@ -188,7 +203,7 @@ export default function Overview() {
                                     O formulário <strong>"{stats.anamnesisName}"</strong> precisa ser atualizado.
                                 </div>
                                 <button 
-                                    onClick={() => navigate('/anamnesis')}
+                                    onClick={() => handleNavigate('/anamnesis')}
                                     style={{ width: '100%', padding: '10px', background: '#ea580c', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
                                 >
                                     Atualizar Agora
@@ -205,7 +220,7 @@ export default function Overview() {
                                     Plano <strong>{stats.financialPending.title}</strong> - R$ {stats.financialPending.amount.toFixed(2)}
                                 </div>
                                 <button 
-                                    onClick={() => navigate('/financial')}
+                                    onClick={() => handleNavigate('/financial')}
                                     style={{ width: '100%', padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
                                 >
                                     Regularizar
@@ -223,7 +238,7 @@ export default function Overview() {
                 marginBottom: 32, padding: 16, borderRadius: 12, 
                 background: '#fff7ed', border: '1px solid #fed7aa', color: '#c2410c',
                 display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer'
-            }} onClick={() => navigate('/anamnesis')}>
+            }} onClick={() => handleNavigate('/anamnesis')}>
                 <AlertCircle size={24} />
                 <div style={{ flex: 1 }}>
                     <strong>Atenção:</strong> Sua anamnese pode estar desatualizada. Clique aqui para responder uma nova.
@@ -239,7 +254,7 @@ export default function Overview() {
                 value={stats.workouts} 
                 icon={Dumbbell} 
                 color="#3b82f6" 
-                onClick={() => navigate('/workouts')}
+                onClick={() => handleNavigate('/workouts')}
                 subtitle={stats.workouts > 0 ? 'Clique para ver seus treinos' : 'Nenhum treino ativo'}
             />
             
@@ -248,7 +263,7 @@ export default function Overview() {
                 value={stats.diets} 
                 icon={Utensils} 
                 color="#10b981" 
-                onClick={() => navigate('/diets')}
+                onClick={() => handleNavigate('/diets')}
                 subtitle={stats.diets > 0 ? 'Clique para ver seu plano alimentar' : 'Nenhuma dieta ativa'}
             />
 
@@ -261,7 +276,7 @@ export default function Overview() {
                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600 }}>Pronto para treinar?</h3>
                 <p style={{ margin: '8px 0 24px 0', color: '#94a3b8' }}>Acesse seu treino de hoje e registre seu progresso.</p>
                 <button 
-                    onClick={() => navigate('/workouts')}
+                    onClick={() => handleNavigate('/workouts')}
                     style={{ 
                         background: '#3b82f6', color: '#fff', border: 'none', padding: '12px 24px', 
                         borderRadius: 8, fontWeight: 600, cursor: 'pointer', width: '100%',

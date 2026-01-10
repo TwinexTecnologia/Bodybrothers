@@ -36,32 +36,10 @@ export default function Login() {
             }
         } else {
             // Lógica de Login
-            const ok = await login(email.trim(), pass)
-            
-            if (ok) {
-                // Verificar se o aluno está ATIVO
-                const { data: authData } = await supabase.auth.getUser()
-                if (authData?.user) {
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('status')
-                        .eq('id', authData.user.id)
-                        .single()
-                    
-                    // Se não estiver ativo, bloqueia
-                    if (profile && profile.status !== 'active') {
-                        await supabase.auth.signOut()
-                        setError('Sua conta está inativa. Entre em contato com seu personal.')
-                        setLoading(false)
-                        return
-                    }
-                }
-                
-                navigate('/dashboard/overview', { replace: true })
-            } else {
-                setError('Credenciais inválidas')
+                const ok = await login(email.trim(), pass)
+                if (ok) navigate('/dashboard/overview', { replace: true })
+                else setError('Credenciais inválidas')
             }
-        }
     } catch (err: any) {
         setError(err.message || 'Erro inesperado')
     } finally {

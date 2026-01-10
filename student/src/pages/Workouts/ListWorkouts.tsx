@@ -82,6 +82,9 @@ export default function ListWorkouts() {
   // Frequência
   const [weeklyFreq, setWeeklyFreq] = useState(0)
   const [activeDays, setActiveDays] = useState<number[]>([])
+  
+  // Status de bloqueio
+  const [isBlocked, setIsBlocked] = useState(false)
 
   // Sessão
   const [session, setSession] = useState<SessionState>({ active: false, elapsedSeconds: 0 })
@@ -121,8 +124,14 @@ export default function ListWorkouts() {
   async function loadData() {
     try {
         setLoading(true)
-        const { data: profile } = await supabase.from('profiles').select('data').eq('id', user?.id).single()
+        const { data: profile } = await supabase.from('profiles').select('data, status').eq('id', user?.id).single()
         
+        if (profile?.status !== 'active') {
+            setIsBlocked(true)
+            setLoading(false)
+            return
+        }
+
         const linkedIds = profile?.data?.workoutIds || []
         const sched = profile?.data?.workoutSchedule || {}
         setSchedule(sched)
@@ -486,6 +495,23 @@ export default function ListWorkouts() {
   }
 
   // --- Renderização da Lista (Design Moderno & Clean) ---
+  
+  if (isBlocked) {
+      return (
+          <div style={{ padding: 40, textAlign: 'center', marginTop: 60 }}>
+              <div style={{ background: '#fef2f2', padding: 32, borderRadius: 24, border: '1px solid #fee2e2' }}>
+                  <div style={{ background: '#fee2e2', width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto' }}>
+                      <X size={32} color="#dc2626" />
+                  </div>
+                  <h2 style={{ color: '#991b1b', marginBottom: 12 }}>Acesso Bloqueado</h2>
+                  <p style={{ color: '#b91c1c', lineHeight: 1.6 }}>
+                      Sua conta está inativa no momento.<br/>
+                      Entre em contato com seu personal trainer para regularizar seu acesso aos treinos.
+                  </p>
+              </div>
+          </div>
+      )
+  }
 
   return (
     <>

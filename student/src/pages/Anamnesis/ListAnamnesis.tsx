@@ -46,6 +46,9 @@ export default function ListAnamnesis() {
 
   // Estado de Visualização
   const [viewingResponse, setViewingResponse] = useState<{response: AnamnesisResponse, model?: AnamnesisModel} | null>(null)
+  
+  // Bloqueio de inativos
+  const [isBlocked, setIsBlocked] = useState(false)
 
   useEffect(() => {
     if (user) loadData()
@@ -55,6 +58,17 @@ export default function ListAnamnesis() {
     try {
         setLoading(true)
         
+        // Verificação de Status
+        const { data: profile } = await supabase
+             .from('profiles')
+             .select('status')
+             .eq('id', user?.id)
+             .single()
+         
+        if (profile?.status !== 'active') {
+             setIsBlocked(true)
+        }
+
         // 1. Busca Modelos Atribuídos ao Aluno
         const { data: modelsData } = await supabase
             .from('protocols')
@@ -92,6 +106,10 @@ export default function ListAnamnesis() {
   }
 
   const handleStartAnswering = (m: AnamnesisModel) => {
+    if (isBlocked) {
+        setErrorMessage('Sua conta está inativa. Contate seu personal para responder.')
+        return
+    }
     setAnsweringModel(m)
     setAnswers({})
   }
