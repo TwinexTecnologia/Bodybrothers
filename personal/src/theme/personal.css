@@ -34,6 +34,15 @@ body { margin: 0; background: var(--personal-bg); color: var(--personal-text); f
 .btn { background: var(--personal-button-bg); color: var(--personal-button-text); border: none; border-radius: 6px; padding: 8px 14px; cursor: pointer }
 .btn:hover { filter: brightness(0.95) }
 
+/* Grid de Exercícios (Treino Ativo) */
+.workout-exercise-row {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 0.8fr 0.8fr 0.8fr;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
 @media (max-width: 900px) {
   /* Tablet: Sidebar compacta (se não for mobile) */
   .app-shell { grid-template-columns: 70px 1fr }
@@ -77,12 +86,37 @@ body { margin: 0; background: var(--personal-bg); color: var(--personal-text); f
       gap: 8px;
   }
   
+  /* Exercícios em Card no Mobile */
+  .workout-exercise-row {
+      grid-template-columns: 1fr;
+      background: #f8fafc;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #e2e8f0;
+  }
+  
   .diet-header {
       align-items: flex-start;
   }
   
   .meal-header {
       flex-wrap: wrap;
+  }
+
+  /* Tabelas Responsivas */
+  .table-responsive {
+      display: block;
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Ajuste de Modais */
+  .modal-container {
+      width: 95% !important;
+      max-height: 90vh !important;
+      padding: 16px !important;
   }
 }
 
@@ -92,9 +126,9 @@ body { margin: 0; background: var(--personal-bg); color: var(--personal-text); f
 .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px }
 .form-section { margin-top: 16px; border-top: 1px solid var(--personal-border); padding-top: 16px }
 .label { color: var(--personal-text); font-size: 0.95rem; display: grid; gap: 6px }
-.input, .select, .textarea { padding: 10px 12px; border: 1px solid var(--personal-border); border-radius: 8px; font-size: 0.95rem; background: #fff }
+.input, .select, .textarea { padding: 10px 12px; border: 1px solid var(--personal-border); border-radius: 8px; font-size: 0.95rem; background: #fff; width: 100%; box-sizing: border-box; }
 .textarea { min-height: 80px }
-.form-actions { display: flex; gap: 10px; margin-top: 16px }
+.form-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
 .form-success { color: #0a7f2e; font-weight: 600 }
 
 @media (max-width: 780px) {

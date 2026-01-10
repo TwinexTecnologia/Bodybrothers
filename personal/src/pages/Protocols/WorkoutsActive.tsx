@@ -130,7 +130,7 @@ export default function WorkoutsActive() {
             <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
               <div style={{ fontWeight: 600 }}>Exercícios</div>
               {w.exercises.map((e, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr 0.8fr 0.8fr 0.8fr', gap: 8 }}>
+                <div key={i} className="workout-exercise-row">
                   <div>{e.name} • {e.group}</div>
                   <div>Séries: {e.series}</div>
                   <div>Reps: {e.reps}</div>

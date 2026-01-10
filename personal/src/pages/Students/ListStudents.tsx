@@ -149,22 +149,23 @@ export default function ListStudents() {
       </div>
       
       {loading ? <div>Carregando...</div> : (
-        <div style={{ display: 'grid', gap: 8 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.7fr 0.7fr 0.7fr 0.8fr 0.8fr 0.8fr 0.6fr 1.4fr', gap: 8, fontWeight: 600, padding: '6px 10px', fontSize: '0.85em', color: '#6b7280' }}>
-            <div>ALUNO</div>
-            <div>TREINOS</div>
-            <div>FREQ.</div>
-            <div>DIETAS</div>
-            <div>ANAMNESE</div>
-            <div>PLANO</div>
-            <div>FINANCEIRO</div>
-            <div>ÚLT. LOGIN</div>
-            <div>STATUS</div>
-            <div style={{ textAlign: 'right' }}>AÇÕES</div>
-            </div>
-            {filtered.map((s) => {
-            // Planos
-            const plan = plans.find(p => p.id === s.planId)
+        <div className="table-responsive">
+            <div style={{ display: 'grid', gap: 8, minWidth: 1200 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.7fr 0.7fr 0.7fr 0.8fr 0.8fr 0.8fr 0.6fr 1.4fr', gap: 8, fontWeight: 600, padding: '6px 10px', fontSize: '0.85em', color: '#6b7280' }}>
+                <div>ALUNO</div>
+                <div>TREINOS</div>
+                <div>FREQ.</div>
+                <div>DIETAS</div>
+                <div>ANAMNESE</div>
+                <div>PLANO</div>
+                <div>FINANCEIRO</div>
+                <div>ÚLT. LOGIN</div>
+                <div>STATUS</div>
+                <div style={{ textAlign: 'right' }}>AÇÕES</div>
+                </div>
+                {filtered.map((s) => {
+                // Planos
+                const plan = plans.find(p => p.id === s.planId)
             const finStatus = getFinancialStatus(s, plan, payments)
             
             const planStr = plan ? (
@@ -347,6 +348,7 @@ export default function ListStudents() {
             })}
             {filtered.length === 0 && <div>Nenhum aluno encontrado.</div>}
         </div>
+      </div>
       )}
 
       {selectedStudentForFeedback && (

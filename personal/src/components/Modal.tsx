@@ -38,9 +38,12 @@ export default function Modal({ isOpen, onClose, title, children, footer, width 
           background: '#fff',
           width: '90%',
           maxWidth: width,
+          maxHeight: '90vh', // Limite de altura para mobile
+          overflowY: 'auto', // Scroll interno
           borderRadius: '16px',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          overflow: 'hidden',
+          overflow: 'hidden', // Cuidado com overflow hidden + auto
+          display: 'flex', flexDirection: 'column', // Para scroll funcionar bem
           animation: 'scaleUp 0.2s ease-out',
           border: type === 'danger' ? '1px solid #fecaca' : '1px solid #e2e8f0'
         }}
@@ -74,7 +77,7 @@ export default function Modal({ isOpen, onClose, title, children, footer, width 
         </div>
 
         {/* Body */}
-        <div style={{ padding: '24px', color: '#475569', lineHeight: 1.6 }}>
+        <div style={{ padding: '24px', color: '#475569', lineHeight: 1.6, overflowY: 'auto', maxHeight: 'calc(90vh - 130px)' }}>
           {children}
         </div>
 
