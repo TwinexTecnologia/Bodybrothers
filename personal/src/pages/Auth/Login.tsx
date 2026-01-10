@@ -53,41 +53,42 @@ export default function Login() {
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        height: '100vh', 
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', // Fundo azul marinho degradê
+        minHeight: '100vh', // Mudado de height para minHeight
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
         fontFamily: 'Inter, sans-serif',
-        paddingBottom: '25vh' // Sobe MUITO o centro visual da tela
+        padding: '40px 20px', // Adicionado padding para evitar corte em mobile
+        boxSizing: 'border-box'
     }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, width: '100%' }}>
         {/* Logo Centralizada */}
-        <div style={{ textAlign: 'center', marginBottom: 0, zIndex: 1 }}> {/* zIndex menor */}
+        <div style={{ textAlign: 'center', marginBottom: 0, zIndex: 1 }}>
             <img 
                src="https://cdtouwfxwuhnlzqhcagy.supabase.co/storage/v1/object/public/system-assets/logo%20twinex.png" 
-               alt="BodyBrothers" 
+               alt="Logo" 
                style={{ 
-                   maxWidth: 400, // Logo Gigante
+                   maxWidth: 350, // Voltando para 350px
+                   width: '80%', // Voltando para 80%
                    height: 'auto', 
-                   filter: 'drop-shadow(0 0 25px rgba(56, 189, 248, 0.5))', // Glow mais forte
+                   filter: 'drop-shadow(0 0 25px rgba(56, 189, 248, 0.5))',
                }} 
                onError={(e) => {
                    e.currentTarget.style.display = 'none'
                    e.currentTarget.nextElementSibling?.removeAttribute('hidden')
                }} 
             />
-            <h1 hidden style={{ color: '#fff', margin: 0, fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-1px' }}>
-                <span style={{ color: '#38bdf8' }}>Body</span>Brothers
-            </h1>
         </div>
 
         <div className="login-card" style={{ 
-            width: 380, 
+            width: '100%',
+            maxWidth: 380, 
             padding: 32, 
             borderRadius: 16, 
             background: '#fff', 
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', 
-            marginTop: -110, // Puxa ainda mais para cima
-            zIndex: 10, // Garante que fique sobre a logo se encostar
-            position: 'relative'
+            marginTop: -60, // Ajustado para a nova proporção
+            zIndex: 10, 
+            position: 'relative',
+            boxSizing: 'border-box'
         }}>
             <h2 style={{ marginTop: 0, marginBottom: 24, fontSize: '1.5rem', color: '#0f172a', textAlign: 'center' }}>
                 {isRecovering ? 'Recuperar Senha' : 'Bem-vindo de volta!'}
@@ -178,7 +179,7 @@ export default function Login() {
                 </form>
             )}
         </div>
-        <div style={{ color: '#64748b', fontSize: '0.875rem', marginTop: 30 }}>
+        <div style={{ color: '#64748b', fontSize: '0.875rem', marginTop: 10 }}>
             &copy; {new Date().getFullYear()} Twinex Tecnologia. Todos os direitos reservados.
         </div>
       </div>
