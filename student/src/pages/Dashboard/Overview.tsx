@@ -37,11 +37,12 @@ export default function Overview() {
         // 1. Perfil (Nome) e Dados JSON
         const { data: profile } = await supabase
             .from('profiles')
-            .select('full_name, data, status')
+            .select('full_name, data')
             .eq('id', user?.id)
             .single()
         
-        if (profile?.status !== 'active') {
+        const status = profile?.data?.status || 'ativo'
+        if (status !== 'ativo' && status !== 'active') {
             setIsBlocked(true)
         }
 

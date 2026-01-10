@@ -67,11 +67,12 @@ export default function ListDiets() {
         // 1. Busca perfil para ver IDs vinculados
         const { data: profile } = await supabase
             .from('profiles')
-            .select('data, status')
+            .select('data')
             .eq('id', user?.id)
             .single()
         
-        if (profile?.status !== 'active') {
+        const status = profile?.data?.status || 'ativo'
+        if (status !== 'ativo' && status !== 'active') {
             setIsBlocked(true)
             setLoading(false)
             return

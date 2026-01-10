@@ -61,11 +61,12 @@ export default function ListAnamnesis() {
         // Verificação de Status
         const { data: profile } = await supabase
              .from('profiles')
-             .select('status')
+             .select('data')
              .eq('id', user?.id)
              .single()
          
-        if (profile?.status !== 'active') {
+        const status = profile?.data?.status || 'ativo'
+        if (status !== 'ativo' && status !== 'active') {
              setIsBlocked(true)
         }
 

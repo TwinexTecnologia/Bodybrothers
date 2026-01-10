@@ -124,9 +124,10 @@ export default function ListWorkouts() {
   async function loadData() {
     try {
         setLoading(true)
-        const { data: profile } = await supabase.from('profiles').select('data, status').eq('id', user?.id).single()
+        const { data: profile } = await supabase.from('profiles').select('data').eq('id', user?.id).single()
         
-        if (profile?.status !== 'active') {
+        const status = profile?.data?.status || 'ativo'
+        if (status !== 'ativo' && status !== 'active') {
             setIsBlocked(true)
             setLoading(false)
             return
