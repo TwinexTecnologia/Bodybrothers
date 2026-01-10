@@ -35,8 +35,55 @@ body { margin: 0; background: var(--personal-bg); color: var(--personal-text); f
 .btn:hover { filter: brightness(0.95) }
 
 @media (max-width: 900px) {
+  /* Tablet: Sidebar compacta (se não for mobile) */
   .app-shell { grid-template-columns: 70px 1fr }
   .sidebar-header .brand-title { display: none }
+}
+
+@media (max-width: 768px) {
+  /* Mobile: Sidebar Drawer */
+  .app-shell { display: block; } /* Remove Grid */
+  
+  .sidebar {
+    position: fixed;
+    left: -280px;
+    top: 0;
+    bottom: 0;
+    width: 260px;
+    z-index: 1000;
+    transition: left 0.3s ease;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+  }
+
+  .sidebar.mobile-open {
+    left: 0;
+  }
+
+  /* Restaura header da sidebar no mobile */
+  .sidebar-header .brand-title { display: block !important; font-size: 1.1rem; }
+  .sidebar-header { justify-content: space-between; padding-right: 12px; }
+
+  /* Botões de controle */
+  .menu-toggle-btn { display: flex !important; }
+  .mobile-close-btn { display: block !important; }
+
+  /* Ajuste de conteúdo */
+  .main { width: 100%; min-height: 100vh; }
+  .content { padding: 12px; } /* Menos padding no mobile */
+  
+  /* Ajuste de formulários e cards para mobile */
+  .form-grid, .form-grid-3, .diet-header, .food-row, .food-header, .supplement-row {
+      grid-template-columns: 1fr !important;
+      gap: 8px;
+  }
+  
+  .diet-header {
+      align-items: flex-start;
+  }
+  
+  .meal-header {
+      flex-wrap: wrap;
+  }
 }
 
 .form-card { background: #fff; border: 1px solid var(--personal-border); border-radius: 12px; padding: 20px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); }

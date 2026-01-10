@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { X } from 'lucide-react'
 
 type Branding = { brandTitle?: string; brandLogoUrl?: string }
 
-export default function Sidebar() {
+interface SidebarProps {
+    isOpen?: boolean
+    onClose?: () => void
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [open, setOpen] = useState<Record<string, boolean>>({
     dashboard: true,
     students: true,
@@ -57,7 +63,7 @@ export default function Sidebar() {
   }, [])
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'mobile-open' : ''}`}>
       <div className="sidebar-header">
         {branding.brandLogoUrl ? (
           <img src={branding.brandLogoUrl} alt="Logo" className="brand-logo" />
@@ -65,6 +71,18 @@ export default function Sidebar() {
           <div className="brand-mark" />
         )}
         <span className="brand-title">{branding.brandTitle || 'Personal Panel'}</span>
+        
+        {/* Botão de Fechar Mobile */}
+        <button 
+            onClick={onClose}
+            className="mobile-close-btn"
+            style={{ 
+                background: 'transparent', border: 'none', color: '#fff', 
+                marginLeft: 'auto', cursor: 'pointer', display: 'none' // display none por padrão, CSS ativa no mobile
+            }}
+        >
+            <X size={24} />
+        </button>
       </div>
       <nav className="menu">
         {canAccess('dashboard') && (
