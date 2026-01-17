@@ -29,6 +29,7 @@ type AnamnesisResponse = {
     modelId: string
     answers: Record<string, any>
   }
+  renew_in_days?: number
 }
 
 export default function ListAnamnesis() {
@@ -96,7 +97,8 @@ export default function ListAnamnesis() {
         setResponses((responsesData || []).map(d => ({
             id: d.id,
             created_at: d.created_at,
-            data: d.data
+            data: d.data,
+            renew_in_days: d.renew_in_days
         })))
 
     } catch (error) {
@@ -234,11 +236,29 @@ export default function ListAnamnesis() {
                             let statusText = ''
                             
                             // Verifica se já foi respondida
-                            const hasResponse = responses.some(r => r.data.modelId === m.id)
+                            const modelResponses = responses.filter(r => r.data.modelId === m.id)
+                            const lastResponse = modelResponses[0] // responses are ordered by created_at desc
 
-                            if (hasResponse) {
-                                statusColor = '#16a34a'
-                                statusText = 'Respondida'
+                            if (lastResponse) {
+                                // Lógica de Projeção Mensal se respondida
+                                if (m.ends_at) {
+                                    let nextDueDate = new Date(m.ends_at)
+                                    const now = new Date()
+
+                                    // Se já venceu, projeta para o próximo mês
+                                    while (nextDueDate < now) {
+                                        nextDueDate.setMonth(nextDueDate.getMonth() + 1)
+                                    }
+
+                                    const diff = nextDueDate.getTime() - now.getTime()
+                                    const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24))
+                                    
+                                    statusColor = '#16a34a'
+                                    statusText = `Vence em ${daysLeft} dias`
+                                } else {
+                                    statusColor = '#16a34a'
+                                    statusText = 'Respondida'
+                                }
                             } else if (days !== null) {
                                 if (days < 0) {
                                     statusColor = '#ef4444'

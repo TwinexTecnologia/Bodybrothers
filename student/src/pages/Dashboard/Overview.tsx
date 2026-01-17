@@ -94,26 +94,42 @@ export default function Overview() {
             // Busca respostas do aluno
             const { data: responses } = await supabase
                 .from('protocols')
-                .select('data')
+                .select('data, created_at, renew_in_days')
                 .eq('type', 'anamnesis')
                 .eq('student_id', user.id)
+                .order('created_at', { ascending: false })
 
             for (const m of modelsData) {
-                if (m.ends_at) {
-                    const end = new Date(m.ends_at).getTime()
-                    const now = new Date().getTime()
-                    
-                    // Se estiver vencido
-                    if (now > end) {
-                        // Verifica se o aluno já respondeu a este modelo
-                        const hasResponse = responses?.some(r => r.data?.modelId === m.id)
-                        
-                        // Se não respondeu, marca como pendente
-                        if (!hasResponse) {
-                            pendingAnamnesisName = m.title
-                            break // Pega o primeiro vencido não respondido
+                // Verifica respostas primeiro
+                const modelResponses = responses?.filter(r => r.data?.modelId === m.id)
+                const lastResponse = modelResponses?.[0]
+                
+                let isPending = false
+
+                if (lastResponse) {
+                    // Se respondeu, verifica recorrência
+                    if (lastResponse.renew_in_days) {
+                        const created = new Date(lastResponse.created_at)
+                        const nextDue = new Date(created.getTime() + (lastResponse.renew_in_days * 24 * 60 * 60 * 1000))
+                        // Se venceu o próximo ciclo
+                        if (nextDue.getTime() < new Date().getTime()) {
+                            isPending = true
                         }
                     }
+                } else {
+                    // Se nunca respondeu, verifica data do modelo
+                    if (m.ends_at) {
+                        const end = new Date(m.ends_at).getTime()
+                        const now = new Date().getTime()
+                        if (now > end) {
+                            isPending = true
+                        }
+                    }
+                }
+
+                if (isPending) {
+                    pendingAnamnesisName = m.title
+                    break 
                 }
             }
         }

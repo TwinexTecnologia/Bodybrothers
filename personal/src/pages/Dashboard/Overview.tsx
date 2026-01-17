@@ -38,13 +38,58 @@ export default function Overview() {
 
         // 2. Anamneses Pendentes (Vencidas)
         const today = new Date().toISOString().split('T')[0]
-        const { count: pendingAnamnesisCount } = await supabase
+        
+        // Busca Modelos
+        const { data: models } = await supabase
             .from('protocols')
-            .select('*', { count: 'exact', head: true })
+            .select('*')
+            .eq('personal_id', user.id)
+            .eq('type', 'anamnesis_model')
+            .not('ends_at', 'is', null)
+        
+        // Busca Respostas
+        const { data: responses } = await supabase
+            .from('protocols')
+            .select('*')
             .eq('personal_id', user.id)
             .eq('type', 'anamnesis')
-            .not('ends_at', 'is', null) // Tem data de vencimento
-            .lt('ends_at', today) // Vencida
+
+        let pendingAnamnesisCount = 0
+        const now = new Date()
+
+        models?.forEach(m => {
+             // Encontra resposta mais recente
+             const modelResponses = responses?.filter(r => r.data?.modelId === m.id).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+             const lastResponse = modelResponses?.[0]
+
+             if (lastResponse) {
+                 if (lastResponse.renew_in_days) {
+                     const created = new Date(lastResponse.created_at)
+                     const nextDue = new Date(created.getTime() + (lastResponse.renew_in_days * 24 * 60 * 60 * 1000))
+                     // Se venceu o próximo ciclo (dá uma folga de 1 dia para não vencer no mesmo segundo)
+                     // Mas comparando com now é seguro.
+                     if (nextDue < now) {
+                         pendingAnamnesisCount++
+                     }
+                 }
+                 // Se tem resposta e não tem recorrência, considera OK
+             } else {
+                 // Sem resposta, verifica data do modelo
+                 if (m.ends_at) {
+                     const endDate = new Date(m.ends_at)
+                     // Ajusta fuso ou compara string? new Date(string) é UTC as vezes.
+                     // Melhor comparar timestamps.
+                     // ends_at é YYYY-MM-DD. new Date('2023-10-10') é UTC.
+                     // now é local.
+                     // Vamos garantir que ends_at seja fim do dia.
+                     const end = new Date(m.ends_at)
+                     end.setHours(23, 59, 59)
+                     if (end < now) {
+                         pendingAnamnesisCount++
+                     }
+                 }
+             }
+        })
 
         // 3. Financeiro Pendente (Cálculo Real igual à tela Financeira)
         let pendingFinanceCount = 0

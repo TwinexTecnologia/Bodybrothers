@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { listStudentsByPersonal, toggleStudentActive, getStudentsWeeklyFrequency, type StudentRecord } from '../../store/students'
 import { listPlans, type PlanRecord } from '../../store/plans'
 import { listActiveWorkouts, type WorkoutRecord } from '../../store/workouts'
-import { listAllAnamnesis, type AnamnesisModel } from '../../store/anamnesis'
+import { listAllAnamnesis, listResponsesByPersonal, type AnamnesisModel, type AnamnesisResponse } from '../../store/anamnesis'
 import { listAllDietsByPersonal, type DietRecord } from '../../store/diets'
 import { listMonthPayments, type DebitRecord } from '../../store/financial'
 import { supabase } from '../../lib/supabase'
@@ -42,6 +42,7 @@ export default function ListStudents() {
   const [workouts, setWorkouts] = useState<WorkoutRecord[]>([])
   const [diets, setDiets] = useState<DietRecord[]>([])
   const [anamneses, setAnamneses] = useState<AnamnesisModel[]>([])
+  const [responses, setResponses] = useState<AnamnesisResponse[]>([])
   const [payments, setPayments] = useState<DebitRecord[]>([])
   const [frequencies, setFrequencies] = useState<Record<string, number>>({})
   const [selectedStudentForFeedback, setSelectedStudentForFeedback] = useState<StudentRecord | null>(null)
@@ -82,13 +83,15 @@ export default function ListStudents() {
             listPlans(user.id),
             listActiveWorkouts(user.id),
             listAllAnamnesis(user.id),
+            listResponsesByPersonal(user.id),
             listAllDietsByPersonal(user.id),
             listMonthPayments(user.id, new Date())
-        ]).then(([p, w, a, d, pay]) => {
+        ]).then(([p, w, a, r, d, pay]) => {
             console.log('Detalhes carregados em background')
             setPlans(p)
             setWorkouts(w)
             setAnamneses(a)
+            setResponses(r)
             setDiets(d)
             setPayments(pay)
         }).catch(err => console.error('Erro carregando detalhes:', err))
@@ -210,11 +213,31 @@ export default function ListStudents() {
                     const nearest = sorted[0]
                     
                     if (nearest.validUntil) {
+                        // Verifica se já respondeu (pega a mais recente)
+                        const modelResponses = responses.filter(r => r.modelId === nearest.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        const lastResponse = modelResponses[0]
+
                         const validDate = new Date(nearest.validUntil)
                         // Verifica se data é válida
                         if (!isNaN(validDate.getTime())) {
-                            const daysLeft = Math.ceil((validDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-                            if (daysLeft < 0) {
+                            let daysLeft = Math.ceil((validDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                            
+                            // Lógica de Recorrência Visual (Projeção Mensal)
+                            // Se já respondeu, calculamos o próximo vencimento (próximo mês no mesmo dia)
+                            if (lastResponse) {
+                                let nextDueDate = new Date(nearest.validUntil!)
+                                const now = new Date()
+                                
+                                // Se a data original já passou, projeta para o próximo mês
+                                while (nextDueDate < now) {
+                                    nextDueDate.setMonth(nextDueDate.getMonth() + 1)
+                                }
+                                
+                                daysLeft = Math.ceil((nextDueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                                
+                                // Se respondeu, mostra sempre verde com a contagem para o próximo
+                                anamnesisStatus = <span style={{ color: '#10b981', fontWeight: 600, fontSize: '0.9em' }}>✅ {daysLeft} dias</span>
+                            } else if (daysLeft < 0) {
                                 anamnesisStatus = <span style={{ color: '#ef4444', fontWeight: 600, fontSize: '0.9em' }}>🔴 Vencida</span>
                             } else if (daysLeft <= 7) {
                                 anamnesisStatus = <span style={{ color: '#f59e0b', fontWeight: 600, fontSize: '0.9em' }}>🟡 Vence em {daysLeft} dias</span>
