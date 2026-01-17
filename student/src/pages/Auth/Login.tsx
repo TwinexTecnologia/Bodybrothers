@@ -90,14 +90,9 @@ export default function Login() {
             position: 'relative',
             boxSizing: 'border-box'
         }}>
-            <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: '1.5rem', color: '#0f172a', textAlign: 'center' }}>
+            <h2 style={{ marginTop: 0, marginBottom: 24, fontSize: '1.5rem', color: '#0f172a', textAlign: 'center' }}>
                 {isRecovering ? 'Recuperar Senha' : 'Portal do Aluno'}
             </h2>
-            {!isRecovering && (
-                <p style={{ textAlign: 'center', color: '#64748b', margin: '0 0 24px 0', fontSize: '0.9rem' }}>
-                    Faça login para acessar seus treinos
-                </p>
-            )}
             
             {successMsg ? (
                 <div style={{ textAlign: 'center' }}>
