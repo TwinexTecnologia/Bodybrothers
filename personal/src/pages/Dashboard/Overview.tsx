@@ -42,7 +42,7 @@ export default function Overview() {
             .from('protocols')
             .select('*', { count: 'exact', head: true })
             .eq('personal_id', user.id)
-            .eq('type', 'anamnesis_model')
+            .eq('type', 'anamnesis')
             .not('ends_at', 'is', null) // Tem data de vencimento
             .lt('ends_at', today) // Vencida
 

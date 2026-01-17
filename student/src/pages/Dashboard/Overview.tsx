@@ -91,13 +91,28 @@ export default function Overview() {
         
         // Verifica se tem algum modelo vencido ou nunca respondido
         if (modelsData && modelsData.length > 0) {
+            // Busca respostas do aluno
+            const { data: responses } = await supabase
+                .from('protocols')
+                .select('data')
+                .eq('type', 'anamnesis')
+                .eq('student_id', user.id)
+
             for (const m of modelsData) {
                 if (m.ends_at) {
                     const end = new Date(m.ends_at).getTime()
                     const now = new Date().getTime()
+                    
+                    // Se estiver vencido
                     if (now > end) {
-                        pendingAnamnesisName = m.title
-                        break // Pega o primeiro vencido
+                        // Verifica se o aluno já respondeu a este modelo
+                        const hasResponse = responses?.some(r => r.data?.modelId === m.id)
+                        
+                        // Se não respondeu, marca como pendente
+                        if (!hasResponse) {
+                            pendingAnamnesisName = m.title
+                            break // Pega o primeiro vencido não respondido
+                        }
                     }
                 }
             }

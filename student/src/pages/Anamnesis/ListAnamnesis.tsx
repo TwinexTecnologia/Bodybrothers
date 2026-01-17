@@ -233,7 +233,13 @@ export default function ListAnamnesis() {
                             let statusColor = '#64748b'
                             let statusText = ''
                             
-                            if (days !== null) {
+                            // Verifica se já foi respondida
+                            const hasResponse = responses.some(r => r.data.modelId === m.id)
+
+                            if (hasResponse) {
+                                statusColor = '#16a34a'
+                                statusText = 'Respondida'
+                            } else if (days !== null) {
                                 if (days < 0) {
                                     statusColor = '#ef4444'
                                     statusText = `Vencida há ${Math.abs(days)} dias`
