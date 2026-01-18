@@ -90,8 +90,9 @@ export default function FoodAutocomplete({
             try {
                 // TENTATIVA: OpenFoodFacts (Direto do Frontend, sem Proxy)
                 // Ajuste de filtros para priorizar alimentos básicos e nomes simples
+                // Aumentando page_size para 100 (Limite seguro para não travar a busca)
                 
-                const response = await fetch(`https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=20&sort_by=unique_scans_n`)
+                const response = await fetch(`https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=100`)
                 
                 if (!response.ok) throw new Error('Erro na API OpenFoodFacts')
                 
@@ -109,9 +110,11 @@ export default function FoodAutocomplete({
                         const startsA = nameA.toLowerCase().startsWith(term)
                         const startsB = nameB.toLowerCase().startsWith(term)
                         
+                        // Prioridade para quem começa com o termo
                         if (startsA && !startsB) return -1
                         if (!startsA && startsB) return 1
                         
+                        // Se ambos começam (ou não), ordena por tamanho (menor primeiro = mais "puro")
                         return nameA.length - nameB.length
                     })
 

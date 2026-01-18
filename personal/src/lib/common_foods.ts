@@ -33,7 +33,17 @@ export const commonFoods = [
     { id: 'local_aveia', name: 'Aveia em Flocos', calories: 394, protein: 13.9, carbs: 66.6, fat: 8.5, unit_weight: 15, sodium: 2 },
     { id: 'local_tapioca', name: 'Tapioca (Goma)', calories: 242, protein: 0.0, carbs: 60.0, fat: 0.0, unit_weight: 20, sodium: 1 },
     { id: 'local_pao_frances', name: 'Pão Francês', calories: 300, protein: 8.0, carbs: 58.6, fat: 3.1, unit_weight: 50, sodium: 648 }, // Alto sódio
-    
+    { id: 'local_bisnaguinha', name: 'Bisnaguinha (Tipo Seven Boys)', calories: 300, protein: 8.0, carbs: 55.0, fat: 5.0, unit_weight: 20, sodium: 450 },
+    { id: 'local_pao_forma', name: 'Pão de Forma Tradicional', calories: 250, protein: 8.0, carbs: 48.0, fat: 3.0, unit_weight: 25, sodium: 400 },
+    { id: 'local_pao_forma_int', name: 'Pão de Forma Integral', calories: 240, protein: 10.0, carbs: 40.0, fat: 4.0, unit_weight: 25, sodium: 380 },
+    { id: 'local_rap10', name: 'Rap10 (Tradicional)', calories: 300, protein: 7.0, carbs: 50.0, fat: 7.0, unit_weight: 40, sodium: 600 },
+    { id: 'local_macarrao_cozido', name: 'Macarrão Cozido (Sem Molho)', calories: 157, protein: 5.8, carbs: 30.9, fat: 0.9, unit_weight: 150, sodium: 1 },
+    { id: 'local_macarrao_cru', name: 'Macarrão Cru (Para pesar antes)', calories: 371, protein: 13.0, carbs: 75.0, fat: 1.5, unit_weight: 80, sodium: 6 },
+    { id: 'local_biscoito_arroz', name: 'Biscoito de Arroz (Camil/Outros)', calories: 380, protein: 8.0, carbs: 80.0, fat: 2.5, unit_weight: 10, sodium: 150 },
+    { id: 'local_cream_cracker', name: 'Biscoito Cream Cracker / Água e Sal', calories: 430, protein: 10.0, carbs: 68.0, fat: 14.0, unit_weight: 6, sodium: 700 },
+    { id: 'local_biscoito_maizena', name: 'Biscoito Maizena / Maria', calories: 440, protein: 8.0, carbs: 74.0, fat: 12.0, unit_weight: 5, sodium: 300 },
+    { id: 'local_cuscuz', name: 'Cuscuz de Milho Cozido', calories: 112, protein: 2.2, carbs: 25.0, fat: 0.7, unit_weight: 150, sodium: 5 },
+
     // Proteínas
     { id: 'local_frango_grelhado', name: 'Peito de Frango Grelhado', calories: 159, protein: 32.0, carbs: 0.0, fat: 2.5, unit_weight: 100, sodium: 50 }, // Sem sal adicionado (natural)
     { id: 'local_frango_cozido', name: 'Peito de Frango Cozido', calories: 163, protein: 31.5, carbs: 0.0, fat: 3.2, unit_weight: 100, sodium: 45 },
@@ -48,6 +58,8 @@ export const commonFoods = [
     { id: 'local_leite_integral', name: 'Leite Integral', calories: 60, protein: 3.0, carbs: 4.5, fat: 3.0, unit_weight: 200, sodium: 50 },
     { id: 'local_leite_desnatado', name: 'Leite Desnatado', calories: 35, protein: 3.0, carbs: 4.5, fat: 0.0, unit_weight: 200, sodium: 52 },
     { id: 'local_queijo_minas', name: 'Queijo Minas Frescal', calories: 264, protein: 17.4, carbs: 3.2, fat: 20.2, unit_weight: 30, sodium: 300 }, // Queijos variam muito
+    { id: 'local_requeijao', name: 'Requeijão Cremoso Tradicional', calories: 280, protein: 9.0, carbs: 2.0, fat: 27.0, unit_weight: 30, sodium: 600 },
+    { id: 'local_requeijao_light', name: 'Requeijão Light', calories: 180, protein: 10.0, carbs: 4.0, fat: 14.0, unit_weight: 30, sodium: 500 },
     { id: 'local_azeite', name: 'Azeite de Oliva', calories: 884, protein: 0.0, carbs: 0.0, fat: 100.0, unit_weight: 13, sodium: 0 },
     { id: 'local_whey', name: 'Whey Protein (Padrão)', calories: 400, protein: 80.0, carbs: 10.0, fat: 5.0, unit_weight: 30, sodium: 150 }, // Varia
 ]
