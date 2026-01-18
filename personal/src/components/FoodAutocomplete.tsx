@@ -90,9 +90,9 @@ export default function FoodAutocomplete({
             try {
                 // TENTATIVA: OpenFoodFacts (Direto do Frontend, sem Proxy)
                 // Ajuste de filtros para priorizar alimentos básicos e nomes simples
-                // Aumentando page_size para 100 (Limite seguro para não travar a busca)
+                // Aumentando page_size para 1000 (Teste de limite extremo a pedido do usuário)
                 
-                const response = await fetch(`https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=100`)
+                const response = await fetch(`https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=1000`)
                 
                 if (!response.ok) throw new Error('Erro na API OpenFoodFacts')
                 
@@ -107,14 +107,25 @@ export default function FoodAutocomplete({
                         const nameA = a.product_name || ''
                         const nameB = b.product_name || ''
                         
+                        // 1. Termo exato (match perfeito)
+                        const exactA = nameA.toLowerCase() === term
+                        const exactB = nameB.toLowerCase() === term
+                        if (exactA && !exactB) return -1
+                        if (!exactA && exactB) return 1
+
+                        // 2. Começa com o termo
                         const startsA = nameA.toLowerCase().startsWith(term)
                         const startsB = nameB.toLowerCase().startsWith(term)
-                        
-                        // Prioridade para quem começa com o termo
                         if (startsA && !startsB) return -1
                         if (!startsA && startsB) return 1
                         
-                        // Se ambos começam (ou não), ordena por tamanho (menor primeiro = mais "puro")
+                        // 3. Contém o termo completo (frase)
+                        const containsA = nameA.toLowerCase().includes(term)
+                        const containsB = nameB.toLowerCase().includes(term)
+                        if (containsA && !containsB) return -1
+                        if (!containsA && containsB) return 1
+
+                        // 4. Se ambos começam (ou não), ordena por tamanho (menor primeiro = mais "puro")
                         return nameA.length - nameB.length
                     })
 

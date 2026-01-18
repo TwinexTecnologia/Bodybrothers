@@ -60,6 +60,11 @@ export const commonFoods = [
     { id: 'local_queijo_minas', name: 'Queijo Minas Frescal', calories: 264, protein: 17.4, carbs: 3.2, fat: 20.2, unit_weight: 30, sodium: 300 }, // Queijos variam muito
     { id: 'local_requeijao', name: 'Requeijão Cremoso Tradicional', calories: 280, protein: 9.0, carbs: 2.0, fat: 27.0, unit_weight: 30, sodium: 600 },
     { id: 'local_requeijao_light', name: 'Requeijão Light', calories: 180, protein: 10.0, carbs: 4.0, fat: 14.0, unit_weight: 30, sodium: 500 },
+    { id: 'local_doce_leite', name: 'Doce de Leite (Tradicional)', calories: 315, protein: 6.0, carbs: 55.0, fat: 7.0, unit_weight: 20, sodium: 130 },
+    { id: 'local_pasta_amendoim', name: 'Pasta de Amendoim (Integral)', calories: 590, protein: 25.0, carbs: 12.0, fat: 50.0, unit_weight: 15, sodium: 0 },
+    { id: 'local_mel', name: 'Mel de Abelha', calories: 304, protein: 0.3, carbs: 82.0, fat: 0.0, unit_weight: 20, sodium: 4 },
+    { id: 'local_geleia', name: 'Geleia de Frutas (Tradicional)', calories: 278, protein: 0.4, carbs: 68.0, fat: 0.1, unit_weight: 20, sodium: 30 },
+    { id: 'local_geleia_diet', name: 'Geleia de Frutas (Diet/Zero)', calories: 50, protein: 0.5, carbs: 12.0, fat: 0.1, unit_weight: 20, sodium: 30 },
     { id: 'local_azeite', name: 'Azeite de Oliva', calories: 884, protein: 0.0, carbs: 0.0, fat: 100.0, unit_weight: 13, sodium: 0 },
     { id: 'local_whey', name: 'Whey Protein (Padrão)', calories: 400, protein: 80.0, carbs: 10.0, fat: 5.0, unit_weight: 30, sodium: 150 }, // Varia
 ]
