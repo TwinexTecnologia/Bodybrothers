@@ -308,7 +308,7 @@ export default function ListWorkouts() {
                               </div>
                           </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 44 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 0 }}>
                               
                               {(() => {
                                   // Normaliza sets: usa o do banco se existir, ou constrói a partir dos campos antigos
@@ -387,7 +387,7 @@ export default function ListWorkouts() {
 
                               {/* Video Player OTIMIZADO */}
                               {ex.videoUrl && (
-                                  <div style={{ width: '100%', maxWidth: 280, aspectRatio: '9/16', borderRadius: 12, overflow: 'hidden', background: '#000', marginTop: 16, position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', alignSelf: 'center' }}>
+                                  <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', background: '#000', marginTop: 16, position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', alignSelf: 'center' }}>
                                       {(() => {
                                           const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
                                           
@@ -410,7 +410,7 @@ export default function ListWorkouts() {
                                                       src={ex.videoUrl} 
                                                       controls 
                                                       playsInline
-                                                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                                   />
                                               );
                                           }
@@ -740,7 +740,7 @@ export default function ListWorkouts() {
                 <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
                     <div style={{ maxWidth: 800, margin: '0 auto' }}>
                         {selectedWorkout.data.exercises.map((ex, i) => (
-                            <div key={i} style={{ background: '#fff', borderRadius: 16, padding: '16px 16px 16px 24px', marginBottom: 16, display: 'flex', alignItems: 'stretch', gap: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden' }}>
+                            <div key={i} style={{ background: '#fff', borderRadius: 16, padding: '16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 16, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden' }}>
                                 
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 20 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -748,7 +748,7 @@ export default function ListWorkouts() {
                                         <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a', fontWeight: 800, lineHeight: 1.2 }}>{ex.name}</h3>
                                     </div>
                                     
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 44 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 0 }}>
                                         {/* Aquecimento */}
                                         {(ex.warmupSeries || ex.warmupReps) && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -816,7 +816,7 @@ export default function ListWorkouts() {
                                 
                                 {/* Video Player Vertical Maior */}
                                 {ex.videoUrl ? (
-                                    <div style={{ width: 180, height: 240, borderRadius: 12, overflow: 'hidden', background: '#000', flexShrink: 0, position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                                    <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', background: '#000', flexShrink: 0, position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
                                         {(() => {
                                             const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
                                             
@@ -842,7 +842,7 @@ export default function ListWorkouts() {
                                                         src={ex.videoUrl} 
                                                         controls 
                                                         playsInline
-                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                                     />
                                                 );
                                             }
@@ -851,7 +851,7 @@ export default function ListWorkouts() {
                                 ) : (
                                     <div className="video-container" style={{ 
                                         background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        border: '1px solid #e2e8f0', flexShrink: 0
+                                        border: '1px solid #e2e8f0', flexShrink: 0, height: 100
                                     }}>
                                         <Dumbbell size={40} color="#cbd5e1" />
                                     </div>
