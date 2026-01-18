@@ -203,10 +203,37 @@ export default function DietCreate() {
     }
   }
 
-  const addMeal = () => setMeals([...meals, { title: '', time: '', foods: [] }])
+  const addMeal = () => {
+      // Tenta pegar o horário da última refeição e somar 3h
+      let newTime = ''
+      if (meals.length > 0) {
+          const lastTime = meals[meals.length - 1].time
+          if (lastTime && lastTime.includes(':')) {
+              const [h, m] = lastTime.split(':').map(Number)
+              if (!isNaN(h)) {
+                  const nextH = (h + 3) % 24
+                  newTime = `${nextH.toString().padStart(2, '0')}:${m ? m.toString().padStart(2, '0') : '00'}`
+              }
+          }
+      }
+      setMeals([...meals, { title: '', time: newTime, foods: [] }])
+  }
+
   const addMealAfter = (index: number) => {
     const next = meals.slice()
-    next.splice(index + 1, 0, { title: '', time: '', foods: [] })
+    
+    // Tenta calcular horário baseado na refeição anterior
+    let newTime = ''
+    const prevTime = meals[index].time
+    if (prevTime && prevTime.includes(':')) {
+        const [h, m] = prevTime.split(':').map(Number)
+        if (!isNaN(h)) {
+            const nextH = (h + 3) % 24
+            newTime = `${nextH.toString().padStart(2, '0')}:${m ? m.toString().padStart(2, '0') : '00'}`
+        }
+    }
+
+    next.splice(index + 1, 0, { title: '', time: newTime, foods: [] })
     setMeals(next)
   }
   const duplicateMeal = (i: number) => {
@@ -557,15 +584,16 @@ export default function DietCreate() {
                             onFocus={(e) => e.target.style.background = '#fff'}
                             onBlur={(e) => e.target.style.background = 'transparent'}
                         />
-                        <input
-                            className="input"
-                            style={{ width: 140, textAlign: 'right', border: '1px solid transparent', background: 'transparent', color: '#64748b' }}
-                            value={m.time}
-                            onChange={(e) => updateMeal(mi, { time: e.target.value })} 
-                            placeholder="Horário (08:00)"
-                            onFocus={(e) => e.target.style.background = '#fff'}
-                            onBlur={(e) => e.target.style.background = 'transparent'}
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ fontSize: '0.85em', color: '#64748b', fontWeight: 600 }}>Horário:</span>
+                            <input
+                                type="time"
+                                className="input"
+                                style={{ width: 110, textAlign: 'center', border: '1px solid #cbd5e1', background: '#fff', fontWeight: 600, padding: '6px' }}
+                                value={m.time}
+                                onChange={(e) => updateMeal(mi, { time: e.target.value })} 
+                            />
+                        </div>
                       </div>
                   </div>
                   
@@ -802,15 +830,15 @@ export default function DietCreate() {
                                         </div>
                                     ))}
                                 </div>
-                                {/* Resumo da Refeição (Rodapé do Card) */}
-                                <div style={{ background: '#f8fafc', padding: '10px 15px', borderTop: '1px solid #e2e8f0', fontSize: '13px', display: 'flex', justifyContent: 'flex-end', gap: 15, color: '#475569', fontWeight: 600 }}>
-                                    <span>Total Refeição:</span>
-                                    <span style={{ color: '#1e3a8a' }}>{Math.round(mealTotals.kcal)} kcal</span>
-                                    <span style={{ color: '#166534' }}>P: {mealTotals.p.toFixed(1)}g</span>
-                                    <span style={{ color: '#1e40af' }}>C: {mealTotals.c.toFixed(1)}g</span>
-                                    <span style={{ color: '#9a3412' }}>G: {mealTotals.g.toFixed(1)}g</span>
-                                    <span style={{ color: '#555' }}>SOD: {Math.round(mealTotals.s)}mg</span>
-                                </div>
+                            {/* Rodapé da Refeição com Totais - Estilo Reforçado para PDF */}
+                            <div style={{ backgroundColor: '#f0f9ff', padding: '10px 15px', borderTop: '2px solid #e2e8f0', fontSize: '12px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', color: '#334155', fontWeight: 'bold', fontFamily: 'Arial, sans-serif' }}>
+                                <span style={{ marginRight: 15, textTransform: 'uppercase', fontSize: '11px', color: '#64748b' }}>Total Refeição:</span>
+                                <span style={{ color: '#1e3a8a', marginRight: 12 }}>{Math.round(mealTotals.kcal)} kcal</span>
+                                <span style={{ color: '#166534', marginRight: 12 }}>P: {mealTotals.p.toFixed(1)}g</span>
+                                <span style={{ color: '#1e40af', marginRight: 12 }}>C: {mealTotals.c.toFixed(1)}g</span>
+                                <span style={{ color: '#9a3412', marginRight: 12 }}>G: {mealTotals.g.toFixed(1)}g</span>
+                                <span style={{ color: '#475569' }}>SOD: {Math.round(mealTotals.s)}mg</span>
+                            </div>
                                 {m.notes && (
                                     <div style={{ padding: '10px 15px', background: '#fff', borderTop: '1px solid #e2e8f0', fontSize: '13px', color: '#475569', fontStyle: 'italic' }}>
                                         <strong>Obs:</strong> {m.notes}
@@ -824,49 +852,46 @@ export default function DietCreate() {
                 {/* Resumo Nutricional Geral (Ao final) */}
                 <div style={{ marginTop: 30, breakInside: 'avoid', borderTop: '3px solid #1e3a8a', paddingTop: 20 }}>
                      <h3 style={{ margin: '0 0 15px 0', color: '#1e3a8a', fontSize: '18px', textTransform: 'uppercase' }}>Resumo Diário Total</h3>
-                     <div style={{ display: 'flex', justifyContent: 'space-around', background: '#f0f9ff', padding: 20, borderRadius: 8, border: '1px solid #bfdbfe' }}>
-                         {(() => {
-                             const total = meals.reduce((acc, m) => {
-                                 m.foods.forEach(f => {
-                                     acc.kcal += Number(f.calories || 0)
-                                     acc.p += Number(f.protein || 0)
-                                     acc.c += Number(f.carbs || 0)
-                                     acc.g += Number(f.fat || 0)
-                                     acc.s += Number(f.sodium || 0)
-                                 })
-                                 return acc
-                             }, { kcal: 0, p: 0, c: 0, g: 0, s: 0 })
-                             return (
-                                 <>
-                                     <div style={{ textAlign: 'center' }}>
-                                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>CALORIAS</div>
-                                         <div style={{ color: '#1e3a8a', fontSize: '1.6em', fontWeight: 800 }}>{Math.round(total.kcal)}</div>
-                                         <div style={{ fontSize: '12px', color: '#64748b' }}>kcal</div>
-                                     </div>
-                                     <div style={{ width: 1, background: '#cbd5e1' }}></div>
-                                     <div style={{ textAlign: 'center' }}>
-                                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>PROTEÍNA</div>
-                                         <div style={{ color: '#166534', fontSize: '1.6em', fontWeight: 800 }}>{total.p.toFixed(0)}g</div>
-                                     </div>
-                                     <div style={{ width: 1, background: '#cbd5e1' }}></div>
-                                     <div style={{ textAlign: 'center' }}>
-                                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>CARBOIDRATO</div>
-                                         <div style={{ color: '#1e40af', fontSize: '1.6em', fontWeight: 800 }}>{total.c.toFixed(0)}g</div>
-                                     </div>
-                                     <div style={{ width: 1, background: '#cbd5e1' }}></div>
-                                     <div style={{ textAlign: 'center' }}>
-                                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>GORDURA</div>
-                                         <div style={{ color: '#9a3412', fontSize: '1.6em', fontWeight: 800 }}>{total.g.toFixed(0)}g</div>
-                                     </div>
-                                     <div style={{ width: 1, background: '#cbd5e1' }}></div>
-                                     <div style={{ textAlign: 'center' }}>
-                                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>SÓDIO</div>
-                                         <div style={{ color: '#555', fontSize: '1.6em', fontWeight: 800 }}>{Math.round(total.s)}mg</div>
-                                     </div>
-                                 </>
-                             )
-                         })()}
-                     </div>
+                     
+                     {/* Tabela de Resumo Total (Mais robusto para PDF) */}
+                     {(() => {
+                         const total = meals.reduce((acc, m) => {
+                             m.foods.forEach(f => {
+                                 acc.kcal += Number(f.calories || 0)
+                                 acc.p += Number(f.protein || 0)
+                                 acc.c += Number(f.carbs || 0)
+                                 acc.g += Number(f.fat || 0)
+                                 acc.s += Number(f.sodium || 0)
+                             })
+                             return acc
+                         }, { kcal: 0, p: 0, c: 0, g: 0, s: 0 })
+
+                         return (
+                            <div style={{ display: 'flex', width: '100%', background: '#f0f9ff', borderRadius: 8, border: '1px solid #bfdbfe', overflow: 'hidden' }}>
+                                <div style={{ flex: 1, textAlign: 'center', padding: '15px 5px', borderRight: '1px solid #cbd5e1' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>CALORIAS</div>
+                                    <div style={{ color: '#1e3a8a', fontSize: '1.6em', fontWeight: 800 }}>{Math.round(total.kcal)}</div>
+                                    <div style={{ fontSize: '12px', color: '#64748b' }}>kcal</div>
+                                </div>
+                                <div style={{ flex: 1, textAlign: 'center', padding: '15px 5px', borderRight: '1px solid #cbd5e1' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>PROTEÍNA</div>
+                                    <div style={{ color: '#166534', fontSize: '1.6em', fontWeight: 800 }}>{total.p.toFixed(0)}g</div>
+                                </div>
+                                <div style={{ flex: 1, textAlign: 'center', padding: '15px 5px', borderRight: '1px solid #cbd5e1' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>CARBOIDRATO</div>
+                                    <div style={{ color: '#1e40af', fontSize: '1.6em', fontWeight: 800 }}>{total.c.toFixed(0)}g</div>
+                                </div>
+                                <div style={{ flex: 1, textAlign: 'center', padding: '15px 5px', borderRight: '1px solid #cbd5e1' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>GORDURA</div>
+                                    <div style={{ color: '#9a3412', fontSize: '1.6em', fontWeight: 800 }}>{total.g.toFixed(0)}g</div>
+                                </div>
+                                <div style={{ flex: 1, textAlign: 'center', padding: '15px 5px' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>SÓDIO</div>
+                                    <div style={{ color: '#555', fontSize: '1.6em', fontWeight: 800 }}>{Math.round(total.s)}mg</div>
+                                </div>
+                            </div>
+                         )
+                     })()}
                 </div>
         {supplements.length > 0 && (
             <div style={{ marginTop: 30, breakInside: 'avoid' }}>
