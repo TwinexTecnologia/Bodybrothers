@@ -192,62 +192,42 @@ export default function PhotoEvolution() {
             </div>
 
             {/* Área de Visualização */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 
-                {/* Lado A */}
-                <div style={{ background: '#fff', padding: 24, borderRadius: 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                    <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 16, marginBottom: 16 }}>
-                        <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.1rem' }}>{recordA ? formatDate(recordA.date) : 'Selecione'}</h3>
-                        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Registro Inicial</span>
-                    </div>
-                    
-                    {recordA && (
-                        <div style={{ display: 'grid', gap: 24 }}>
-                            {recordA.photos.map((photo, i) => (
-                                <div key={i} style={{ 
-                                    position: 'relative',
-                                    height: 400,
-                                    background: '#f8fafc',
-                                    borderRadius: 12,
-                                    border: '1px solid #e2e8f0',
-                                    overflow: 'hidden',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}>
-                                    <img 
-                                        src={photo} 
-                                        alt={`Foto ${i+1}`} 
-                                        style={{ 
-                                            maxWidth: '100%', 
-                                            maxHeight: '100%', 
-                                            objectFit: 'contain',
-                                            cursor: 'pointer' 
-                                        }}
-                                        onClick={() => window.open(photo, '_blank')}
-                                    />
-                                    <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem' }}>
-                                        Foto {i+1}
-                                    </div>
-                                </div>
-                            ))}
+                {/* Cabeçalho das Colunas (Data) */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, textAlign: 'center' }}>
+                    <div style={{ background: '#f8fafc', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>
+                            {recordA ? formatDate(recordA.date) : 'Selecione'}
                         </div>
-                    )}
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>ANTES</div>
+                    </div>
+                    <div style={{ background: '#f0fdf4', padding: 10, borderRadius: 8, border: '1px solid #bbf7d0' }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>
+                            {recordB ? formatDate(recordB.date) : 'Selecione'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#16a34a' }}>DEPOIS</div>
+                    </div>
                 </div>
 
-                {/* Lado B */}
-                <div style={{ background: '#fff', padding: 24, borderRadius: 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                    <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 16, marginBottom: 16 }}>
-                        <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.1rem' }}>{recordB ? formatDate(recordB.date) : 'Selecione'}</h3>
-                        <span style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 600 }}>Registro Comparativo</span>
-                    </div>
-                    
-                    {recordB && (
-                        <div style={{ display: 'grid', gap: 24 }}>
-                            {recordB.photos.map((photo, i) => (
-                                <div key={i} style={{ 
+                {/* Lista de Fotos Lado a Lado */}
+                {(() => {
+                    const countA = recordA?.photos.length || 0
+                    const countB = recordB?.photos.length || 0
+                    const maxPhotos = Math.max(countA, countB)
+
+                    if (maxPhotos === 0) return <div className="text-center text-gray-500 py-8">Nenhuma foto para comparar nos períodos selecionados.</div>
+
+                    return Array.from({ length: maxPhotos }).map((_, i) => {
+                        const photoA = recordA?.photos[i]
+                        const photoB = recordB?.photos[i]
+
+                        return (
+                            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                {/* Lado A */}
+                                <div style={{ 
                                     position: 'relative',
-                                    height: 400,
+                                    height: 300,
                                     background: '#f8fafc',
                                     borderRadius: 12,
                                     border: '1px solid #e2e8f0',
@@ -256,25 +236,57 @@ export default function PhotoEvolution() {
                                     alignItems: 'center',
                                     justifyContent: 'center'
                                 }}>
-                                    <img 
-                                        src={photo} 
-                                        alt={`Foto ${i+1}`} 
-                                        style={{ 
-                                            maxWidth: '100%', 
-                                            maxHeight: '100%', 
-                                            objectFit: 'contain',
-                                            cursor: 'pointer' 
-                                        }}
-                                        onClick={() => window.open(photo, '_blank')}
-                                    />
-                                    <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem' }}>
-                                        Foto {i+1}
-                                    </div>
+                                    {photoA ? (
+                                        <img 
+                                            src={photoA} 
+                                            alt={`Foto ${i+1} Antes`} 
+                                            style={{ 
+                                                maxWidth: '100%', 
+                                                maxHeight: '100%', 
+                                                objectFit: 'contain',
+                                                cursor: 'pointer' 
+                                            }}
+                                            onClick={() => window.open(photoA, '_blank')}
+                                        />
+                                    ) : (
+                                        <div style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>Sem foto</div>
+                                    )}
+                                    {photoA && <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '2px 6px', borderRadius: 4, fontSize: '0.7rem' }}>{i+1}</div>}
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+
+                                {/* Lado B */}
+                                <div style={{ 
+                                    position: 'relative',
+                                    height: 300,
+                                    background: '#f0fdf4',
+                                    borderRadius: 12,
+                                    border: '1px solid #bbf7d0',
+                                    overflow: 'hidden',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    {photoB ? (
+                                        <img 
+                                            src={photoB} 
+                                            alt={`Foto ${i+1} Depois`} 
+                                            style={{ 
+                                                maxWidth: '100%', 
+                                                maxHeight: '100%', 
+                                                objectFit: 'contain',
+                                                cursor: 'pointer' 
+                                            }}
+                                            onClick={() => window.open(photoB, '_blank')}
+                                        />
+                                    ) : (
+                                        <div style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>Sem foto</div>
+                                    )}
+                                    {photoB && <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '2px 6px', borderRadius: 4, fontSize: '0.7rem' }}>{i+1}</div>}
+                                </div>
+                            </div>
+                        )
+                    })
+                })()}
 
             </div>
         </div>
