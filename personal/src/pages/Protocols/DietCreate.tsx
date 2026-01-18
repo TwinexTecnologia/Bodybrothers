@@ -642,7 +642,20 @@ export default function DietCreate() {
                         {(f.substitutes || []).map((s, si) => (
                             <div key={si} style={{ display: 'flex', gap: 10, marginTop: 8, alignItems: 'center', paddingLeft: 20 }}>
                                 <div style={{ color: '#cbd5e1' }}>↳</div>
-                                <input className="input" style={{ flex: 3, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Substituto" value={s.name} onChange={(e) => updateSubstitute(mi, fi, si, { name: e.target.value })} />
+                                <div style={{ flex: 3 }}>
+                                    <FoodAutocomplete 
+                                        className="input" 
+                                        style={{ width: '100%', minWidth: 0, fontSize: '0.9em', background: '#f8fafc' }} 
+                                        placeholder="Buscar Substituto..." 
+                                        value={s.name} 
+                                        onChange={(val) => updateSubstitute(mi, fi, si, { name: val })}
+                                        onSelect={(details) => updateSubstitute(mi, fi, si, {
+                                            name: details.name,
+                                            unit: details.unit_weight ? 'unid' : 'g',
+                                            quantity: details.unit_weight ? '1' : '100'
+                                        })}
+                                    />
+                                </div>
                                 <input className="input" style={{ flex: 1, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Qtd" value={s.quantity} onChange={(e) => updateSubstitute(mi, fi, si, { quantity: e.target.value })} />
                                 <input className="input" style={{ flex: 1, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Unid" value={s.unit} onChange={(e) => updateSubstitute(mi, fi, si, { unit: e.target.value })} />
                                 <button onClick={() => removeSubstitute(mi, fi, si)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8em', padding: '0 8px' }}>✕</button>
