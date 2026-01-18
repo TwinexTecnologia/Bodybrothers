@@ -527,7 +527,7 @@ export default function ListWorkouts() {
             
             <div className="frequency-scroll">
                 {/* Linha de conexão sutil */}
-                <div style={{ position: 'absolute', top: 22, left: 24, right: 24, height: 3, background: '#f1f5f9', zIndex: 0, borderRadius: 2 }} />
+                <div style={{ position: 'absolute', top: 19, left: 24, right: 24, height: 3, background: '#f1f5f9', zIndex: 0, borderRadius: 2 }} />
                 
                 {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, i) => {
                     const isActive = activeDays.includes(i)
@@ -546,27 +546,27 @@ export default function ListWorkouts() {
                         bg = '#10b981'
                         border = '2px solid #10b981'
                         color = '#fff'
-                        content = <CheckCircle size={20} strokeWidth={3} />
+                        content = <CheckCircle size={18} strokeWidth={3} />
                         shadow = '0 4px 12px rgba(16, 185, 129, 0.4)'
                         scale = 1.1
                     } else if (isPast) {
                         bg = '#fff'
                         border = '2px solid #fecaca'
                         color = '#ef4444'
-                        content = <X size={20} strokeWidth={3} />
+                        content = <X size={18} strokeWidth={3} />
                     } else if (isToday) {
                         bg = '#fff'
                         border = '2px solid #3b82f6'
                         color = '#3b82f6'
-                        content = <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#3b82f6' }} />
+                        content = <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#3b82f6' }} />
                         shadow = '0 0 0 4px rgba(59, 130, 246, 0.15)'
                         scale = 1.1
                     }
 
                     return (
-                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, zIndex: 1, position: 'relative', flex: 1 }}>
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, zIndex: 1, position: 'relative', flex: 1 }}>
                             <div style={{ 
-                                width: 48, height: 48, borderRadius: '50%', 
+                                width: 40, height: 40, borderRadius: '50%', 
                                 border: border, background: bg, 
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 color: color, boxShadow: shadow, 
@@ -575,7 +575,7 @@ export default function ListWorkouts() {
                             }}>
                                 {content}
                             </div>
-                            <span style={{ fontSize: '0.8rem', color: isToday ? '#3b82f6' : '#64748b', fontWeight: isToday ? 800 : 600 }}>{day}</span>
+                            <span style={{ fontSize: '0.75rem', color: isToday ? '#3b82f6' : '#64748b', fontWeight: isToday ? 800 : 600 }}>{day}</span>
                         </div>
                     )
                 })}

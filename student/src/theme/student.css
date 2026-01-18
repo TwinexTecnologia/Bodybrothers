@@ -147,14 +147,16 @@ body {
   }
 
   .frequency-scroll {
-      overflow-x: auto;
-      padding-bottom: 12px;
-      justify-content: flex-start;
-      gap: 16px;
+      /* Ajuste para caber na tela sem scroll */
+      overflow-x: visible;
+      padding-bottom: 0;
+      justify-content: space-between;
+      gap: 2px;
   }
   
   .frequency-scroll > div {
-      min-width: 60px;
+      min-width: auto;
+      flex: 1;
   }
   
   /* Timer gigante no modo treino */
