@@ -688,8 +688,8 @@ export default function ListWorkouts() {
                         </div>
                         
                         <div style={{ marginTop: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-                            <div style={{ width: 90, height: 90, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(10px)', boxShadow: '0 8px 32px rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.2)', marginTop: -50, marginBottom: 16 }}>
-                                <Dumbbell size={44} color="#fff" strokeWidth={1.5} />
+                            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(10px)', boxShadow: '0 8px 32px rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.2)', marginTop: 12, marginBottom: 12 }}>
+                                <Dumbbell size={32} color="#fff" strokeWidth={1.5} />
                             </div>
 
                             {activeDays.includes(new Date().getDay()) ? (
