@@ -516,10 +516,10 @@ export default function ListWorkouts() {
 
   return (
     <>
-      <div style={{ padding: 24, maxWidth: 800, margin: '0 auto', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <div style={{ padding: 16, maxWidth: 800, margin: '0 auto', fontFamily: 'Inter, system-ui, sans-serif' }}>
         
         {/* Frequência de Treinos */}
-        <div style={{ background: '#fff', borderRadius: 24, padding: '24px', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.05)', marginBottom: 32, border: '1px solid rgba(0,0,0,0.02)' }}>
+        <div style={{ background: '#fff', borderRadius: 24, padding: '20px 16px', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.05)', marginBottom: 32, border: '1px solid rgba(0,0,0,0.02)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <h2 style={{ fontSize: '1.1rem', color: '#0f172a', margin: 0, fontWeight: 800, letterSpacing: '-0.5px' }}>Frequência Semanal</h2>
                 <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>{weeklyFreq} / {Object.keys(schedule).length || 5} treinos</span>
@@ -527,7 +527,7 @@ export default function ListWorkouts() {
             
             <div className="frequency-scroll">
                 {/* Linha de conexão sutil */}
-                <div style={{ position: 'absolute', top: 19, left: 24, right: 24, height: 3, background: '#f1f5f9', zIndex: 0, borderRadius: 2 }} />
+                <div style={{ position: 'absolute', top: 16, left: 16, right: 16, height: 2, background: '#f1f5f9', zIndex: 0, borderRadius: 2 }} />
                 
                 {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, i) => {
                     const isActive = activeDays.includes(i)
@@ -546,27 +546,27 @@ export default function ListWorkouts() {
                         bg = '#10b981'
                         border = '2px solid #10b981'
                         color = '#fff'
-                        content = <CheckCircle size={18} strokeWidth={3} />
+                        content = <CheckCircle size={16} strokeWidth={3} />
                         shadow = '0 4px 12px rgba(16, 185, 129, 0.4)'
                         scale = 1.1
                     } else if (isPast) {
                         bg = '#fff'
                         border = '2px solid #fecaca'
                         color = '#ef4444'
-                        content = <X size={18} strokeWidth={3} />
+                        content = <X size={16} strokeWidth={3} />
                     } else if (isToday) {
                         bg = '#fff'
                         border = '2px solid #3b82f6'
                         color = '#3b82f6'
-                        content = <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#3b82f6' }} />
+                        content = <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} />
                         shadow = '0 0 0 4px rgba(59, 130, 246, 0.15)'
                         scale = 1.1
                     }
 
                     return (
-                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, zIndex: 1, position: 'relative', flex: 1 }}>
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, zIndex: 1, position: 'relative', flex: 1 }}>
                             <div style={{ 
-                                width: 40, height: 40, borderRadius: '50%', 
+                                width: 34, height: 34, borderRadius: '50%', 
                                 border: border, background: bg, 
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 color: color, boxShadow: shadow, 
@@ -575,7 +575,7 @@ export default function ListWorkouts() {
                             }}>
                                 {content}
                             </div>
-                            <span style={{ fontSize: '0.75rem', color: isToday ? '#3b82f6' : '#64748b', fontWeight: isToday ? 800 : 600 }}>{day}</span>
+                            <span style={{ fontSize: '0.7rem', color: isToday ? '#3b82f6' : '#64748b', fontWeight: isToday ? 800 : 600 }}>{day}</span>
                         </div>
                     )
                 })}
