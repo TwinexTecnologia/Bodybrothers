@@ -3,6 +3,7 @@ import { addDiet, updateDiet, getDietById, deleteDietIfPersonalized, type DietMe
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { getStudent, updateStudent } from '../../store/students'
 import { supabase } from '../../lib/supabase'
+import FoodAutocomplete from '../../components/FoodAutocomplete'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 
@@ -168,6 +169,25 @@ export default function DietCreate() {
   }
 
   // Helpers
+  const recalculateMacros = (f: DietFood): DietFood => {
+    // Se não tem base, não calcula
+    if (!f.base_calories_100g) return f
+    
+    const qtyStr = f.quantity ? f.quantity.toString().replace(',', '.') : '0'
+    const qty = Number(qtyStr)
+    
+    if (isNaN(qty)) return f
+
+    const factor = qty / 100
+    return {
+        ...f,
+        calories: (Number(f.base_calories_100g) * factor).toFixed(0),
+        protein: (Number(f.base_protein_100g) * factor).toFixed(1),
+        carbs: (Number(f.base_carbs_100g) * factor).toFixed(1),
+        fat: (Number(f.base_fat_100g) * factor).toFixed(1)
+    }
+  }
+
   const addMeal = () => setMeals([...meals, { title: '', time: '', foods: [] }])
   const addMealAfter = (index: number) => {
     const next = meals.slice()
@@ -195,14 +215,22 @@ export default function DietCreate() {
   const addFood = (mi: number) => {
     const next = meals.slice()
     const foods = next[mi].foods.slice()
-    foods.push({ name: '', quantity: '', unit: '' })
+    foods.push({ name: '', quantity: '', unit: 'g' })
     next[mi] = { ...next[mi], foods }
     setMeals(next)
   }
   const updateFood = (mi: number, fi: number, patch: Partial<DietFood>) => {
     const next = meals.slice()
     const foods = next[mi].foods.slice()
-    foods[fi] = { ...foods[fi], ...patch }
+    
+    let updatedFood = { ...foods[fi], ...patch }
+    
+    // Recalcula macros se quantidade ou base mudar
+    if (patch.quantity !== undefined || patch.base_calories_100g !== undefined) {
+        updatedFood = recalculateMacros(updatedFood)
+    }
+    
+    foods[fi] = updatedFood
     next[mi] = { ...next[mi], foods }
     setMeals(next)
   }
@@ -487,7 +515,7 @@ export default function DietCreate() {
             <div
               key={mi}
               className="form-card"
-              style={{ padding: 0, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}
+              style={{ padding: 0, overflow: 'visible', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}
               draggable
               onDragStart={() => setDragIndex(mi)}
               onDragOver={(e) => e.preventDefault()}
@@ -535,30 +563,55 @@ export default function DietCreate() {
 
               <div style={{ padding: 20 }}>
                 {/* Tabela de Alimentos */}
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 40px', gap: 10, marginBottom: 8, padding: '0 8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 40px', gap: 8, marginBottom: 8, padding: '0 8px' }}>
                     <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>ALIMENTO</div>
                     <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>QTD</div>
                     <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>UNID</div>
+                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Calorias">KCAL</div>
+                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Proteína">P</div>
+                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Carboidrato">C</div>
+                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Gordura">G</div>
                     <div></div>
                 </div>
 
                 {m.foods.map((f, fi) => (
                     <div key={fi} style={{ marginBottom: 12, padding: '8px', background: '#fff', borderRadius: 8, border: '1px solid #f1f5f9' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 40px', gap: 10, alignItems: 'center' }}>
-                            <input className="input" style={{ width: '100%', minWidth: 0 }} placeholder="Ex: Arroz Branco" value={f.name} onChange={(e) => updateFood(mi, fi, { name: e.target.value })} />
+                        <div style={{ display: 'grid', gridTemplateColumns: '3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 40px', gap: 8, alignItems: 'center' }}>
+                            <FoodAutocomplete 
+                                className="input" 
+                                style={{ width: '100%', minWidth: 0 }} 
+                                placeholder="Ex: Arroz Branco" 
+                                value={f.name} 
+                                onChange={(val) => updateFood(mi, fi, { name: val })}
+                                onSelect={(details) => updateFood(mi, fi, {
+                                    name: details.name,
+                                    food_id: details.food_id,
+                                    base_calories_100g: details.calories_100g.toString(),
+                                    base_protein_100g: details.protein_100g.toString(),
+                                    base_carbs_100g: details.carbs_100g.toString(),
+                                    base_fat_100g: details.fat_100g.toString()
+                                })}
+                            />
                             <input className="input" style={{ width: '100%', minWidth: 0 }} placeholder="100" value={f.quantity} onChange={(e) => updateFood(mi, fi, { quantity: e.target.value })} />
                             <input className="input" style={{ width: '100%', minWidth: 0 }} placeholder="g" value={f.unit} onChange={(e) => updateFood(mi, fi, { unit: e.target.value })} />
+                            
+                            {/* Macros Readonly */}
+                            <input className="input" style={{ background: '#f8fafc', color: '#64748b', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.calories || '-'} />
+                            <input className="input" style={{ background: '#f0fdf4', color: '#166534', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.protein || '-'} />
+                            <input className="input" style={{ background: '#eff6ff', color: '#1e40af', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.carbs || '-'} />
+                            <input className="input" style={{ background: '#fff7ed', color: '#9a3412', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.fat || '-'} />
+
                             <button onClick={() => removeFood(mi, fi)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
                         </div>
                         
                         {/* Substitutos */}
                         {(f.substitutes || []).map((s, si) => (
-                            <div key={si} style={{ display: 'grid', gridTemplateColumns: '20px 2fr 1fr 1fr 40px', gap: 10, marginTop: 8, alignItems: 'center' }}>
-                                <div style={{ color: '#cbd5e1', textAlign: 'center' }}>↳</div>
-                                <input className="input" style={{ width: '100%', minWidth: 0, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Substituto" value={s.name} onChange={(e) => updateSubstitute(mi, fi, si, { name: e.target.value })} />
-                                <input className="input" style={{ width: '100%', minWidth: 0, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Qtd" value={s.quantity} onChange={(e) => updateSubstitute(mi, fi, si, { quantity: e.target.value })} />
-                                <input className="input" style={{ width: '100%', minWidth: 0, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Unid" value={s.unit} onChange={(e) => updateSubstitute(mi, fi, si, { unit: e.target.value })} />
-                                <button onClick={() => removeSubstitute(mi, fi, si)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8em' }}>✕</button>
+                            <div key={si} style={{ display: 'flex', gap: 10, marginTop: 8, alignItems: 'center', paddingLeft: 20 }}>
+                                <div style={{ color: '#cbd5e1' }}>↳</div>
+                                <input className="input" style={{ flex: 3, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Substituto" value={s.name} onChange={(e) => updateSubstitute(mi, fi, si, { name: e.target.value })} />
+                                <input className="input" style={{ flex: 1, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Qtd" value={s.quantity} onChange={(e) => updateSubstitute(mi, fi, si, { quantity: e.target.value })} />
+                                <input className="input" style={{ flex: 1, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Unid" value={s.unit} onChange={(e) => updateSubstitute(mi, fi, si, { unit: e.target.value })} />
+                                <button onClick={() => removeSubstitute(mi, fi, si)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8em', padding: '0 8px' }}>✕</button>
                             </div>
                         ))}
                         
@@ -676,6 +729,11 @@ export default function DietCreate() {
                                     <strong style={{ fontWeight: 700, color: '#1e293b' }}>{f.name}</strong>
                                     <span style={{ fontWeight: 600 }}>{f.quantity && `${f.quantity} ${f.unit}`}</span>
                                 </div>
+                                {f.calories && (
+                                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: 2 }}>
+                                        {f.calories}kcal &nbsp; P:{f.protein}g &nbsp; C:{f.carbs}g &nbsp; G:{f.fat}g
+                                    </div>
+                                )}
                                 {(f.substitutes || []).map((s, si) => (
                                     <div key={si} style={{ marginLeft: 15, marginTop: 4, color: '#64748b', fontSize: '0.9em', display: 'flex', alignItems: 'center' }}>
                                         <span style={{ marginRight: 5 }}>↳</span> ou {s.name} - {s.quantity} {s.unit}

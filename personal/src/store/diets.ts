@@ -12,6 +12,16 @@ export type DietFood = {
   unit: string
   notes?: string
   substitutes?: DietSubstitute[]
+  // Macros e Metadados
+  calories?: string
+  protein?: string
+  carbs?: string
+  fat?: string
+  food_id?: string
+  base_calories_100g?: string
+  base_protein_100g?: string
+  base_carbs_100g?: string
+  base_fat_100g?: string
 }
 
 export type DietMeal = {
