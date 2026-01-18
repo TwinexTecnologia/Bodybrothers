@@ -178,13 +178,28 @@ export default function DietCreate() {
     
     if (isNaN(qty)) return f
 
-    const factor = qty / 100
+    let grams = 0
+    const unit = f.unit ? f.unit.toLowerCase().trim() : 'g'
+
+    if (unit === 'g' || unit === 'ml') {
+        grams = qty
+    } else if (f.base_unit_weight) {
+        // Se temos o peso da unidade cadastrado
+        grams = qty * f.base_unit_weight
+    } else {
+        // Se não temos peso de referência para a unidade, não calculamos automaticamente
+        // para não sobrescrever edições manuais com valores errados.
+        return f
+    }
+
+    const factor = grams / 100
     return {
         ...f,
         calories: (Number(f.base_calories_100g) * factor).toFixed(0),
         protein: (Number(f.base_protein_100g) * factor).toFixed(1),
         carbs: (Number(f.base_carbs_100g) * factor).toFixed(1),
-        fat: (Number(f.base_fat_100g) * factor).toFixed(1)
+        fat: (Number(f.base_fat_100g) * factor).toFixed(1),
+        sodium: (Number(f.base_sodium_100g || 0) * factor).toFixed(0)
     }
   }
 
@@ -225,8 +240,8 @@ export default function DietCreate() {
     
     let updatedFood = { ...foods[fi], ...patch }
     
-    // Recalcula macros se quantidade ou base mudar
-    if (patch.quantity !== undefined || patch.base_calories_100g !== undefined) {
+    // Recalcula macros se quantidade, unidade ou base mudar
+    if (patch.quantity !== undefined || patch.base_calories_100g !== undefined || patch.unit !== undefined) {
         updatedFood = recalculateMacros(updatedFood)
     }
     
@@ -563,7 +578,7 @@ export default function DietCreate() {
 
               <div style={{ padding: 20 }}>
                 {/* Tabela de Alimentos */}
-                <div style={{ display: 'grid', gridTemplateColumns: '3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 40px', gap: 8, marginBottom: 8, padding: '0 8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 0.5fr 40px', gap: 8, marginBottom: 8, padding: '0 8px' }}>
                     <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>ALIMENTO</div>
                     <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>QTD</div>
                     <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>UNID</div>
@@ -571,12 +586,13 @@ export default function DietCreate() {
                     <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Proteína">P</div>
                     <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Carboidrato">C</div>
                     <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Gordura">G</div>
+                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Sódio (mg)">SOD</div>
                     <div></div>
                 </div>
 
                 {m.foods.map((f, fi) => (
                     <div key={fi} style={{ marginBottom: 12, padding: '8px', background: '#fff', borderRadius: 8, border: '1px solid #f1f5f9' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 40px', gap: 8, alignItems: 'center' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 0.5fr 40px', gap: 8, alignItems: 'center' }}>
                             <FoodAutocomplete 
                                 className="input" 
                                 style={{ width: '100%', minWidth: 0 }} 
@@ -589,17 +605,35 @@ export default function DietCreate() {
                                     base_calories_100g: details.calories_100g.toString(),
                                     base_protein_100g: details.protein_100g.toString(),
                                     base_carbs_100g: details.carbs_100g.toString(),
-                                    base_fat_100g: details.fat_100g.toString()
+                                    base_fat_100g: details.fat_100g.toString(),
+                                    base_sodium_100g: details.sodium_100g.toString(),
+                                    base_unit_weight: details.unit_weight,
+                                    unit: details.unit_weight ? 'unid' : 'g',
+                                    quantity: details.unit_weight ? '1' : '100'
                                 })}
                             />
                             <input className="input" style={{ width: '100%', minWidth: 0 }} placeholder="100" value={f.quantity} onChange={(e) => updateFood(mi, fi, { quantity: e.target.value })} />
-                            <input className="input" style={{ width: '100%', minWidth: 0 }} placeholder="g" value={f.unit} onChange={(e) => updateFood(mi, fi, { unit: e.target.value })} />
+                            
+                            <select 
+                                className="input" 
+                                style={{ width: '100%', minWidth: 0, padding: '8px 4px', background: '#fff' }} 
+                                value={f.unit || 'g'} 
+                                onChange={(e) => updateFood(mi, fi, { unit: e.target.value })}
+                            >
+                                <option value="g">g</option>
+                                <option value="ml">ml</option>
+                                <option value="unid">unid</option>
+                                <option value="fatia">fatia</option>
+                                <option value="colher">colher</option>
+                                <option value="scoop">scoop</option>
+                            </select>
                             
                             {/* Macros Readonly */}
                             <input className="input" style={{ background: '#f8fafc', color: '#64748b', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.calories || '-'} />
                             <input className="input" style={{ background: '#f0fdf4', color: '#166534', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.protein || '-'} />
                             <input className="input" style={{ background: '#eff6ff', color: '#1e40af', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.carbs || '-'} />
                             <input className="input" style={{ background: '#fff7ed', color: '#9a3412', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.fat || '-'} />
+                            <input className="input" style={{ background: '#f5f5f5', color: '#555', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.sodium || '-'} />
 
                             <button onClick={() => removeFood(mi, fi)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
                         </div>
@@ -715,41 +749,112 @@ export default function DietCreate() {
                 {notes}
             </div>
         )}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 25 }}>
-            {meals.map((m, i) => (
-                <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden', breakInside: 'avoid', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                    <div style={{ background: '#1e3a8a', color: '#fff', padding: '10px 15px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '16px', textTransform: 'uppercase' }}>{m.title || `Refeição ${i+1}`}</span>
-                        <span style={{ fontSize: '15px', fontWeight: 500 }}>{m.time}</span>
-                    </div>
-                    <div style={{ padding: '15px' }}>
-                        {m.foods.map((f, fi) => (
-                            <div key={fi} style={{ marginBottom: 10, fontSize: '15px', borderBottom: fi < m.foods.length - 1 ? '1px solid #f1f5f9' : 'none', paddingBottom: fi < m.foods.length - 1 ? 10 : 0 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <strong style={{ fontWeight: 700, color: '#1e293b' }}>{f.name}</strong>
-                                    <span style={{ fontWeight: 600 }}>{f.quantity && `${f.quantity} ${f.unit}`}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 25 }}>
+                    {/* (Removido Resumo Geral do Topo - Mover para o Fim) */}
+
+                    {meals.map((m, i) => {
+                        // Calcula totais da refeição
+                        const mealTotals = m.foods.reduce((acc, f) => {
+                            acc.kcal += Number(f.calories || 0)
+                            acc.p += Number(f.protein || 0)
+                            acc.c += Number(f.carbs || 0)
+                            acc.g += Number(f.fat || 0)
+                            acc.s += Number(f.sodium || 0)
+                            return acc
+                        }, { kcal: 0, p: 0, c: 0, g: 0, s: 0 })
+
+                        return (
+                            <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden', breakInside: 'avoid', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                                <div style={{ background: '#1e3a8a', color: '#fff', padding: '10px 15px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '16px', textTransform: 'uppercase' }}>{m.title || `Refeição ${i+1}`}</span>
+                                    <span style={{ fontSize: '15px', fontWeight: 500 }}>{m.time}</span>
                                 </div>
-                                {f.calories && (
-                                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: 2 }}>
-                                        {f.calories}kcal &nbsp; P:{f.protein}g &nbsp; C:{f.carbs}g &nbsp; G:{f.fat}g
+                                <div style={{ padding: '15px' }}>
+                                    {m.foods.map((f, fi) => (
+                                        <div key={fi} style={{ marginBottom: 10, fontSize: '15px', borderBottom: fi < m.foods.length - 1 ? '1px solid #f1f5f9' : 'none', paddingBottom: fi < m.foods.length - 1 ? 10 : 0 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <strong style={{ fontWeight: 700, color: '#1e293b' }}>{f.name}</strong>
+                                                <span style={{ fontWeight: 600 }}>{f.quantity && `${f.quantity} ${f.unit}`}</span>
+                                            </div>
+                                            {f.calories && (
+                                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: 2 }}>
+                                                    {f.calories}kcal &nbsp; P:{f.protein}g &nbsp; C:{f.carbs}g &nbsp; G:{f.fat}g &nbsp; SOD:{f.sodium || 0}mg
+                                                </div>
+                                            )}
+                                            {(f.substitutes || []).map((s, si) => (
+                                                <div key={si} style={{ marginLeft: 15, marginTop: 4, color: '#64748b', fontSize: '0.9em', display: 'flex', alignItems: 'center' }}>
+                                                    <span style={{ marginRight: 5 }}>↳</span> ou {s.name} - {s.quantity} {s.unit}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Resumo da Refeição (Rodapé do Card) */}
+                                <div style={{ background: '#f8fafc', padding: '10px 15px', borderTop: '1px solid #e2e8f0', fontSize: '13px', display: 'flex', justifyContent: 'flex-end', gap: 15, color: '#475569', fontWeight: 600 }}>
+                                    <span>Total Refeição:</span>
+                                    <span style={{ color: '#1e3a8a' }}>{Math.round(mealTotals.kcal)} kcal</span>
+                                    <span style={{ color: '#166534' }}>P: {mealTotals.p.toFixed(1)}g</span>
+                                    <span style={{ color: '#1e40af' }}>C: {mealTotals.c.toFixed(1)}g</span>
+                                    <span style={{ color: '#9a3412' }}>G: {mealTotals.g.toFixed(1)}g</span>
+                                    <span style={{ color: '#555' }}>SOD: {Math.round(mealTotals.s)}mg</span>
+                                </div>
+                                {m.notes && (
+                                    <div style={{ padding: '10px 15px', background: '#fff', borderTop: '1px solid #e2e8f0', fontSize: '13px', color: '#475569', fontStyle: 'italic' }}>
+                                        <strong>Obs:</strong> {m.notes}
                                     </div>
                                 )}
-                                {(f.substitutes || []).map((s, si) => (
-                                    <div key={si} style={{ marginLeft: 15, marginTop: 4, color: '#64748b', fontSize: '0.9em', display: 'flex', alignItems: 'center' }}>
-                                        <span style={{ marginRight: 5 }}>↳</span> ou {s.name} - {s.quantity} {s.unit}
-                                    </div>
-                                ))}
                             </div>
-                        ))}
-                    </div>
-                    {m.notes && (
-                        <div style={{ padding: '10px 15px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', fontSize: '13px', color: '#475569' }}>
-                            <strong>Obs:</strong> {m.notes}
-                        </div>
-                    )}
+                        )
+                    })}
                 </div>
-            ))}
-        </div>
+
+                {/* Resumo Nutricional Geral (Ao final) */}
+                <div style={{ marginTop: 30, breakInside: 'avoid', borderTop: '3px solid #1e3a8a', paddingTop: 20 }}>
+                     <h3 style={{ margin: '0 0 15px 0', color: '#1e3a8a', fontSize: '18px', textTransform: 'uppercase' }}>Resumo Diário Total</h3>
+                     <div style={{ display: 'flex', justifyContent: 'space-around', background: '#f0f9ff', padding: 20, borderRadius: 8, border: '1px solid #bfdbfe' }}>
+                         {(() => {
+                             const total = meals.reduce((acc, m) => {
+                                 m.foods.forEach(f => {
+                                     acc.kcal += Number(f.calories || 0)
+                                     acc.p += Number(f.protein || 0)
+                                     acc.c += Number(f.carbs || 0)
+                                     acc.g += Number(f.fat || 0)
+                                     acc.s += Number(f.sodium || 0)
+                                 })
+                                 return acc
+                             }, { kcal: 0, p: 0, c: 0, g: 0, s: 0 })
+                             return (
+                                 <>
+                                     <div style={{ textAlign: 'center' }}>
+                                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>CALORIAS</div>
+                                         <div style={{ color: '#1e3a8a', fontSize: '1.6em', fontWeight: 800 }}>{Math.round(total.kcal)}</div>
+                                         <div style={{ fontSize: '12px', color: '#64748b' }}>kcal</div>
+                                     </div>
+                                     <div style={{ width: 1, background: '#cbd5e1' }}></div>
+                                     <div style={{ textAlign: 'center' }}>
+                                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>PROTEÍNA</div>
+                                         <div style={{ color: '#166534', fontSize: '1.6em', fontWeight: 800 }}>{total.p.toFixed(0)}g</div>
+                                     </div>
+                                     <div style={{ width: 1, background: '#cbd5e1' }}></div>
+                                     <div style={{ textAlign: 'center' }}>
+                                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>CARBOIDRATO</div>
+                                         <div style={{ color: '#1e40af', fontSize: '1.6em', fontWeight: 800 }}>{total.c.toFixed(0)}g</div>
+                                     </div>
+                                     <div style={{ width: 1, background: '#cbd5e1' }}></div>
+                                     <div style={{ textAlign: 'center' }}>
+                                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>GORDURA</div>
+                                         <div style={{ color: '#9a3412', fontSize: '1.6em', fontWeight: 800 }}>{total.g.toFixed(0)}g</div>
+                                     </div>
+                                     <div style={{ width: 1, background: '#cbd5e1' }}></div>
+                                     <div style={{ textAlign: 'center' }}>
+                                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: 5 }}>SÓDIO</div>
+                                         <div style={{ color: '#555', fontSize: '1.6em', fontWeight: 800 }}>{Math.round(total.s)}mg</div>
+                                     </div>
+                                 </>
+                             )
+                         })()}
+                     </div>
+                </div>
         {supplements.length > 0 && (
             <div style={{ marginTop: 30, breakInside: 'avoid' }}>
                 <h3 style={{ borderBottom: '2px solid #e5e7eb', paddingBottom: 8, marginBottom: 15, fontSize: '18px' }}>Suplementação</h3>

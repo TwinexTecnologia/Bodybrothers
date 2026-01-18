@@ -17,11 +17,14 @@ export type DietFood = {
   protein?: string
   carbs?: string
   fat?: string
+  sodium?: string
   food_id?: string
   base_calories_100g?: string
   base_protein_100g?: string
   base_carbs_100g?: string
   base_fat_100g?: string
+  base_sodium_100g?: string
+  base_unit_weight?: number // Peso em gramas de 1 unidade (se aplicável)
 }
 
 export type DietMeal = {
