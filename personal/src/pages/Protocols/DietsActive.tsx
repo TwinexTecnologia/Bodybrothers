@@ -294,9 +294,34 @@ export default function DietsActive() {
       
       // Se a dieta selecionada JÁ pertence ao aluno escolhido:
       if (selectedDietForAssign.studentId === assignStudentId) {
-          alert('Esta dieta já pertence a este aluno. Use o botão "Editar" para modificá-la.')
+          alert('Esta dieta já pertence a este aluno. Use o botão "Editar" para modificá-lo.')
           setLoading(false)
           return
+      }
+
+      // Verifica se é um item da biblioteca que PARECE ser do aluno
+      // e oferece a opção de VINCULAR (Mover) ao invés de DUPLICAR
+      const studentName = studentNames[assignStudentId]
+      const firstName = studentName ? studentName.split(' ')[0] : ''
+      
+      let shouldMove = false
+      if (!selectedDietForAssign.studentId && firstName && selectedDietForAssign.name.toLowerCase().includes(firstName.toLowerCase())) {
+          shouldMove = true
+      }
+
+      if (shouldMove) {
+          if (confirm(`Esta dieta "${selectedDietForAssign.name}" parece pertencer a este aluno. Deseja VINCULAR (remover da biblioteca) em vez de criar uma cópia? Clique em OK para Vincular ou Cancelar para Copiar.`)) {
+              await updateDiet(selectedDietForAssign.id, { studentId: assignStudentId })
+              
+              // Atualiza lista localmente
+              setItems(prev => prev.map(d => d.id === selectedDietForAssign.id ? { ...d, studentId: assignStudentId } : d))
+              
+              setAssignModalOpen(false)
+              setSelectedDietForAssign(null)
+              setAssignStudentId('')
+              setLoading(false)
+              return
+          }
       }
 
       // Se for de OUTRO aluno ou da Biblioteca -> CRIA CÓPIA
