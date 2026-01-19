@@ -135,6 +135,7 @@ export async function updateModel(id: string, patch: Partial<AnamnesisModel>): P
   
   const updates: any = { updated_at: new Date().toISOString() }
   if (patch.name) updates.title = patch.name
+  if (patch.studentId !== undefined) updates.student_id = patch.studentId || null
   
   if (patch.goal || patch.questions) {
       updates.data = {

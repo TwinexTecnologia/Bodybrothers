@@ -2,9 +2,9 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Camera } from 'lucide-react'
 import { listStudentsByPersonal, updateStudent, getStudent, type StudentRecord } from '../../store/students'
-import { listActiveDiets, type DietRecord, listStudentDiets, duplicateDiet, deleteDietIfPersonalized } from '../../store/diets'
-import { listActiveWorkouts, duplicateWorkout, setWorkoutStatus, type WorkoutRecord } from '../../store/workouts'
-import { listLibraryModels, listStudentModels, duplicateModel, deleteModel, type AnamnesisModel } from '../../store/anamnesis'
+import { listActiveDiets, type DietRecord, listStudentDiets, duplicateDiet, updateDiet, deleteDietIfPersonalized } from '../../store/diets'
+import { listActiveWorkouts, duplicateWorkout, updateWorkout, setWorkoutStatus, type WorkoutRecord } from '../../store/workouts'
+import { listLibraryModels, listStudentModels, duplicateModel, updateModel, deleteModel, type AnamnesisModel } from '../../store/anamnesis'
 import { listPlans, type PlanRecord } from '../../store/plans'
 import { listAllStudentPayments } from '../../store/financial'
 import { isStudentOverdue } from '../../lib/finance_utils'
@@ -322,9 +322,9 @@ export default function EditStudent() {
   }
 
   const handleRemoveStudentDiet = async (did: string) => {
-      if (!confirm('Tem certeza que deseja remover esta dieta do aluno?')) return
+      if (!confirm('Tem certeza que deseja remover esta dieta do aluno? Ela permanecerá na lista de Dietas Ativas como não-vinculada.')) return
       setLoading(true)
-      await deleteDietIfPersonalized(did)
+      await updateDiet(did, { studentId: '' }) // Unlink instead of delete
       await reloadStudentDiets()
       setLoading(false)
   }
@@ -366,9 +366,9 @@ export default function EditStudent() {
   }
 
   const handleRemoveStudentWorkout = async (wid: string) => {
-      if (!confirm('Tem certeza que deseja remover este treino do aluno?')) return
+      if (!confirm('Tem certeza que deseja remover este treino do aluno? Ele permanecerá na lista de Treinos Ativos como não-vinculado.')) return
       setLoading(true)
-      await setWorkoutStatus(wid, 'inativo')
+      await updateWorkout(wid, { studentId: '' }) // Unlink instead of setting to inactive
       await reloadWorkouts()
       setLoading(false)
   }
@@ -394,9 +394,9 @@ export default function EditStudent() {
   }
 
   const handleRemoveAnamnesis = async (aid: string) => {
-      if (!confirm('Tem certeza que deseja remover esta anamnese do aluno?')) return
+      if (!confirm('Tem certeza que deseja remover esta anamnese do aluno? Ela permanecerá nos Modelos Ativos.')) return
       setLoading(true)
-      await deleteModel(aid)
+      await updateModel(aid, { studentId: '' }) // Unlink instead of delete
       await reloadAnamnesis()
       setLoading(false)
   }

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { listActiveWorkouts, setWorkoutStatus, updateWorkout, toggleWorkoutFavorite, type WorkoutRecord } from '../../store/workouts'
-import { supabase } from '../../lib/supabase'
-import { Star } from 'lucide-react'
+import { listActiveWorkouts, setWorkoutStatus, updateWorkout, toggleWorkoutFavorite, duplicateWorkout, type WorkoutRecord } from '../../store/workouts'
+  import { supabase } from '../../lib/supabase'
+  import { Star, Copy } from 'lucide-react'
+  import Modal from '../../components/Modal'
 
 export default function WorkoutsActive() {
   const [items, setItems] = useState<WorkoutRecord[]>([])
@@ -18,6 +19,10 @@ export default function WorkoutsActive() {
   const [eExercises, setEExercises] = useState<Array<WorkoutRecord['exercises'][number]>>([])
   const [loading, setLoading] = useState(true)
   const [personalId, setPersonalId] = useState('')
+
+  const [assignModalOpen, setAssignModalOpen] = useState(false)
+  const [selectedWorkoutForAssign, setSelectedWorkoutForAssign] = useState<WorkoutRecord | null>(null)
+  const [assignStudentId, setAssignStudentId] = useState('')
 
   async function loadData() {
     setLoading(true)
@@ -141,6 +146,45 @@ export default function WorkoutsActive() {
         setItems(prev => prev.map(x => x.id === rec.id ? rec : x))
     }
     cancelEdit()
+  }
+
+  const openAssignModal = (w: WorkoutRecord) => {
+      setSelectedWorkoutForAssign(w)
+      setAssignStudentId('')
+      setAssignModalOpen(true)
+  }
+
+  const handleAssign = async () => {
+      if (!selectedWorkoutForAssign || !assignStudentId) return
+      
+      setLoading(true)
+      
+      // Lógica de Duplicação Inteligente:
+      // 1. Se o treino JÁ É do aluno selecionado -> Não faz nada ou avisa (mas aqui vamos assumir que o usuário sabe o que faz e duplicaria se quisesse, mas a regra é "editar")
+      // Mas o botão é "Vincular/Duplicar".
+      // A regra pedida:
+      // "se for o treino dele ja ele so editar nao criar novo" -> Isso é o botão EDITAR que já existe na lista.
+      // "se for de um aluno diferente ele cria um novo com o nome do aluno que foi aplicado" -> Isso é o duplicateWorkout.
+      
+      // Se o treino selecionado JÁ pertence ao aluno escolhido:
+      if (selectedWorkoutForAssign.studentId === assignStudentId) {
+          alert('Este treino já pertence a este aluno. Use o botão "Editar" para modificá-lo.')
+          setLoading(false)
+          return
+      }
+
+      // Se for de OUTRO aluno ou da Biblioteca -> CRIA CÓPIA
+      const newWorkout = await duplicateWorkout(selectedWorkoutForAssign.id, assignStudentId)
+      
+      if (newWorkout) {
+          // Adiciona na lista
+          setItems(prev => [newWorkout, ...prev])
+          setAssignModalOpen(false)
+          setSelectedWorkoutForAssign(null)
+          setAssignStudentId('')
+      }
+      
+      setLoading(false)
   }
 
   if (loading) return <div>Carregando...</div>
@@ -279,6 +323,14 @@ export default function WorkoutsActive() {
                 <div><small>Validade</small>: {w.validUntil ? new Date(w.validUntil).toLocaleDateString() : '—'}</div>
               </div>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button 
+                    className="btn" 
+                    onClick={() => openAssignModal(w)} 
+                    style={{ background: '#3b82f6', display: 'flex', alignItems: 'center', gap: 6 }}
+                    title="Duplicar para um aluno"
+                >
+                    <Copy size={16} /> Vincular
+                </button>
                 <button className="btn" onClick={() => startEdit(w)} style={{ background: 'var(--personal-accent)' }}>Editar</button>
                 <button className="btn" onClick={() => archive(w)} style={{ background: '#ef4444' }}>Arquivar</button>
               </div>
@@ -402,6 +454,44 @@ export default function WorkoutsActive() {
           </div>
         )}
       </div>
+
+      <Modal
+          isOpen={assignModalOpen}
+          onClose={() => setAssignModalOpen(false)}
+          title="Vincular Treino a Aluno"
+          footer={
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <button className="btn" style={{ background: '#e2e8f0', color: '#1e293b' }} onClick={() => setAssignModalOpen(false)}>Cancelar</button>
+                  <button className="btn" style={{ background: '#0f172a', color: '#fff' }} onClick={handleAssign} disabled={!assignStudentId}>Confirmar</button>
+              </div>
+          }
+      >
+          <div style={{ padding: 10 }}>
+              <p style={{ color: '#64748b', marginBottom: 16 }}>
+                  Selecione o aluno para quem deseja copiar este treino.
+                  <br/>
+                  <small>Será criada uma cópia independente com o nome do aluno.</small>
+              </p>
+              
+              <label className="label">
+                  Selecione o Aluno
+                  <select 
+                      className="select" 
+                      style={{ width: '100%' }}
+                      value={assignStudentId} 
+                      onChange={e => setAssignStudentId(e.target.value)}
+                  >
+                      <option value="">Selecione...</option>
+                      {Object.entries(studentNames)
+                          .sort((a,b) => a[1].localeCompare(b[1]))
+                          .map(([id, name]) => (
+                              <option key={id} value={id}>{name}</option>
+                          ))
+                      }
+                  </select>
+              </label>
+          </div>
+      </Modal>
     </div>
   )
 }
