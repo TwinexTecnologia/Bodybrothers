@@ -7,6 +7,7 @@ import { Star } from 'lucide-react'
 
 export default function DietsActive() {
   const [items, setItems] = useState<DietRecord[]>([])
+  const [studentNames, setStudentNames] = useState<Record<string, string>>({})
   const [q, setQ] = useState('')
   const [openSubs, setOpenSubs] = useState<Record<string, boolean>>({})
   const [openDiet, setOpenDiet] = useState<Record<string, boolean>>({})
@@ -28,6 +29,17 @@ export default function DietsActive() {
     if (user) {
         const list = await listActiveDiets(user.id)
         setItems(list)
+
+        // Carrega nomes de TODOS os alunos disponíveis
+        const { data: students } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+        
+        const names: Record<string, string> = {}
+        students?.forEach(s => {
+            names[s.id] = s.full_name
+        })
+        setStudentNames(names)
         
         const { data: config } = await supabase
             .from('personal_config')
@@ -278,7 +290,42 @@ export default function DietsActive() {
                     <Star size={20} fill={d.isFavorite ? "#eab308" : "none"} color={d.isFavorite ? "#eab308" : "#94a3b8"} />
                 </button>
                 <div>
-                  <div className="diet-title">{d.name}</div>
+                  <div className="diet-title">
+                      {d.name}
+                      {d.studentId ? (
+                          <span style={{ 
+                              fontSize: '0.75em', 
+                              backgroundColor: '#eff6ff', 
+                              color: '#3b82f6', 
+                              padding: '2px 8px', 
+                              borderRadius: 12, 
+                              marginLeft: 8,
+                              verticalAlign: 'middle',
+                              border: '1px solid #dbeafe',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4
+                          }}>
+                              👤 {studentNames[d.studentId] || 'Aluno'}
+                          </span>
+                      ) : (
+                          <span style={{ 
+                              fontSize: '0.75em', 
+                              backgroundColor: '#f1f5f9', 
+                              color: '#64748b', 
+                              padding: '2px 8px', 
+                              borderRadius: 12, 
+                              marginLeft: 8,
+                              verticalAlign: 'middle',
+                              border: '1px solid #e2e8f0',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4
+                          }}>
+                              📚 Biblioteca
+                          </span>
+                      )}
+                  </div>
                   <div className="diet-goal">{d.goal || '—'}</div>
                 </div>
               </div>

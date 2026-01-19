@@ -212,10 +212,21 @@ export async function duplicateWorkout(originalId: string, studentId: string, ne
   const original = await getWorkoutById(originalId)
   if (!original) return null
 
+  let finalTitle = newTitle || original.name
+
+  // Se não foi passado um título novo e estamos vinculando a um aluno,
+  // adiciona o nome do aluno ao título para fácil identificação
+  if (!newTitle && studentId) {
+      const { data: student } = await supabase.from('profiles').select('name').eq('id', studentId).single()
+      if (student?.name) {
+          finalTitle = `${original.name} - ${student.name.split(' ')[0]}`
+      }
+  }
+
   return addWorkout({
     personalId: original.personalId,
     studentId: studentId, // Vincula ao aluno
-    name: newTitle || `${original.name}`,
+    name: finalTitle,
     goal: original.goal,
     validUntil: original.validUntil,
     notes: original.notes,

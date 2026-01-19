@@ -222,11 +222,21 @@ export async function duplicateDiet(originalId: string, studentId: string): Prom
   const original = await getDietById(originalId)
   if (!original) return null
 
+  let finalTitle = `${original.name}`
+
+  // Adiciona nome do aluno para identificar fácil na lista geral
+  if (studentId) {
+      const { data: student } = await supabase.from('profiles').select('name').eq('id', studentId).single()
+      if (student?.name) {
+          finalTitle = `${original.name} - ${student.name.split(' ')[0]}`
+      }
+  }
+
   // Cria cópia vinculada ao aluno
   return addDiet({
       personalId: original.personalId,
       studentId: studentId,
-      name: `${original.name}`,
+      name: finalTitle,
       goal: original.goal,
       meals: original.meals,
       variants: original.variants,

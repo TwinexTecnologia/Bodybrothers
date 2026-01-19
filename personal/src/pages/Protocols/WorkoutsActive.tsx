@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { listLibraryWorkouts, setWorkoutStatus, updateWorkout, toggleWorkoutFavorite, type WorkoutRecord } from '../../store/workouts'
+import { listActiveWorkouts, setWorkoutStatus, updateWorkout, toggleWorkoutFavorite, type WorkoutRecord } from '../../store/workouts'
 import { supabase } from '../../lib/supabase'
 import { Star } from 'lucide-react'
 
 export default function WorkoutsActive() {
   const [items, setItems] = useState<WorkoutRecord[]>([])
+  const [studentNames, setStudentNames] = useState<Record<string, string>>({})
   const [q, setQ] = useState('')
   const [editingId, setEditingId] = useState('')
   const [eName, setEName] = useState('')
@@ -21,8 +22,21 @@ export default function WorkoutsActive() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
         setPersonalId(user.id)
-        const list = await listLibraryWorkouts(user.id)
+        // Agora busca TODOS os ativos (incluindo de alunos)
+        const list = await listActiveWorkouts(user.id)
         setItems(list)
+
+        // 2. Carrega nomes de TODOS os alunos disponíveis
+        // Removemos filtro de role para evitar bugs (pode ser 'aluno' ou 'student')
+        const { data: students } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+        
+        const names: Record<string, string> = {}
+        students?.forEach(s => {
+            names[s.id] = s.full_name
+        })
+        setStudentNames(names)
     }
     setLoading(false)
   }
@@ -143,7 +157,40 @@ export default function WorkoutsActive() {
                     <Star size={20} fill={w.isFavorite ? "#eab308" : "none"} color={w.isFavorite ? "#eab308" : "#94a3b8"} />
                 </button>
                 <div>
-                  <strong>{w.name}</strong>
+                  <strong style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      {w.name}
+                      {w.studentId ? (
+                          <span style={{ 
+                              fontSize: '0.75em', 
+                              backgroundColor: '#eff6ff', 
+                              color: '#3b82f6', 
+                              padding: '2px 8px', 
+                              borderRadius: 12, 
+                              fontWeight: 600,
+                              border: '1px solid #dbeafe',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4
+                          }}>
+                              👤 {studentNames[w.studentId] || 'Aluno'}
+                          </span>
+                      ) : (
+                          <span style={{ 
+                              fontSize: '0.75em', 
+                              backgroundColor: '#f1f5f9', 
+                              color: '#64748b', 
+                              padding: '2px 8px', 
+                              borderRadius: 12, 
+                              fontWeight: 600,
+                              border: '1px solid #e2e8f0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4
+                          }}>
+                              📚 Biblioteca
+                          </span>
+                      )}
+                  </strong>
                   <div style={{ color: '#64748b' }}>{w.goal || '—'}</div>
                 </div>
               </div>
