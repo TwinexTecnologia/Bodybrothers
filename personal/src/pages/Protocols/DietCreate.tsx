@@ -170,36 +170,55 @@ export default function DietCreate() {
 
   // Helpers
   const recalculateMacros = (f: DietFood): DietFood => {
-    // Se não tem base, não calcula
-    if (!f.base_calories_100g) return f
-    
-    const qtyStr = f.quantity ? f.quantity.toString().replace(',', '.') : '0'
-    const qty = Number(qtyStr)
-    
-    if (isNaN(qty)) return f
+    try {
+        // Se não tem base, não calcula
+        if (!f.base_calories_100g) return f
+        
+        // Garante que quantity seja string
+        const qtyRaw = f.quantity !== undefined && f.quantity !== null ? String(f.quantity) : '0'
+        const qtyStr = qtyRaw.replace(',', '.')
+        const qty = Number(qtyStr)
+        
+        if (isNaN(qty)) return f
 
-    let grams = 0
-    const unit = f.unit ? f.unit.toLowerCase().trim() : 'g'
+        let grams = 0
+        const unit = f.unit ? String(f.unit).toLowerCase().trim() : 'g'
 
-    if (unit === 'g' || unit === 'ml') {
-        grams = qty
-    } else if (f.base_unit_weight) {
-        // Se temos o peso da unidade cadastrado
-        grams = qty * f.base_unit_weight
-    } else {
-        // Se não temos peso de referência para a unidade, não calculamos automaticamente
-        // para não sobrescrever edições manuais com valores errados.
+        if (unit === 'g' || unit === 'ml') {
+            grams = qty
+        } else if (f.base_unit_weight) {
+            // Se temos o peso da unidade cadastrado
+            grams = qty * Number(f.base_unit_weight)
+        } else {
+            // Se não temos peso de referência para a unidade, não calculamos automaticamente
+            return f
+        }
+
+        const factor = grams / 100
+        
+        const safeCalc = (val: string | undefined) => {
+            const n = Number(val || 0)
+            if (isNaN(n)) return '0'
+            return (n * factor).toFixed(0)
+        }
+
+        const safeCalcFloat = (val: string | undefined) => {
+            const n = Number(val || 0)
+            if (isNaN(n)) return '0'
+            return (n * factor).toFixed(1)
+        }
+
+        return {
+            ...f,
+            calories: safeCalc(f.base_calories_100g),
+            protein: safeCalcFloat(f.base_protein_100g),
+            carbs: safeCalcFloat(f.base_carbs_100g),
+            fat: safeCalcFloat(f.base_fat_100g),
+            sodium: safeCalc(f.base_sodium_100g)
+        }
+    } catch (e) {
+        console.error('Erro ao calcular macros:', e)
         return f
-    }
-
-    const factor = grams / 100
-    return {
-        ...f,
-        calories: (Number(f.base_calories_100g) * factor).toFixed(0),
-        protein: (Number(f.base_protein_100g) * factor).toFixed(1),
-        carbs: (Number(f.base_carbs_100g) * factor).toFixed(1),
-        fat: (Number(f.base_fat_100g) * factor).toFixed(1),
-        sodium: (Number(f.base_sodium_100g || 0) * factor).toFixed(0)
     }
   }
 
