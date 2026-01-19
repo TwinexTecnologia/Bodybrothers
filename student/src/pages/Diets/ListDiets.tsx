@@ -299,9 +299,38 @@ export default function ListDiets() {
                     }}
                 >
                     <div className="diet-modal-header">
+                        <style>{`
+                            .diet-modal-header {
+                                 display: flex;
+                                 padding: 16px 20px;
+                                 flex-direction: column;
+                                 align-items: flex-start;
+                                 gap: 12px;
+                                 position: relative; /* Garante contexto de empilhamento */
+                             }
+                             .diet-modal-header h2 {
+                                 font-size: 1.25rem !important;
+                                 word-break: break-word;
+                                 line-height: 1.3;
+                                 width: 100%; /* Força largura total */
+                                 margin-bottom: 4px !important;
+                             }
+                             .diet-modal-header p {
+                                  font-size: 0.9rem !important;
+                                  word-break: break-word;
+                                  line-height: 1.4;
+                                  width: 100%;
+                             }
+                             .diet-modal-header-actions {
+                                 width: 100%;
+                                 display: flex;
+                                 gap: 12px;
+                                 margin-top: 8px !important; /* Espaço explícito acima dos botões */
+                             }
+                        `}</style>
                         <div style={{ width: '100%' }}>
-                            <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a', lineHeight: 1.2 }}>{selectedDiet.title}</h2>
-                            {selectedDiet.data.goal && <p style={{ margin: '8px 0 0 0', color: '#64748b', lineHeight: 1.4 }}>{selectedDiet.data.goal}</p>}
+                            <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a' }}>{selectedDiet.title}</h2>
+                            {selectedDiet.data.goal && <p style={{ margin: '4px 0 0 0', color: '#64748b' }}>{selectedDiet.data.goal}</p>}
                         </div>
                         <div className="diet-modal-header-actions" style={{ display: 'flex', gap: 12, marginTop: '10px' }}>
                             <button onClick={exportPDF} style={{ background: '#f1f5f9', border: 'none', padding: '8px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: '#64748b', fontWeight: 600 }}>
