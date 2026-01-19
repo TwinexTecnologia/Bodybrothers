@@ -107,6 +107,19 @@ export async function listArchivedDiets(personalId: string): Promise<DietRecord[
   return (data || []).map(mapFromDb)
 }
 
+export async function listArchivedStudentDiets(personalId: string, studentId: string): Promise<DietRecord[]> {
+  const { data, error } = await supabase
+    .from('protocols')
+    .select('*')
+    .eq('personal_id', personalId)
+    .eq('student_id', studentId)
+    .eq('type', 'diet')
+    .neq('status', 'active')
+  
+  if (error) return []
+  return (data || []).map(mapFromDb)
+}
+
 export async function addDiet(d: Omit<DietRecord, 'id' | 'status' | 'updatedAt'>): Promise<DietRecord | null> {
   const { data, error } = await supabase
     .from('protocols')

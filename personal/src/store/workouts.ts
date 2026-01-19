@@ -117,6 +117,19 @@ export async function listArchivedWorkouts(personalId: string): Promise<WorkoutR
   return (data || []).map(mapFromDb)
 }
 
+export async function listArchivedStudentWorkouts(personalId: string, studentId: string): Promise<WorkoutRecord[]> {
+  const { data, error } = await supabase
+    .from('protocols')
+    .select('*')
+    .eq('personal_id', personalId)
+    .eq('student_id', studentId)
+    .eq('type', 'workout')
+    .neq('status', 'active')
+  
+  if (error) return []
+  return (data || []).map(mapFromDb)
+}
+
 export async function addWorkout(w: Omit<WorkoutRecord, 'id' | 'status' | 'updatedAt'>): Promise<WorkoutRecord | null> {
   const { data, error } = await supabase
     .from('protocols')

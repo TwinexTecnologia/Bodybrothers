@@ -2,9 +2,9 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Camera } from 'lucide-react'
 import { listStudentsByPersonal, updateStudent, getStudent, type StudentRecord } from '../../store/students'
-import { listActiveDiets, type DietRecord, listStudentDiets, duplicateDiet, updateDiet, deleteDietIfPersonalized } from '../../store/diets'
-import { listActiveWorkouts, duplicateWorkout, updateWorkout, setWorkoutStatus, type WorkoutRecord } from '../../store/workouts'
-import { listLibraryModels, listStudentModels, duplicateModel, updateModel, deleteModel, type AnamnesisModel } from '../../store/anamnesis'
+import { listActiveDiets, type DietRecord, listStudentDiets, duplicateDiet, updateDiet, deleteDietIfPersonalized, listArchivedStudentDiets } from '../../store/diets'
+import { listActiveWorkouts, duplicateWorkout, updateWorkout, setWorkoutStatus, type WorkoutRecord, listArchivedStudentWorkouts } from '../../store/workouts'
+import { listLibraryModels, listStudentModels, duplicateModel, updateModel, deleteModel, type AnamnesisModel, listArchivedStudentModels } from '../../store/anamnesis'
 import { listPlans, type PlanRecord } from '../../store/plans'
 import { listAllStudentPayments } from '../../store/financial'
 import { isStudentOverdue } from '../../lib/finance_utils'
@@ -45,6 +45,11 @@ export default function EditStudent() {
   const [selectedDietIds, setSelectedDietIds] = useState<string[]>([])
   const [workoutSchedule, setWorkoutSchedule] = useState<Record<string, string[]>>({})
   
+  // Arquivados (Histórico do aluno)
+  const [archivedWorkouts, setArchivedWorkouts] = useState<WorkoutRecord[]>([])
+  const [archivedDiets, setArchivedDiets] = useState<DietRecord[]>([])
+  const [archivedAnamnesis, setArchivedAnamnesis] = useState<AnamnesisModel[]>([])
+
   // Anamneses
   const [libraryAnamnesis, setLibraryAnamnesis] = useState<AnamnesisModel[]>([])
   const [studentAnamnesis, setStudentAnamnesis] = useState<AnamnesisModel[]>([])
@@ -93,46 +98,44 @@ export default function EditStudent() {
 
   // Opções para dropdowns (Blindado contra erros)
   const workoutOptions = useMemo(() => {
-      if (!allWorkouts || !Array.isArray(allWorkouts)) return []
-      try {
-          return allWorkouts
-            .filter(w => w && w.studentId !== selectedId)
-            .sort((a, b) => {
-                const na = a?.name || ''
-                const nb = b?.name || ''
-                return String(na).localeCompare(String(nb))
-            })
-            .map(w => {
-                const ownerName = w.studentId ? studentMap[w.studentId] : null
-                const label = ownerName ? `${w.name} (👤 ${ownerName})` : `📚 ${w.name}`
-                return { id: w.id, label }
-            })
-      } catch (err) {
-          console.error('Erro ao gerar opções de treino:', err)
-          return []
-      }
-  }, [allWorkouts, selectedId, studentMap])
+      const activeOptions = (allWorkouts || [])
+        .filter(w => w && w.studentId !== selectedId)
+        .map(w => {
+            const ownerName = w.studentId ? studentMap[w.studentId] : null
+            const label = ownerName ? `${w.name} (👤 ${ownerName})` : `📚 ${w.name}`
+            return { id: w.id, label, isArchived: false }
+        })
+
+      const archivedOptions = (archivedWorkouts || [])
+        .map(w => ({ id: w.id, label: `📁 ${w.name} (Arquivado)`, isArchived: true }))
+
+      return [...activeOptions, ...archivedOptions].sort((a, b) => a.label.localeCompare(b.label))
+  }, [allWorkouts, archivedWorkouts, selectedId, studentMap])
 
   const dietOptions = useMemo(() => {
-      if (!diets || !Array.isArray(diets)) return []
-      try {
-          return diets
-            .filter(d => d && d.studentId !== selectedId)
-            .sort((a, b) => {
-                const na = a?.name || ''
-                const nb = b?.name || ''
-                return String(na).localeCompare(String(nb))
-            })
-            .map(d => {
-                const ownerName = d.studentId ? studentMap[d.studentId] : null
-                const label = ownerName ? `${d.name} (👤 ${ownerName})` : `📚 ${d.name}`
-                return { id: d.id, label }
-            })
-      } catch (err) {
-          console.error('Erro ao gerar opções de dieta:', err)
-          return []
-      }
-  }, [diets, selectedId, studentMap])
+      const activeOptions = (diets || [])
+        .filter(d => d && d.studentId !== selectedId)
+        .map(d => {
+            const ownerName = d.studentId ? studentMap[d.studentId] : null
+            const label = ownerName ? `${d.name} (👤 ${ownerName})` : `📚 ${d.name}`
+            return { id: d.id, label, isArchived: false }
+        })
+
+      const archivedOptions = (archivedDiets || [])
+        .map(d => ({ id: d.id, label: `📁 ${d.name} (Arquivado)`, isArchived: true }))
+
+      return [...activeOptions, ...archivedOptions].sort((a, b) => a.label.localeCompare(b.label))
+  }, [diets, archivedDiets, selectedId, studentMap])
+  
+  const anamnesisOptions = useMemo(() => {
+      const activeOptions = (libraryAnamnesis || [])
+          .map(a => ({ id: a.id, label: `📚 ${a.name}`, isArchived: false }))
+      
+      const archivedOptions = (archivedAnamnesis || [])
+          .map(a => ({ id: a.id, label: `📁 ${a.name} (Arquivado)`, isArchived: true }))
+          
+      return [...activeOptions, ...archivedOptions].sort((a, b) => a.label.localeCompare(b.label))
+  }, [libraryAnamnesis, archivedAnamnesis])
 
   useEffect(() => {
     async function load() {
@@ -198,6 +201,11 @@ export default function EditStudent() {
             
             const sDiets = await listStudentDiets(user.id, selectedId)
             setStudentDiets(sDiets)
+            
+            // Carrega Arquivados
+            setArchivedWorkouts(await listArchivedStudentWorkouts(user.id, selectedId))
+            setArchivedDiets(await listArchivedStudentDiets(user.id, selectedId))
+            setArchivedAnamnesis(await listArchivedStudentModels(user.id, selectedId))
           }
       }
       loadStudentResources()
@@ -316,6 +324,21 @@ export default function EditStudent() {
       if (!libraryDietId) return
       setLoading(true)
 
+      // 1. Verifica se é um arquivado
+      const archived = archivedDiets.find(d => d.id === libraryDietId)
+      if (archived) {
+          await updateDiet(libraryDietId, { status: 'ativa' })
+          await reloadStudentDiets()
+          
+          // Reload archived to remove from list
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) setArchivedDiets(await listArchivedStudentDiets(user.id, selectedId))
+          
+          setLibraryDietId('')
+          setLoading(false)
+          return
+      }
+
       // Verifica se é um item da biblioteca que PARECE ser do aluno
       const diet = diets.find(d => d.id === libraryDietId)
       const currentStudent = students.find(s => s.id === selectedId)
@@ -346,16 +369,21 @@ export default function EditStudent() {
           const list = await listActiveDiets(user.id)
           setDiets(list)
       }
-
+      
       setLibraryDietId('')
       setLoading(false)
   }
 
   const handleRemoveStudentDiet = async (did: string) => {
-      if (!confirm('Tem certeza que deseja remover esta dieta do aluno? Ela permanecerá na lista de Dietas Ativas como não-vinculada.')) return
+      if (!confirm('Tem certeza que deseja remover esta dieta do aluno? Ela será arquivada e poderá ser recuperada depois.')) return
       setLoading(true)
-      await updateDiet(did, { studentId: '' }) // Unlink instead of delete
+      await updateDiet(did, { status: 'inativa' }) // Arquiva mantendo vínculo
       await reloadStudentDiets()
+      
+      // Atualiza lista geral para aparecer no dropdown
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) setArchivedDiets(await listArchivedStudentDiets(user.id, selectedId))
+
       setLoading(false)
   }
 

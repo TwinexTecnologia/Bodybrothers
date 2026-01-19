@@ -255,6 +255,20 @@ export async function listStudentModels(personalId: string, studentId: string): 
     .eq('personal_id', personalId)
     .eq('student_id', studentId) // Busca modelos específicos do aluno
     .eq('type', 'anamnesis_model')
+    .eq('status', 'active') // Apenas ativos
+  
+  if (error) return []
+  return (data || []).map(mapModelFromDb)
+}
+
+export async function listArchivedStudentModels(personalId: string, studentId: string): Promise<AnamnesisModel[]> {
+  const { data, error } = await supabase
+    .from('protocols')
+    .select('*')
+    .eq('personal_id', personalId)
+    .eq('student_id', studentId)
+    .eq('type', 'anamnesis_model')
+    .neq('status', 'active')
   
   if (error) return []
   return (data || []).map(mapModelFromDb)
