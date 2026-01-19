@@ -23,6 +23,13 @@ export default function WorkoutsActive() {
   const [assignModalOpen, setAssignModalOpen] = useState(false)
   const [selectedWorkoutForAssign, setSelectedWorkoutForAssign] = useState<WorkoutRecord | null>(null)
   const [assignStudentId, setAssignStudentId] = useState('')
+  
+  // Modal de Confirmação
+  const [smartLinkState, setSmartLinkState] = useState<{
+      itemId: string;
+      itemName: string;
+      targetStudentId: string;
+  } | null>(null)
 
   async function loadData() {
     setLoading(true)
@@ -184,18 +191,14 @@ export default function WorkoutsActive() {
       }
 
       if (shouldMove) {
-          if (confirm(`Este treino "${selectedWorkoutForAssign.name}" parece pertencer a este aluno. Deseja VINCULAR (remover da biblioteca) em vez de criar uma cópia? Clique em OK para Vincular ou Cancelar para Copiar.`)) {
-              await updateWorkout(selectedWorkoutForAssign.id, { studentId: assignStudentId })
-              
-              // Atualiza lista localmente
-              setItems(prev => prev.map(w => w.id === selectedWorkoutForAssign.id ? { ...w, studentId: assignStudentId } : w))
-              
-              setAssignModalOpen(false)
-              setSelectedWorkoutForAssign(null)
-              setAssignStudentId('')
-              setLoading(false)
-              return
-          }
+          setSmartLinkState({
+              itemId: selectedWorkoutForAssign.id,
+              itemName: selectedWorkoutForAssign.name,
+              targetStudentId: assignStudentId
+          })
+          setAssignModalOpen(false)
+          setLoading(false)
+          return
       }
 
       // Se for de OUTRO aluno ou da Biblioteca (e não moveu) -> CRIA CÓPIA
@@ -209,6 +212,29 @@ export default function WorkoutsActive() {
           setAssignStudentId('')
       }
       
+      setLoading(false)
+  }
+
+  const confirmSmartLink = async (action: 'link' | 'copy') => {
+      if (!smartLinkState) return
+      setLoading(true)
+      
+      const { itemId, targetStudentId } = smartLinkState
+      
+      if (action === 'link') {
+          await updateWorkout(itemId, { studentId: targetStudentId })
+          // Atualiza lista localmente
+          setItems(prev => prev.map(w => w.id === itemId ? { ...w, studentId: targetStudentId } : w))
+      } else {
+          const newWorkout = await duplicateWorkout(itemId, targetStudentId)
+          if (newWorkout) {
+              setItems(prev => [newWorkout, ...prev])
+          }
+      }
+      
+      setSmartLinkState(null)
+      setSelectedWorkoutForAssign(null)
+      setAssignStudentId('')
       setLoading(false)
   }
 
@@ -516,6 +542,38 @@ export default function WorkoutsActive() {
                   </select>
               </label>
           </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!smartLinkState}
+        onClose={() => setSmartLinkState(null)}
+        title="Vincular ou Copiar?"
+        footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                <button className="btn" style={{ background: '#e2e8f0', color: '#1e293b' }} onClick={() => setSmartLinkState(null)}>Cancelar</button>
+                <button className="btn" style={{ background: '#fff', color: '#0f172a', border: '1px solid #cbd5e1' }} onClick={() => confirmSmartLink('copy')}>Criar Cópia</button>
+                <button className="btn" style={{ background: '#0f172a', color: '#fff' }} onClick={() => confirmSmartLink('link')}>Vincular (Mover)</button>
+            </div>
+        }
+      >
+        <div style={{ textAlign: 'center', padding: 10 }}>
+            <div style={{ fontSize: '3rem', marginBottom: 16 }}>🔄</div>
+            <h3 style={{ color: '#1e293b', marginBottom: 12 }}>Item encontrado na Biblioteca</h3>
+            <p style={{ color: '#64748b', fontSize: '1.05em', marginBottom: 20 }}>
+                O item <strong>"{smartLinkState?.itemName}"</strong> parece já pertencer ao aluno selecionado.
+            </p>
+            <div style={{ textAlign: 'left', background: '#f8fafc', padding: 16, borderRadius: 8, fontSize: '0.95em', color: '#475569' }}>
+                <p style={{ margin: '0 0 10px 0' }}><strong>O que você deseja fazer?</strong></p>
+                <ul style={{ paddingLeft: 20, margin: 0 }}>
+                    <li style={{ marginBottom: 8 }}>
+                        <strong>Vincular (Mover):</strong> Retira da biblioteca e atribui ao aluno.
+                    </li>
+                    <li>
+                        <strong>Criar Cópia:</strong> Mantém o original na biblioteca e cria um novo para o aluno.
+                    </li>
+                </ul>
+            </div>
+        </div>
       </Modal>
     </div>
   )

@@ -338,6 +338,29 @@ export default function DietsActive() {
       setLoading(false)
   }
 
+  const confirmSmartLink = async (action: 'link' | 'copy') => {
+      if (!smartLinkState) return
+      setLoading(true)
+      
+      const { itemId, targetStudentId } = smartLinkState
+      
+      if (action === 'link') {
+          await updateDiet(itemId, { studentId: targetStudentId })
+          // Atualiza lista localmente
+          setItems(prev => prev.map(d => d.id === itemId ? { ...d, studentId: targetStudentId } : d))
+      } else {
+          const newDiet = await duplicateDiet(itemId, targetStudentId)
+          if (newDiet) {
+              setItems(prev => [newDiet, ...prev])
+          }
+      }
+      
+      setSmartLinkState(null)
+      setSelectedDietForAssign(null)
+      setAssignStudentId('')
+      setLoading(false)
+  }
+
   if (loading) return <div>Carregando...</div>
 
   return (
@@ -630,6 +653,38 @@ export default function DietsActive() {
                   </select>
               </label>
           </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!smartLinkState}
+        onClose={() => setSmartLinkState(null)}
+        title="Vincular ou Copiar?"
+        footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                <button className="btn" style={{ background: '#e2e8f0', color: '#1e293b' }} onClick={() => setSmartLinkState(null)}>Cancelar</button>
+                <button className="btn" style={{ background: '#fff', color: '#0f172a', border: '1px solid #cbd5e1' }} onClick={() => confirmSmartLink('copy')}>Criar Cópia</button>
+                <button className="btn" style={{ background: '#0f172a', color: '#fff' }} onClick={() => confirmSmartLink('link')}>Vincular (Mover)</button>
+            </div>
+        }
+      >
+        <div style={{ textAlign: 'center', padding: 10 }}>
+            <div style={{ fontSize: '3rem', marginBottom: 16 }}>🔄</div>
+            <h3 style={{ color: '#1e293b', marginBottom: 12 }}>Item encontrado na Biblioteca</h3>
+            <p style={{ color: '#64748b', fontSize: '1.05em', marginBottom: 20 }}>
+                O item <strong>"{smartLinkState?.itemName}"</strong> parece já pertencer ao aluno selecionado.
+            </p>
+            <div style={{ textAlign: 'left', background: '#f8fafc', padding: 16, borderRadius: 8, fontSize: '0.95em', color: '#475569' }}>
+                <p style={{ margin: '0 0 10px 0' }}><strong>O que você deseja fazer?</strong></p>
+                <ul style={{ paddingLeft: 20, margin: 0 }}>
+                    <li style={{ marginBottom: 8 }}>
+                        <strong>Vincular (Mover):</strong> Retira da biblioteca e atribui ao aluno.
+                    </li>
+                    <li>
+                        <strong>Criar Cópia:</strong> Mantém o original na biblioteca e cria um novo para o aluno.
+                    </li>
+                </ul>
+            </div>
+        </div>
       </Modal>
     </div>
   )

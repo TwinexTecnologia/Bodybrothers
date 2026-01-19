@@ -55,6 +55,14 @@ export default function EditStudent() {
   // Controle de Treinos e Dietas
   const [libraryWorkoutId, setLibraryWorkoutId] = useState('')
   const [libraryDietId, setLibraryDietId] = useState('')
+  
+  // Estado para Modal de Confirmação de Vínculo Inteligente
+  const [smartLinkState, setSmartLinkState] = useState<{
+      type: 'workout' | 'diet' | 'anamnesis';
+      itemId: string;
+      itemName: string;
+      days?: number; // apenas para anamnese
+  } | null>(null)
 
   // Branding para PDF
   const [brandLogoUrl, setBrandLogoUrl] = useState('')
@@ -378,6 +386,30 @@ export default function EditStudent() {
   const handleAddWorkout = async () => {
       if (!libraryWorkoutId) return
       setLoading(true)
+      
+      // Verifica se é um item da biblioteca que PARECE ser do aluno (ex: "Treino - Alex")
+      const workout = allWorkouts.find(w => w.id === libraryWorkoutId)
+      const currentStudent = students.find(s => s.id === selectedId)
+      
+      let shouldMove = false
+      if (workout && !workout.studentId && currentStudent) {
+          const firstName = currentStudent.name.split(' ')[0]
+          // Heurística: Se o nome contém o nome do aluno, assume que é dele e move (vínculo)
+          if (workout.name.toLowerCase().includes(firstName.toLowerCase())) {
+              shouldMove = true
+          }
+      }
+
+      if (shouldMove && workout) {
+          setSmartLinkState({
+              type: 'workout',
+              itemId: libraryWorkoutId,
+              itemName: workout.name
+          })
+          setLoading(false)
+          return
+      }
+
       await duplicateWorkout(libraryWorkoutId, selectedId)
       await reloadWorkouts()
       setLibraryWorkoutId('')
