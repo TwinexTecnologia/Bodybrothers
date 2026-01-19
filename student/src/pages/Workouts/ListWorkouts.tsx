@@ -4,7 +4,7 @@ import { useAuth } from '../../auth/useAuth'
 import { Dumbbell, ChevronRight, PlayCircle, Clock, X, StopCircle, CheckCircle, Calendar, MessageSquare, History, TrendingUp, ChevronLeft, Play, ArrowRight, Flame, BarChart2 } from 'lucide-react'
 import { startSession, finishSession, getWeeklyFrequency, getWeeklyActivity } from '../../store/history'
 
-// Tipos atualizados para refletir nova estrutura do Personal
+// Atualizado para suportar múltiplos sets
 type ExerciseSet = {
     type: 'warmup' | 'feeder' | 'working' | 'custom'
     customLabel?: string
@@ -748,67 +748,84 @@ export default function ListWorkouts() {
                                         <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a', fontWeight: 800, lineHeight: 1.2 }}>{ex.name}</h3>
                                     </div>
                                     
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 0 }}>
-                                        {/* Aquecimento */}
-                                        {(ex.warmupSeries || ex.warmupReps) && (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', color: '#64748b' }}>
-                                                    <span style={{ fontWeight: 600, color: '#ea580c' }}>Aquecimento:</span>
-                                                    <span style={{ fontWeight: 500 }}>{ex.warmupSeries} Séries {ex.warmupReps} Reps {ex.warmupLoad && `(${ex.warmupLoad})`}</span>
-                                                </div>
-                                                {ex.warmupRest && (
-                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: '#64748b', marginLeft: 16 }}>
-                                                         <Clock size={14} />
-                                                         <span>Descanso: {ex.warmupRest}</span>
-                                                     </div>
-                                                )}
-                                            </div>
-                                        )}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 0 }}>
+                                        {(() => {
+                                            // Normaliza sets: usa o do banco se existir, ou constrói a partir dos campos antigos
+                                            let setsToRender: ExerciseSet[] = ex.sets || []
+                                            
+                                            if (setsToRender.length === 0) {
+                                                if (ex.warmupSeries || ex.warmupReps) {
+                                                    setsToRender.push({ type: 'warmup', series: ex.warmupSeries || '', reps: ex.warmupReps || '', load: ex.warmupLoad || '', rest: ex.warmupRest || '' })
+                                                }
+                                                if (ex.feederSeries || ex.feederReps) {
+                                                    setsToRender.push({ type: 'feeder', series: ex.feederSeries || '', reps: ex.feederReps || '', load: ex.feederLoad || '', rest: ex.feederRest || '' })
+                                                }
+                                                // Sempre tem trabalho (exceto se for vazio mesmo)
+                                                if (ex.series || ex.reps) {
+                                                    setsToRender.push({ type: 'working', series: ex.series || '', reps: ex.reps || '', load: ex.load || '', rest: ex.rest || '' })
+                                                }
+                                            }
 
-                                        {/* Feeder */}
-                                        {(ex.feederSeries || ex.feederReps) && (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', color: '#64748b' }}>
-                                                    <span style={{ fontWeight: 600, color: '#0284c7' }}>Preparação:</span>
-                                                    <span style={{ fontWeight: 500 }}>{ex.feederSeries} Séries {ex.feederReps} Reps {ex.feederLoad && `(${ex.feederLoad})`}</span>
-                                                </div>
-                                                {ex.feederRest && (
-                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: '#64748b', marginLeft: 16 }}>
-                                                         <Clock size={14} />
-                                                         <span>Descanso: {ex.feederRest}</span>
-                                                     </div>
-                                                )}
-                                            </div>
-                                        )}
+                                            if (setsToRender.length > 0) {
+                                                return (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                        {setsToRender.map((set, setIdx) => {
+                                                            let color = '#334155'
+                                                            let bg = 'transparent'
+                                                            let label = ''
 
-                                        {/* Working Sets */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1.1rem', color: '#334155' }}>
-                                            <span style={{ fontWeight: 800, color: '#0f172a' }}>Trabalho:</span>
-                                            <span style={{ fontWeight: 600 }}>{ex.series} Séries {ex.reps} Reps</span> 
-                                        </div>
-                                        
-                                        {ex.load && (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1.1rem', color: '#334155' }}>
-                                                <span style={{ fontWeight: 800, color: '#0f172a' }}>Carga:</span>
-                                                <span style={{ fontWeight: 600 }}>{ex.load}</span>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Descanso/Obs */}
-                                        {(ex.rest || ex.notes) && (
-                                            <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                                {ex.rest && (
-                                                    <div style={{ fontSize: '0.9rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                        <Clock size={16} /> 
-                                                        <span>Descanso: {ex.rest}</span>
+                                                            if (set.type === 'warmup') {
+                                                                color = '#ea580c'
+                                                                bg = '#fff7ed'
+                                                                label = 'Aquecimento'
+                                                            } else if (set.type === 'feeder') {
+                                                                color = '#0284c7'
+                                                                bg = '#f0f9ff'
+                                                                label = 'Preparação'
+                                                            } else if (set.type === 'working') {
+                                                                color = '#16a34a'
+                                                                bg = '#f0fdf4'
+                                                                label = 'Trabalho'
+                                                            } else if (set.type === 'topset') {
+                                                                color = '#7c3aed'
+                                                                bg = '#f5f3ff'
+                                                                label = 'Top Set'
+                                                            } else if (set.type === 'custom') {
+                                                                color = '#475569'
+                                                                bg = '#f1f5f9'
+                                                                label = set.customLabel || 'Outro'
+                                                            }
+
+                                                            return (
+                                                                <div key={setIdx} style={{ display: 'flex', flexDirection: 'column', gap: 4, background: bg, padding: '10px 14px', borderRadius: 10, border: `1px solid ${color}30` }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                            <span style={{ fontWeight: 800, color: color, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', background: '#fff', padding: '2px 6px', borderRadius: 4, border: `1px solid ${color}20` }}>{label}</span>
+                                                                            <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '1rem' }}>{set.series} x {set.reps}</span>
+                                                                        </div>
+                                                                        {set.load && <span style={{ fontWeight: 600, color: '#475569', fontSize: '0.9rem' }}>Carga: {set.load}</span>}
+                                                                    </div>
+                                                                    {set.rest && (
+                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: '#64748b', marginTop: 2 }}>
+                                                                             <Clock size={14} />
+                                                                             <span>Descanso: {set.rest}</span>
+                                                                         </div>
+                                                                    )}
+                                                                </div>
+                                                            )
+                                                        })}
                                                     </div>
-                                                )}
-                                                {ex.notes && (
-                                                    <div style={{ fontSize: '0.85rem', color: '#64748b', background: '#fff7ed', padding: '8px 12px', borderRadius: 8, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                                                        <MessageSquare size={16} style={{ marginTop: 2, flexShrink: 0, color: '#f97316' }} /> 
-                                                        <span style={{ color: '#c2410c' }}>{ex.notes}</span>
-                                                    </div>
-                                                )}
+                                                )
+                                            } else {
+                                                return <div style={{ color: '#94a3b8', fontStyle: 'italic', padding: 10 }}>Sem séries definidas.</div>
+                                            }
+                                        })()}
+                                        
+                                        {/* Obs */}
+                                        {ex.notes && (
+                                            <div style={{ fontSize: '0.9rem', color: '#64748b', background: '#fff7ed', padding: '10px 14px', borderRadius: 10, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
+                                                <MessageSquare size={16} style={{ marginTop: 3, flexShrink: 0, color: '#f97316' }} /> 
+                                                <span style={{ color: '#c2410c', lineHeight: 1.5 }}>{ex.notes}</span>
                                             </div>
                                         )}
                                     </div>
