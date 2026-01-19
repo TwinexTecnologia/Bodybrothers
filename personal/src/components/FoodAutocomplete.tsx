@@ -70,53 +70,59 @@ export default function FoodAutocomplete({
                 if (!response.ok) throw new Error('Erro na API OpenFoodFacts')
                 
                 const data = await response.json()
-                let products = data.products || []
+                let products = Array.isArray(data.products) ? data.products : []
                 
                 let apiMatches: any[] = []
 
                 if (products.length > 0) {
-                    // Ordenação customizada API
-                    products.sort((a: any, b: any) => {
-                        const nameA = a.product_name || ''
-                        const nameB = b.product_name || ''
-                        
-                        // 1. Termo exato (match perfeito)
-                        const exactA = nameA.toLowerCase() === text.toLowerCase()
-                        const exactB = nameB.toLowerCase() === text.toLowerCase()
-                        if (exactA && !exactB) return -1
-                        if (!exactA && exactB) return 1
+                    try {
+                        // Ordenação customizada API
+                        products.sort((a: any, b: any) => {
+                            const nameA = a?.product_name || ''
+                            const nameB = b?.product_name || ''
+                            
+                            // 1. Termo exato (match perfeito)
+                            const exactA = nameA.toLowerCase() === text.toLowerCase()
+                            const exactB = nameB.toLowerCase() === text.toLowerCase()
+                            if (exactA && !exactB) return -1
+                            if (!exactA && exactB) return 1
 
-                        // 2. Começa com o termo
-                        const startsA = nameA.toLowerCase().startsWith(text.toLowerCase())
-                        const startsB = nameB.toLowerCase().startsWith(text.toLowerCase())
-                        if (startsA && !startsB) return -1
-                        if (!startsA && startsB) return 1
-                        
-                        // 3. Contém o termo completo (frase)
-                        const containsA = nameA.toLowerCase().includes(text.toLowerCase())
-                        const containsB = nameB.toLowerCase().includes(text.toLowerCase())
-                        if (containsA && !containsB) return -1
-                        if (!containsA && containsB) return 1
+                            // 2. Começa com o termo
+                            const startsA = nameA.toLowerCase().startsWith(text.toLowerCase())
+                            const startsB = nameB.toLowerCase().startsWith(text.toLowerCase())
+                            if (startsA && !startsB) return -1
+                            if (!startsA && startsB) return 1
+                            
+                            // 3. Contém o termo completo (frase)
+                            const containsA = nameA.toLowerCase().includes(text.toLowerCase())
+                            const containsB = nameB.toLowerCase().includes(text.toLowerCase())
+                            if (containsA && !containsB) return -1
+                            if (!containsA && containsB) return 1
 
-                        // 4. Se ambos começam (ou não), ordena por tamanho (menor primeiro = mais "puro")
-                        return nameA.length - nameB.length
-                    })
+                            // 4. Se ambos começam (ou não), ordena por tamanho (menor primeiro = mais "puro")
+                            return nameA.length - nameB.length
+                        })
 
-                    apiMatches = products.map((p: any) => ({
-                        food_id: p.code, 
-                        food_name: p.product_name,
-                        food_description: p.brands ? `${p.brands}` : '',
-                        _raw: p 
-                    }))
+                        apiMatches = products.map((p: any) => ({
+                            food_id: p.code || Math.random().toString(), 
+                            food_name: p.product_name || 'Desconhecido',
+                            food_description: p.brands ? `${p.brands}` : '',
+                            _raw: p 
+                        }))
+                    } catch (e) {
+                        console.error('Erro ao processar produtos:', e)
+                    }
                 }
 
                 setSuggestions(prev => {
+                    if (!Array.isArray(prev)) return apiMatches
+                    
                     // MERGE: Mantém os atuais (locais) e adiciona os da API sem duplicar
-                    const currentNames = new Set(prev.map(m => m.food_name.toLowerCase()))
+                    const currentNames = new Set(prev.map(m => (m.food_name || '').toLowerCase()))
                     const newItems = [...prev]
                     
                     apiMatches.forEach(apiItem => {
-                        if (!currentNames.has(apiItem.food_name.toLowerCase())) {
+                        if (apiItem.food_name && !currentNames.has(apiItem.food_name.toLowerCase())) {
                             newItems.push(apiItem)
                         }
                     })
