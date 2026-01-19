@@ -259,7 +259,7 @@ export default function FoodAutocomplete({
                          <div style={{ padding: 10, color: '#ef4444', fontSize: '0.9em' }}>{errorMsg}</div>
                     )}
 
-                    {!loading && !errorMsg && suggestions.map((s) => (
+                    {!loading && !errorMsg && Array.isArray(suggestions) && suggestions.map((s) => (
                         <div
                             key={s.food_id}
                             onClick={() => handleSelect(s)}
@@ -271,6 +271,21 @@ export default function FoodAutocomplete({
                             <div style={{ fontSize: '0.75em', color: '#64748b' }}>{s.food_description}</div>
                         </div>
                     ))}
+
+                    {!loading && value.length >= 2 && (
+                        <div 
+                            onClick={() => searchWeb(value)}
+                            style={{ 
+                                padding: '12px', textAlign: 'center', cursor: 'pointer', 
+                                color: '#3b82f6', fontWeight: 600, borderTop: '1px solid #e2e8f0',
+                                background: '#f8fafc', fontSize: '0.9em'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#eff6ff'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = '#f8fafc'}
+                        >
+                            🌍 Buscar "{value}" na Web
+                        </div>
+                    )}
                 </div>
             )}
         </div>
