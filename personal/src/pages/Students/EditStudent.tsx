@@ -64,6 +64,15 @@ export default function EditStudent() {
       days?: number; // apenas para anamnese
   } | null>(null)
 
+  // Estado para Confirmação Genérica (Exclusão/Arquivamento)
+  const [confirmModal, setConfirmModal] = useState<{
+      isOpen: boolean;
+      title: string;
+      message: string;
+      onConfirm: () => void;
+      type?: 'danger' | 'default';
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'default' })
+
   // Branding para PDF
   const [brandLogoUrl, setBrandLogoUrl] = useState('')
 
@@ -325,11 +334,13 @@ export default function EditStudent() {
       }
 
       if (shouldMove) {
-          if (confirm('Este item da biblioteca parece pertencer a este aluno. Deseja VINCULAR (remover da biblioteca) em vez de criar uma cópia? Clique em OK para Vincular ou Cancelar para Copiar.')) {
-              await updateDiet(libraryDietId, { studentId: selectedId })
-          } else {
-              await duplicateDiet(libraryDietId, selectedId)
-          }
+          setSmartLinkState({
+              type: 'diet',
+              itemId: libraryDietId,
+              itemName: diet.name
+          })
+          setLoading(false)
+          return
       } else {
           await duplicateDiet(libraryDietId, selectedId)
       }
@@ -348,12 +359,19 @@ export default function EditStudent() {
   }
 
   const handleRemoveStudentDiet = async (did: string) => {
-      if (!confirm('Tem certeza que deseja remover esta dieta do aluno? Ela será arquivada e poderá ser recuperada depois.')) return
-      setLoading(true)
-      await updateDiet(did, { status: 'inativa' }) // Arquiva mantendo vínculo
-      await reloadStudentDiets()
-      
-      setLoading(false)
+      setConfirmModal({
+          isOpen: true,
+          title: 'Arquivar Dieta',
+          message: 'Tem certeza que deseja remover esta dieta do aluno? Ela será arquivada e poderá ser recuperada depois.',
+          type: 'danger',
+          onConfirm: async () => {
+              setLoading(true)
+              await updateDiet(did, { status: 'inativa' })
+              await reloadStudentDiets()
+              setLoading(false)
+              setConfirmModal(prev => ({ ...prev, isOpen: false }))
+          }
+      })
   }
 
   const handleExportDietPdf = async (d: DietRecord) => {
@@ -417,11 +435,19 @@ export default function EditStudent() {
   }
 
   const handleRemoveStudentWorkout = async (wid: string) => {
-      if (!confirm('Tem certeza que deseja remover este treino do aluno? Ele permanecerá na lista de Treinos Ativos como não-vinculado.')) return
-      setLoading(true)
-      await updateWorkout(wid, { studentId: '' }) // Unlink instead of setting to inactive
-      await reloadWorkouts()
-      setLoading(false)
+      setConfirmModal({
+          isOpen: true,
+          title: 'Desvincular Treino',
+          message: 'Tem certeza que deseja remover este treino do aluno? Ele permanecerá na lista de Treinos Ativos como não-vinculado.',
+          type: 'danger',
+          onConfirm: async () => {
+              setLoading(true)
+              await updateWorkout(wid, { studentId: '' })
+              await reloadWorkouts()
+              setLoading(false)
+              setConfirmModal(prev => ({ ...prev, isOpen: false }))
+          }
+      })
   }
 
   const toggleDay = (wid: string, day: string) => {
@@ -924,6 +950,65 @@ export default function EditStudent() {
             <p style={{ color: '#64748b', fontSize: '0.95em' }}>
                 Não é possível alterar o plano até que as pendências sejam regularizadas.
                 Por favor, registre o pagamento no menu <strong>Financeiro</strong> antes de prosseguir.
+            </p>
+        </div>
+      </Modal>
+
+      {/* Modal Smart Link */}
+      <Modal
+        isOpen={!!smartLinkState}
+        onClose={() => setSmartLinkState(null)}
+        title="Vincular ou Copiar?"
+        footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                <button className="btn" style={{ background: '#e2e8f0', color: '#1e293b' }} onClick={() => setSmartLinkState(null)}>Cancelar</button>
+                <button className="btn" style={{ background: '#fff', color: '#0f172a', border: '1px solid #cbd5e1' }} onClick={() => handleSmartLinkAction('copy')}>Criar Cópia</button>
+                <button className="btn" style={{ background: '#0f172a', color: '#fff' }} onClick={() => handleSmartLinkAction('link')}>Vincular (Mover)</button>
+            </div>
+        }
+      >
+        <div style={{ textAlign: 'center', padding: 10 }}>
+            <div style={{ fontSize: '3rem', marginBottom: 16 }}>🔄</div>
+            <h3 style={{ color: '#1e293b', marginBottom: 12 }}>Item encontrado na Biblioteca</h3>
+            <p style={{ color: '#64748b', fontSize: '1.05em', marginBottom: 20 }}>
+                O item <strong>"{smartLinkState?.itemName}"</strong> parece já pertencer ao aluno.
+            </p>
+            <div style={{ textAlign: 'left', background: '#f8fafc', padding: 16, borderRadius: 8, fontSize: '0.95em', color: '#475569' }}>
+                <p style={{ margin: '0 0 10px 0' }}><strong>O que você deseja fazer?</strong></p>
+                <ul style={{ paddingLeft: 20, margin: 0 }}>
+                    <li style={{ marginBottom: 8 }}>
+                        <strong>Vincular (Mover):</strong> Retira da biblioteca e atribui ao aluno.
+                    </li>
+                    <li>
+                        <strong>Criar Cópia:</strong> Mantém o original na biblioteca e cria um novo para o aluno.
+                    </li>
+                </ul>
+            </div>
+        </div>
+      </Modal>
+
+      {/* Modal Genérico de Confirmação */}
+      <Modal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        title={confirmModal.title}
+        type={confirmModal.type}
+        footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                <button className="btn" style={{ background: '#e2e8f0', color: '#1e293b' }} onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}>Cancelar</button>
+                <button 
+                    className="btn" 
+                    style={{ background: confirmModal.type === 'danger' ? '#dc2626' : '#0f172a', color: '#fff' }} 
+                    onClick={confirmModal.onConfirm}
+                >
+                    Confirmar
+                </button>
+            </div>
+        }
+      >
+        <div style={{ padding: 10 }}>
+            <p style={{ color: '#64748b', fontSize: '1.05em' }}>
+                {confirmModal.message}
             </p>
         </div>
       </Modal>

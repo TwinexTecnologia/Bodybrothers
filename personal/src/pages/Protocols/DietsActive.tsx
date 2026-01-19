@@ -20,6 +20,13 @@ export default function DietsActive() {
   const [assignModalOpen, setAssignModalOpen] = useState(false)
   const [selectedDietForAssign, setSelectedDietForAssign] = useState<DietRecord | null>(null)
   const [assignStudentId, setAssignStudentId] = useState('')
+  
+  // Modal de Confirmação
+  const [smartLinkState, setSmartLinkState] = useState<{
+      itemId: string;
+      itemName: string;
+      targetStudentId: string;
+  } | null>(null)
 
   const toMin = (s: string) => {
     const d = String(s || '').replace(/\D/g, '').slice(0, 4)
@@ -310,18 +317,14 @@ export default function DietsActive() {
       }
 
       if (shouldMove) {
-          if (confirm(`Esta dieta "${selectedDietForAssign.name}" parece pertencer a este aluno. Deseja VINCULAR (remover da biblioteca) em vez de criar uma cópia? Clique em OK para Vincular ou Cancelar para Copiar.`)) {
-              await updateDiet(selectedDietForAssign.id, { studentId: assignStudentId })
-              
-              // Atualiza lista localmente
-              setItems(prev => prev.map(d => d.id === selectedDietForAssign.id ? { ...d, studentId: assignStudentId } : d))
-              
-              setAssignModalOpen(false)
-              setSelectedDietForAssign(null)
-              setAssignStudentId('')
-              setLoading(false)
-              return
-          }
+          setSmartLinkState({
+              itemId: selectedDietForAssign.id,
+              itemName: selectedDietForAssign.name,
+              targetStudentId: assignStudentId
+          })
+          setAssignModalOpen(false)
+          setLoading(false)
+          return
       }
 
       // Se for de OUTRO aluno ou da Biblioteca -> CRIA CÓPIA

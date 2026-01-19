@@ -542,11 +542,25 @@ export default function DietCreate() {
                         <span 
                             onClick={(e) => removeVariant(v.id, e)}
                             style={{ 
-                                marginLeft: 8, fontSize: '1.2em', lineHeight: 0.5,
+                                marginLeft: 4, fontSize: '1.2em', lineHeight: 0.5,
                                 color: activeVariantId === v.id ? '#ef4444' : '#9ca3af',
                             }}
                             title="Remover variação"
                         >×</span>
+                    )}
+                    
+                    {!editingVariantId && (
+                         <span 
+                            onClick={(e) => duplicateVariant(v.id, e)}
+                            style={{ 
+                                marginLeft: 8, lineHeight: 0.5,
+                                color: activeVariantId === v.id ? '#3b82f6' : '#9ca3af',
+                                display: 'flex', alignItems: 'center'
+                            }}
+                            title="Duplicar variação"
+                        >
+                            <Copy size={14} />
+                        </span>
                     )}
                 </div>
             ))}
