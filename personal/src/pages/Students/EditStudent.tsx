@@ -389,6 +389,7 @@ export default function EditStudent() {
       const days = parseInt(validityDays) || 90
       await duplicateModel(selectedAnamnesisId, selectedId, days)
       await reloadAnamnesis()
+      // Não precisa recarregar biblioteca pois duplicate cria cópia
       setSelectedAnamnesisId('')
       setLoading(false)
   }
@@ -398,6 +399,7 @@ export default function EditStudent() {
       setLoading(true)
       await updateModel(aid, { studentId: '' }) // Unlink instead of delete
       await reloadAnamnesis()
+      await reloadLibraryAnamnesis() // Recarrega biblioteca para aparecer no dropdown
       setLoading(false)
   }
 
