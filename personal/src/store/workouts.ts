@@ -219,7 +219,15 @@ export async function duplicateWorkout(originalId: string, studentId: string, ne
   if (!newTitle && studentId) {
       const { data: student } = await supabase.from('profiles').select('full_name').eq('id', studentId).single()
       if (student?.full_name) {
-          finalTitle = `${original.name} - ${student.full_name.split(' ')[0]}`
+          const firstName = student.full_name.split(' ')[0]
+          const suffix = ` - ${firstName}`
+          
+          // Evita duplicação do sufixo (ex: "Treino - Alex - Alex")
+          if (original.name.endsWith(suffix)) {
+              finalTitle = original.name
+          } else {
+              finalTitle = `${original.name}${suffix}`
+          }
       }
   }
 

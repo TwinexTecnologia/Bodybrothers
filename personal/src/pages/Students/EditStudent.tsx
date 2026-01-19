@@ -315,8 +315,38 @@ export default function EditStudent() {
   const handleAddDiet = async () => {
       if (!libraryDietId) return
       setLoading(true)
-      await duplicateDiet(libraryDietId, selectedId)
+
+      // Verifica se é um item da biblioteca que PARECE ser do aluno
+      const diet = diets.find(d => d.id === libraryDietId)
+      const currentStudent = students.find(s => s.id === selectedId)
+      
+      let shouldMove = false
+      if (diet && !diet.studentId && currentStudent) {
+          const firstName = currentStudent.name.split(' ')[0]
+          if (diet.name.toLowerCase().includes(firstName.toLowerCase())) {
+              shouldMove = true
+          }
+      }
+
+      if (shouldMove) {
+          if (confirm('Este item da biblioteca parece pertencer a este aluno. Deseja VINCULAR (remover da biblioteca) em vez de criar uma cópia? Clique em OK para Vincular ou Cancelar para Copiar.')) {
+              await updateDiet(libraryDietId, { studentId: selectedId })
+          } else {
+              await duplicateDiet(libraryDietId, selectedId)
+          }
+      } else {
+          await duplicateDiet(libraryDietId, selectedId)
+      }
+
       await reloadStudentDiets()
+      
+      // Reload library diets
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+          const list = await listActiveDiets(user.id)
+          setDiets(list)
+      }
+
       setLibraryDietId('')
       setLoading(false)
   }
