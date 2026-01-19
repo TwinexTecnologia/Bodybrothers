@@ -30,8 +30,9 @@ function mapFromDb(d: any): WorkoutRecord {
   // Migração de dados de exercícios legados
   const exercises = (d.data?.exercises || []).map((ex: any) => ({
       ...ex,
-      // Se tiver 'sets', usa como 'series' (migração)
-      series: ex.series || ex.sets || '',
+      // Se tiver 'sets', usa como 'series' (migração) APENAS se for string (legado)
+      // Se for array (novo formato), series deve ser string vazia ou pega do primeiro set
+      series: ex.series || (typeof ex.sets === 'string' ? ex.sets : '') || '',
       // Garante que outros campos existam
       reps: ex.reps || '',
       load: ex.load || '',
