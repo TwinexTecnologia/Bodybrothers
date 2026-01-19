@@ -385,9 +385,9 @@ export default function ListWorkouts() {
                                   </div>
                               )}
 
-                              {/* Video Player OTIMIZADO */}
+                              {/* Video Player OTIMIZADO - Com tamanho máximo */}
                               {ex.videoUrl && (
-                                  <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', background: '#000', marginTop: 16, position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', alignSelf: 'center' }}>
+                                  <div style={{ width: '100%', maxWidth: '400px', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', background: '#000', marginTop: 16, position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', alignSelf: 'center' }}>
                                       {(() => {
                                           const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
                                           
