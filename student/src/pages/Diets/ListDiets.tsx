@@ -298,12 +298,12 @@ export default function ListDiets() {
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
                     }}
                 >
-                    <div style={{ padding: '24px 32px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
-                        <div>
+                    <div className="diet-modal-header">
+                        <div style={{ width: '100%' }}>
                             <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a' }}>{selectedDiet.title}</h2>
                             {selectedDiet.data.goal && <p style={{ margin: '4px 0 0 0', color: '#64748b' }}>{selectedDiet.data.goal}</p>}
                         </div>
-                        <div style={{ display: 'flex', gap: 12 }}>
+                        <div className="diet-modal-header-actions" style={{ display: 'flex', gap: 12, marginTop: '10px' }}>
                             <button onClick={exportPDF} style={{ background: '#f1f5f9', border: 'none', padding: '8px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: '#64748b', fontWeight: 600 }}>
                                 <Download size={18} /> Exportar PDF
                             </button>
