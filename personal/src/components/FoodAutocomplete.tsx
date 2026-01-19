@@ -50,6 +50,87 @@ export default function FoodAutocomplete({
     const timeoutRef = useRef<any>(null)
     const [errorMsg, setErrorMsg] = useState('')
 
+    const controllerRef = useRef<AbortController | null>(null)
+
+    const searchWeb = async (text: string) => {
+        setLoading(true)
+        // Cancela requisição anterior se houver
+        if (controllerRef.current) controllerRef.current.abort()
+        controllerRef.current = new AbortController()
+        const signal = controllerRef.current.signal
+
+        try {
+                // TENTATIVA: OpenFoodFacts OTIMIZADO
+                // Filtra apenas campos necessários: code,product_name,nutriments,brands,serving_quantity
+                // Isso reduz drasticamente o tamanho do JSON e acelera a resposta
+                
+                const fields = 'code,product_name,nutriments,brands,serving_quantity'
+                const response = await fetch(`https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=1000&fields=${fields}`, { signal })
+                
+                if (!response.ok) throw new Error('Erro na API OpenFoodFacts')
+                
+                const data = await response.json()
+                let products = data.products || []
+                
+                let apiMatches: any[] = []
+
+                if (products.length > 0) {
+                    // Ordenação customizada API
+                    products.sort((a: any, b: any) => {
+                        const nameA = a.product_name || ''
+                        const nameB = b.product_name || ''
+                        
+                        // 1. Termo exato (match perfeito)
+                        const exactA = nameA.toLowerCase() === text.toLowerCase()
+                        const exactB = nameB.toLowerCase() === text.toLowerCase()
+                        if (exactA && !exactB) return -1
+                        if (!exactA && exactB) return 1
+
+                        // 2. Começa com o termo
+                        const startsA = nameA.toLowerCase().startsWith(text.toLowerCase())
+                        const startsB = nameB.toLowerCase().startsWith(text.toLowerCase())
+                        if (startsA && !startsB) return -1
+                        if (!startsA && startsB) return 1
+                        
+                        // 3. Contém o termo completo (frase)
+                        const containsA = nameA.toLowerCase().includes(text.toLowerCase())
+                        const containsB = nameB.toLowerCase().includes(text.toLowerCase())
+                        if (containsA && !containsB) return -1
+                        if (!containsA && containsB) return 1
+
+                        // 4. Se ambos começam (ou não), ordena por tamanho (menor primeiro = mais "puro")
+                        return nameA.length - nameB.length
+                    })
+
+                    apiMatches = products.map((p: any) => ({
+                        food_id: p.code, 
+                        food_name: p.product_name,
+                        food_description: p.brands ? `${p.brands}` : '',
+                        _raw: p 
+                    }))
+                }
+
+                setSuggestions(prev => {
+                    // MERGE: Mantém os atuais (locais) e adiciona os da API sem duplicar
+                    const currentNames = new Set(prev.map(m => m.food_name.toLowerCase()))
+                    const newItems = [...prev]
+                    
+                    apiMatches.forEach(apiItem => {
+                        if (!currentNames.has(apiItem.food_name.toLowerCase())) {
+                            newItems.push(apiItem)
+                        }
+                    })
+                    return newItems
+                })
+        } catch (err: any) {
+            if (err.name === 'AbortError') return 
+            console.error(err)
+            setErrorMsg('Erro na busca web')
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const handleSearch = (text: string) => {
         onChange(text)
         setErrorMsg('')
@@ -85,88 +166,13 @@ export default function FoodAutocomplete({
         setSuggestions(localMatches)
         setShowSuggestions(true)
 
-        timeoutRef.current = setTimeout(async () => {
-            setLoading(true)
-            try {
-                // TENTATIVA: OpenFoodFacts (Direto do Frontend, sem Proxy)
-                // Ajuste de filtros para priorizar alimentos básicos e nomes simples
-                // Aumentando page_size para 1000 (Teste de limite extremo a pedido do usuário)
-                
-                const response = await fetch(`https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=1000`)
-                
-                if (!response.ok) throw new Error('Erro na API OpenFoodFacts')
-                
-                const data = await response.json()
-                let products = data.products || []
-                
-                let apiMatches: any[] = []
+        // OTIMIZAÇÃO: Se já encontrou muitos resultados locais (>= 5), não busca na API automaticamente
+        if (localMatches.length >= 5) {
+            setLoading(false)
+            return
+        }
 
-                if (products.length > 0) {
-                    // Ordenação customizada API
-                    products.sort((a: any, b: any) => {
-                        const nameA = a.product_name || ''
-                        const nameB = b.product_name || ''
-                        
-                        // 1. Termo exato (match perfeito)
-                        const exactA = nameA.toLowerCase() === term
-                        const exactB = nameB.toLowerCase() === term
-                        if (exactA && !exactB) return -1
-                        if (!exactA && exactB) return 1
-
-                        // 2. Começa com o termo
-                        const startsA = nameA.toLowerCase().startsWith(term)
-                        const startsB = nameB.toLowerCase().startsWith(term)
-                        if (startsA && !startsB) return -1
-                        if (!startsA && startsB) return 1
-                        
-                        // 3. Contém o termo completo (frase)
-                        const containsA = nameA.toLowerCase().includes(term)
-                        const containsB = nameB.toLowerCase().includes(term)
-                        if (containsA && !containsB) return -1
-                        if (!containsA && containsB) return 1
-
-                        // 4. Se ambos começam (ou não), ordena por tamanho (menor primeiro = mais "puro")
-                        return nameA.length - nameB.length
-                    })
-
-                    apiMatches = products.map((p: any) => ({
-                        food_id: p.code, 
-                        food_name: p.product_name,
-                        food_description: p.brands ? `${p.brands}` : '',
-                        _raw: p 
-                    }))
-                }
-
-                // MERGE: Locais no topo + API embaixo
-                // Remove duplicatas (se o nome for idêntico, prefere o local)
-                const combined = [...localMatches]
-                const localNames = new Set(localMatches.map(m => m.food_name.toLowerCase()))
-
-                apiMatches.forEach(apiItem => {
-                    if (!localNames.has(apiItem.food_name.toLowerCase())) {
-                        combined.push(apiItem)
-                    }
-                })
-
-                if (combined.length > 0) {
-                    setSuggestions(combined)
-                    setShowSuggestions(true)
-                } else {
-                    setSuggestions([])
-                    setErrorMsg('Nenhum alimento encontrado')
-                    setShowSuggestions(true)
-                }
-            } catch (err: any) {
-                console.error('Erro ao buscar alimentos:', err)
-                // Se der erro na API, mantemos os locais se houver
-                if (localMatches.length === 0) {
-                    setErrorMsg('Erro ao buscar.')
-                }
-                setShowSuggestions(true)
-            } finally {
-                setLoading(false)
-            }
-        }, 500)
+        timeoutRef.current = setTimeout(() => searchWeb(text), 600) 
     }
 
     const handleSelect = async (item: FoodSuggestion) => {
