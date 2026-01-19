@@ -150,13 +150,19 @@ export default function ListDiets() {
       if (!printRef.current || !selectedDiet) return
       
       try {
+          // Detecta se é mobile para ajustar escala e evitar crash
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+          const scale = isMobile ? 1.5 : 2
+
           const canvas = await html2canvas(printRef.current, { 
-              scale: 2,
+              scale: scale,
               useCORS: true,
               allowTaint: true,
-              logging: true 
+              logging: false,
+              windowWidth: 794, // A4 width in px at 96dpi approx
           })
-          const imgData = canvas.toDataURL('image/png')
+          
+          const imgData = canvas.toDataURL('image/jpeg', 0.95) // JPEG is lighter than PNG
           
           const pdf = new jsPDF('p', 'mm', 'a4')
           const pdfWidth = pdf.internal.pageSize.getWidth()
@@ -167,20 +173,25 @@ export default function ListDiets() {
           let heightLeft = imgHeight
           let position = 0
 
-          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
           heightLeft -= pdfHeight
 
           while (heightLeft > 0) {
             position = heightLeft - imgHeight
             pdf.addPage()
-            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
             heightLeft -= pdfHeight
           }
           
-          pdf.save(`Dieta_${selectedDiet.title.replace(/\s+/g, '_')}.pdf`)
+          // Nome do arquivo sanitizado
+          const fileName = `Dieta_${selectedDiet.title.replace(/[^a-z0-9]/gi, '_')}.pdf`
+          
+          // Salva o PDF
+          pdf.save(fileName)
+
       } catch (err) {
           console.error('Erro ao gerar PDF:', err)
-          alert('Erro ao gerar PDF')
+          alert('Não foi possível gerar o PDF. Tente novamente.')
       }
   }
 
@@ -386,9 +397,9 @@ export default function ListDiets() {
                                                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
                                                     {meal.foods.map((food, fIndex) => (
                                                         <li key={fIndex} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                            <div className="meal-food-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                                 <span style={{ color: '#0f172a', fontWeight: 500 }}>{food.name}</span>
-                                                                <span style={{ color: '#16a34a', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                                                <span className="meal-food-qty" style={{ color: '#16a34a', fontWeight: 600, whiteSpace: 'nowrap' }}>
                                                                     {food.quantity} {food.unit}
                                                                 </span>
                                                             </div>
