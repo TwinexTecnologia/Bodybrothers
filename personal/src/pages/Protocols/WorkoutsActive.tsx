@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { listLibraryWorkouts, setWorkoutStatus, updateWorkout, type WorkoutRecord } from '../../store/workouts'
+import { listLibraryWorkouts, setWorkoutStatus, updateWorkout, toggleWorkoutFavorite, type WorkoutRecord } from '../../store/workouts'
 import { supabase } from '../../lib/supabase'
+import { Star } from 'lucide-react'
 
 export default function WorkoutsActive() {
   const [items, setItems] = useState<WorkoutRecord[]>([])
@@ -32,7 +33,7 @@ export default function WorkoutsActive() {
 
   const filtered = useMemo(() => {
     const s = q.toLowerCase()
-    return items.filter(w => {
+    const result = items.filter(w => {
       const exNames = w.exercises.map(e => `${e.name} ${e.group}`).join(' ').toLowerCase()
       return (
         w.name.toLowerCase().includes(s) ||
@@ -41,11 +42,31 @@ export default function WorkoutsActive() {
         exNames.includes(s)
       )
     })
+    
+    // Garante ordenação: Favoritos > Data
+    return result.sort((a, b) => {
+        if (a.isFavorite && !b.isFavorite) return -1
+        if (!a.isFavorite && b.isFavorite) return 1
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    })
   }, [items, q])
 
   const archive = async (w: WorkoutRecord) => {
     await setWorkoutStatus(w.id, 'inativo')
     setItems(prev => prev.filter(x => x.id !== w.id))
+  }
+
+  const toggleFav = async (w: WorkoutRecord) => {
+      // Atualiza UI otimista
+      setItems(prev => prev.map(item => item.id === w.id ? { ...item, isFavorite: !item.isFavorite } : item))
+      
+      // Persiste no banco
+      const updated = await toggleWorkoutFavorite(w.id)
+      
+      // Sincroniza estado real
+      if (updated) {
+          setItems(prev => prev.map(item => item.id === w.id ? updated : item))
+      }
   }
 
   const startEdit = (w: WorkoutRecord) => {
@@ -113,9 +134,18 @@ export default function WorkoutsActive() {
         {filtered.map(w => (
           <div key={w.id} className="form-card" style={{ padding: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 8, alignItems: 'center' }}>
-              <div>
-                <strong>{w.name}</strong>
-                <div style={{ color: '#64748b' }}>{w.goal || '—'}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button 
+                    onClick={(e) => { e.stopPropagation(); toggleFav(w); }}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}
+                    title={w.isFavorite ? "Remover dos favoritos" : "Favoritar"}
+                >
+                    <Star size={20} fill={w.isFavorite ? "#eab308" : "none"} color={w.isFavorite ? "#eab308" : "#94a3b8"} />
+                </button>
+                <div>
+                  <strong>{w.name}</strong>
+                  <div style={{ color: '#64748b' }}>{w.goal || '—'}</div>
+                </div>
               </div>
               <div>
                 <div><small>Criado</small>: {w.createdAt ? new Date(w.createdAt).toLocaleDateString() : '—'}</div>

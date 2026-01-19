@@ -54,6 +54,7 @@ export type DietRecord = {
   notes?: string
   status: 'ativa' | 'inativa'
   updatedAt: string
+  isFavorite?: boolean
 }
 
 // Helpers para converter do banco para o tipo DietRecord
@@ -71,7 +72,8 @@ function mapFromDb(d: any): DietRecord {
     meals: d.data?.meals || [],
     variants: d.data?.variants || [],
     supplements: d.data?.supplements || [],
-    notes: d.data?.notes
+    notes: d.data?.notes,
+    isFavorite: d.data?.isFavorite || false
   }
 }
 
@@ -84,7 +86,13 @@ export async function listActiveDiets(personalId: string): Promise<DietRecord[]>
     .eq('status', 'active')
   
   if (error) return []
-  return (data || []).map(mapFromDb)
+  return (data || [])
+    .map(mapFromDb)
+    .sort((a, b) => {
+        if (a.isFavorite && !b.isFavorite) return -1
+        if (!a.isFavorite && b.isFavorite) return 1
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    })
 }
 
 export async function listArchivedDiets(personalId: string): Promise<DietRecord[]> {
@@ -226,6 +234,29 @@ export async function duplicateDiet(originalId: string, studentId: string): Prom
       notes: original.notes,
       startDate: new Date().toISOString().split('T')[0]
   })
+}
+
+export async function toggleDietFavorite(id: string): Promise<DietRecord | null> {
+    const d = await getDietById(id)
+    if (!d) return null
+    
+    const newStatus = !d.isFavorite
+    
+    const { data: current } = await supabase.from('protocols').select('data').eq('id', id).single()
+    const currentData = current?.data || {}
+    
+    const { data, error } = await supabase
+        .from('protocols')
+        .update({
+            data: { ...currentData, isFavorite: newStatus },
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) return null
+    return mapFromDb(data)
 }
 
 export async function listAllDietsByPersonal(personalId: string): Promise<DietRecord[]> {

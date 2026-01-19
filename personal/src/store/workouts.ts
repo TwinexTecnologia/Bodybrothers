@@ -23,6 +23,7 @@ export type WorkoutRecord = {
   exercises: WorkoutExercise[]
   status: 'ativo' | 'inativo'
   updatedAt: string
+  isFavorite?: boolean
 }
 
 // Helper para converter do banco para o tipo WorkoutRecord
@@ -59,6 +60,7 @@ function mapFromDb(d: any): WorkoutRecord {
     goal: d.data?.goal,
     validUntil: d.data?.validUntil,
     notes: d.data?.notes,
+    isFavorite: d.data?.isFavorite || false,
     exercises: exercises
   }
 }
@@ -72,7 +74,15 @@ export async function listActiveWorkouts(personalId: string): Promise<WorkoutRec
     .eq('status', 'active')
   
   if (error) return []
-  return (data || []).map(mapFromDb)
+  return (data || [])
+    .map(mapFromDb)
+    .sort((a, b) => {
+        // Favoritos primeiro
+        if (a.isFavorite && !b.isFavorite) return -1
+        if (!a.isFavorite && b.isFavorite) return 1
+        // Depois por data de atualização (mais recente primeiro)
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    })
 }
 
 export async function listLibraryWorkouts(personalId: string): Promise<WorkoutRecord[]> {
@@ -85,7 +95,14 @@ export async function listLibraryWorkouts(personalId: string): Promise<WorkoutRe
     .is('student_id', null) // Apenas modelos gerais
   
   if (error) return []
-  return (data || []).map(mapFromDb)
+  return (data || [])
+    .map(mapFromDb)
+    .sort((a, b) => {
+        // Favoritos primeiro
+        if (a.isFavorite && !b.isFavorite) return -1
+        if (!a.isFavorite && b.isFavorite) return 1
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    })
 }
 
 export async function listArchivedWorkouts(personalId: string): Promise<WorkoutRecord[]> {
@@ -204,6 +221,32 @@ export async function duplicateWorkout(originalId: string, studentId: string, ne
     notes: original.notes,
     exercises: original.exercises // Copia exercícios
   })
+}
+
+export async function toggleWorkoutFavorite(id: string): Promise<WorkoutRecord | null> {
+    const w = await getWorkoutById(id)
+    if (!w) return null
+    
+    // Toggle
+    const newStatus = !w.isFavorite
+    
+    // Atualiza apenas o campo isFavorite dentro do JSON data
+    // Precisa buscar o raw data atual para não perder outros campos
+    const { data: current } = await supabase.from('protocols').select('data').eq('id', id).single()
+    const currentData = current?.data || {}
+    
+    const { data, error } = await supabase
+        .from('protocols')
+        .update({
+            data: { ...currentData, isFavorite: newStatus },
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) return null
+    return mapFromDb(data)
 }
 
 // Funções legadas (sem uso no Supabase)

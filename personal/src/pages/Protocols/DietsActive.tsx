@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { listActiveDiets, setDietStatus, type DietRecord } from '../../store/diets'
+import { listActiveDiets, setDietStatus, toggleDietFavorite, type DietRecord } from '../../store/diets'
 import { supabase } from '../../lib/supabase'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
+import { Star } from 'lucide-react'
 
 export default function DietsActive() {
   const [items, setItems] = useState<DietRecord[]>([])
@@ -49,7 +50,7 @@ export default function DietsActive() {
 
   const filtered = useMemo(() => {
     const s = q.toLowerCase()
-    return items.filter(d => {
+    const result = items.filter(d => {
       const mealFoods = d.meals
         .flatMap(m => m.foods.map(f => `${f.name} ${f.quantity} ${f.unit}`))
         .join(' ')
@@ -65,11 +66,31 @@ export default function DietsActive() {
         supps.includes(s)
       )
     })
+
+    // Garante ordenação: Favoritos > Data
+    return result.sort((a, b) => {
+        if (a.isFavorite && !b.isFavorite) return -1
+        if (!a.isFavorite && b.isFavorite) return 1
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    })
   }, [items, q])
 
   const archive = async (d: DietRecord) => {
     await setDietStatus(d.id, 'inativa')
     setItems(prev => prev.filter(x => x.id !== d.id))
+  }
+
+  const toggleFav = async (d: DietRecord) => {
+      // Atualiza UI otimista
+      setItems(prev => prev.map(item => item.id === d.id ? { ...item, isFavorite: !item.isFavorite } : item))
+      
+      // Persiste no banco
+      const updated = await toggleDietFavorite(d.id)
+      
+      // Sincroniza estado real
+      if (updated) {
+          setItems(prev => prev.map(item => item.id === d.id ? updated : item))
+      }
   }
 
   const exportDietPdf = async (d: DietRecord) => {
@@ -248,9 +269,18 @@ export default function DietsActive() {
         {filtered.map(d => (
           <div key={d.id} className="diet-card">
             <div className="diet-header">
-              <div>
-                <div className="diet-title">{d.name}</div>
-                <div className="diet-goal">{d.goal || '—'}</div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <button 
+                    onClick={(e) => { e.stopPropagation(); toggleFav(d); }}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}
+                    title={d.isFavorite ? "Remover dos favoritos" : "Favoritar"}
+                >
+                    <Star size={20} fill={d.isFavorite ? "#eab308" : "none"} color={d.isFavorite ? "#eab308" : "#94a3b8"} />
+                </button>
+                <div>
+                  <div className="diet-title">{d.name}</div>
+                  <div className="diet-goal">{d.goal || '—'}</div>
+                </div>
               </div>
               <div className="diet-dates">
                 <div><small>Início</small>: {d.startDate ? new Date(d.startDate).toLocaleDateString() : '—'}</div>
