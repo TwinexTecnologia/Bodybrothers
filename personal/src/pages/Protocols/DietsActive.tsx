@@ -8,6 +8,8 @@ import { Star } from 'lucide-react'
 export default function DietsActive() {
   const [items, setItems] = useState<DietRecord[]>([])
   const [studentNames, setStudentNames] = useState<Record<string, string>>({})
+  const [filterType, setFilterType] = useState<'all' | 'library' | 'student'>('all')
+  const [selectedStudentId, setSelectedStudentId] = useState('')
   const [q, setQ] = useState('')
   const [openSubs, setOpenSubs] = useState<Record<string, boolean>>({})
   const [openDiet, setOpenDiet] = useState<Record<string, boolean>>({})
@@ -34,6 +36,7 @@ export default function DietsActive() {
         const { data: students } = await supabase
           .from('profiles')
           .select('id, full_name')
+          .or('role.eq.student,role.eq.aluno')
         
         const names: Record<string, string> = {}
         students?.forEach(s => {
@@ -63,6 +66,11 @@ export default function DietsActive() {
   const filtered = useMemo(() => {
     const s = q.toLowerCase()
     const result = items.filter(d => {
+      // Filtros
+      if (filterType === 'library' && d.studentId) return false
+      if (filterType === 'student' && !d.studentId) return false
+      if (selectedStudentId && d.studentId !== selectedStudentId) return false
+
       const mealFoods = d.meals
         .flatMap(m => m.foods.map(f => `${f.name} ${f.quantity} ${f.unit}`))
         .join(' ')
@@ -85,7 +93,7 @@ export default function DietsActive() {
         if (!a.isFavorite && b.isFavorite) return 1
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     })
-  }, [items, q])
+  }, [items, q, filterType, selectedStudentId])
 
   const archive = async (d: DietRecord) => {
     await setDietStatus(d.id, 'inativa')
@@ -273,9 +281,81 @@ export default function DietsActive() {
   return (
     <div>
       <h1>Protocolos • Dietas Ativas</h1>
-      <div style={{ marginBottom: 10, display: 'flex', gap: 10 }}>
-        <input placeholder="Buscar por nome, objetivo ou alimento" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className="btn" onClick={loadData}>Atualizar</button>
+      <div style={{ marginBottom: 20, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', background: '#fff', padding: 12, borderRadius: 12, border: '1px solid #f1f5f9' }}>
+        
+        {/* Filtro de Tipo (Pills) */}
+        <div style={{ display: 'flex', gap: 8 }}>
+            {[
+                { id: 'all', label: 'Todos' },
+                { id: 'library', label: '📚 Biblioteca' },
+                { id: 'student', label: '👤 Alunos' }
+            ].map(opt => (
+                <button
+                    key={opt.id}
+                    onClick={() => {
+                        setFilterType(opt.id as any)
+                        if (opt.id !== 'student') setSelectedStudentId('')
+                    }}
+                    style={{
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        border: filterType === opt.id ? 'none' : '1px solid #e2e8f0',
+                        background: filterType === opt.id ? '#0f172a' : '#fff',
+                        color: filterType === opt.id ? '#fff' : '#64748b',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        fontSize: '0.9rem',
+                        transition: 'all 0.2s',
+                        boxShadow: filterType === opt.id ? '0 2px 4px rgba(15,23,42,0.2)' : 'none'
+                    }}
+                >
+                    {opt.label}
+                </button>
+            ))}
+        </div>
+
+        {/* Divisor Vertical */}
+        <div style={{ width: 1, height: 24, background: '#e2e8f0' }}></div>
+
+        {/* Filtro de Aluno (Select) */}
+        <div style={{ flex: 1, display: 'flex', gap: 10 }}>
+            {filterType === 'student' && (
+                <div style={{ position: 'relative', minWidth: 200 }}>
+                    <select 
+                        className="select" 
+                        style={{ 
+                            padding: '8px 32px 8px 12px', 
+                            width: '100%', 
+                            borderRadius: 8,
+                            borderColor: '#cbd5e1',
+                            background: '#f8fafc',
+                            fontSize: '0.9rem'
+                        }}
+                        value={selectedStudentId} 
+                        onChange={e => setSelectedStudentId(e.target.value)}
+                    >
+                        <option value="">Todos os Alunos</option>
+                        {Object.entries(studentNames).sort((a,b) => a[1].localeCompare(b[1])).map(([id, name]) => (
+                            <option key={id} value={id}>{name}</option>
+                        ))}
+                    </select>
+                    <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b', fontSize: '0.8rem' }}>▼</div>
+                </div>
+            )}
+
+            <input 
+                placeholder="🔍 Buscar por nome, objetivo..." 
+                value={q} 
+                onChange={(e) => setQ(e.target.value)} 
+                style={{ 
+                    flex: 1, 
+                    padding: '8px 12px', 
+                    borderRadius: 8, 
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.9rem'
+                }} 
+            />
+        </div>
       </div>
       <div style={{ display: 'grid', gap: 10 }}>
         {filtered.map(d => (

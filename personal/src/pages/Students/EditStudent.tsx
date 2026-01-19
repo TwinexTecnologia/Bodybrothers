@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Camera } from 'lucide-react'
 import { listStudentsByPersonal, updateStudent, getStudent, type StudentRecord } from '../../store/students'
@@ -70,9 +70,70 @@ export default function EditStudent() {
   const libraryWorkouts = allWorkouts.filter(w => !w.studentId && w.status === 'ativo')
 
   // Filtra alunos pelo termo de busca
-  const filteredStudents = students.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredStudents = useMemo(() => {
+      if (!students || !Array.isArray(students)) return []
+      const term = (searchTerm || '').toLowerCase()
+      return students.filter(s => {
+          if (!s) return false
+          const name = (s.name || '').toLowerCase()
+          return name.includes(term)
+      })
+  }, [students, searchTerm])
 
-  // Carregar lista de alunos e recursos ao abrir
+  // Mapa de nomes de alunos para lookup rápido
+  const studentMap = useMemo(() => {
+      const map: Record<string, string> = {}
+      if (students && Array.isArray(students)) {
+          students.forEach(s => {
+              if (s && s.id) map[s.id] = s.name || ''
+          })
+      }
+      return map
+  }, [students])
+
+  // Opções para dropdowns (Blindado contra erros)
+  const workoutOptions = useMemo(() => {
+      if (!allWorkouts || !Array.isArray(allWorkouts)) return []
+      try {
+          return allWorkouts
+            .filter(w => w && w.studentId !== selectedId)
+            .sort((a, b) => {
+                const na = a?.name || ''
+                const nb = b?.name || ''
+                return String(na).localeCompare(String(nb))
+            })
+            .map(w => {
+                const ownerName = w.studentId ? studentMap[w.studentId] : null
+                const label = ownerName ? `${w.name} (👤 ${ownerName})` : `📚 ${w.name}`
+                return { id: w.id, label }
+            })
+      } catch (err) {
+          console.error('Erro ao gerar opções de treino:', err)
+          return []
+      }
+  }, [allWorkouts, selectedId, studentMap])
+
+  const dietOptions = useMemo(() => {
+      if (!diets || !Array.isArray(diets)) return []
+      try {
+          return diets
+            .filter(d => d && d.studentId !== selectedId)
+            .sort((a, b) => {
+                const na = a?.name || ''
+                const nb = b?.name || ''
+                return String(na).localeCompare(String(nb))
+            })
+            .map(d => {
+                const ownerName = d.studentId ? studentMap[d.studentId] : null
+                const label = ownerName ? `${d.name} (👤 ${ownerName})` : `📚 ${d.name}`
+                return { id: d.id, label }
+            })
+      } catch (err) {
+          console.error('Erro ao gerar opções de dieta:', err)
+          return []
+      }
+  }, [diets, selectedId, studentMap])
+
   useEffect(() => {
     async function load() {
       try {
@@ -575,8 +636,10 @@ export default function EditStudent() {
                     
                     <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8 }}>
                         <select className="select" style={{ fontSize: '0.9em' }} value={libraryWorkoutId} onChange={e => setLibraryWorkoutId(e.target.value)}>
-                            <option value="">Adicionar modelo da biblioteca...</option>
-                            {libraryWorkouts.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                            <option value="">Adicionar modelo ou copiar de aluno...</option>
+                            {workoutOptions.map(o => (
+                                <option key={o.id} value={o.id}>{o.label}</option>
+                            ))}
                         </select>
                         <button className="btn" onClick={handleAddWorkout} disabled={!libraryWorkoutId} style={{ background: '#0f172a', whiteSpace: 'nowrap' }}>+ Add</button>
                     </div>
@@ -630,8 +693,10 @@ export default function EditStudent() {
 
                     <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8 }}>
                         <select className="select" style={{ fontSize: '0.9em' }} value={libraryDietId} onChange={e => setLibraryDietId(e.target.value)}>
-                            <option value="">Adicionar modelo da biblioteca...</option>
-                            {(diets || []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            <option value="">Adicionar modelo ou copiar de aluno...</option>
+                            {dietOptions.map(o => (
+                                <option key={o.id} value={o.id}>{o.label}</option>
+                            ))}
                         </select>
                         <button className="btn" onClick={handleAddDiet} disabled={!libraryDietId} style={{ background: '#0f172a', whiteSpace: 'nowrap' }}>+ Add</button>
                     </div>

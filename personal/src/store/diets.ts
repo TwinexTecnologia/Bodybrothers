@@ -226,9 +226,9 @@ export async function duplicateDiet(originalId: string, studentId: string): Prom
 
   // Adiciona nome do aluno para identificar fácil na lista geral
   if (studentId) {
-      const { data: student } = await supabase.from('profiles').select('name').eq('id', studentId).single()
-      if (student?.name) {
-          finalTitle = `${original.name} - ${student.name.split(' ')[0]}`
+      const { data: student } = await supabase.from('profiles').select('full_name').eq('id', studentId).single()
+      if (student?.full_name) {
+          finalTitle = `${original.name} - ${student.full_name.split(' ')[0]}`
       }
   }
 
