@@ -630,11 +630,11 @@ export default function DietCreate() {
                                 onSelect={(details) => updateFood(mi, fi, {
                                     name: details.name,
                                     food_id: details.food_id,
-                                    base_calories_100g: details.calories_100g.toString(),
-                                    base_protein_100g: details.protein_100g.toString(),
-                                    base_carbs_100g: details.carbs_100g.toString(),
-                                    base_fat_100g: details.fat_100g.toString(),
-                                    base_sodium_100g: details.sodium_100g.toString(),
+                                    base_calories_100g: String(details.calories_100g || 0),
+                                    base_protein_100g: String(details.protein_100g || 0),
+                                    base_carbs_100g: String(details.carbs_100g || 0),
+                                    base_fat_100g: String(details.fat_100g || 0),
+                                    base_sodium_100g: String(details.sodium_100g || 0),
                                     base_unit_weight: details.unit_weight,
                                     unit: details.unit_weight ? 'unid' : 'g',
                                     quantity: details.unit_weight ? '1' : '100'
