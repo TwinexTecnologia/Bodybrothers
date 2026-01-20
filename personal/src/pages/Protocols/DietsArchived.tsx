@@ -244,6 +244,45 @@ export default function DietsArchived() {
                 <div><small>Início</small>: {d.startDate ? new Date(d.startDate).toLocaleDateString() : '—'}</div>
                 <div><small>Fim</small>: {d.endDate ? new Date(d.endDate).toLocaleDateString() : '—'}</div>
               </div>
+
+              {/* Resumo Nutricional Compacto no Card */}
+              {(() => {
+                  const meals = (d.variants && d.variants.length > 0) ? d.variants[0].meals : d.meals
+                  
+                  if (meals.length > 0) {
+                      const total = meals.reduce((acc, m) => {
+                          m.foods.forEach(f => {
+                              acc.kcal += Number(f.calories || 0)
+                              acc.p += Number(f.protein || 0)
+                              acc.c += Number(f.carbs || 0)
+                              acc.g += Number(f.fat || 0)
+                          })
+                          return acc
+                      }, { kcal: 0, p: 0, c: 0, g: 0 })
+
+                      return (
+                          <div style={{ 
+                              display: 'flex', gap: 12, alignItems: 'center', 
+                              background: '#f8fafc', padding: '6px 12px', borderRadius: 8, 
+                              fontSize: '0.8em', border: '1px solid #e2e8f0',
+                              marginTop: 8, marginBottom: 8, flexWrap: 'wrap'
+                          }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }}>
+                                  <span style={{ fontWeight: 800, color: '#0369a1', fontSize: '1.1em' }}>{Math.round(total.kcal)}</span>
+                                  <span style={{ color: '#64748b', fontSize: '0.9em' }}>kcal</span>
+                              </div>
+                              <div style={{ width: 1, height: 20, background: '#cbd5e1' }}></div>
+                              <div style={{ display: 'flex', gap: 10 }}>
+                                  <span title="Proteína" style={{ color: '#15803d', fontWeight: 600 }}>P: {total.p.toFixed(0)}g</span>
+                                  <span title="Carboidrato" style={{ color: '#1d4ed8', fontWeight: 600 }}>C: {total.c.toFixed(0)}g</span>
+                                  <span title="Gordura" style={{ color: '#c2410c', fontWeight: 600 }}>G: {total.g.toFixed(0)}g</span>
+                              </div>
+                          </div>
+                      )
+                  }
+                  return null
+              })()}
+
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
                 <button
                   className="btn"
