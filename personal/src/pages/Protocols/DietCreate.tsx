@@ -511,7 +511,44 @@ export default function DietCreate() {
         </div>
       </div>
 
+      {/* RESUMO DE MACROS (TOTAL DIÁRIO) */}
+      {meals.length > 0 && (() => {
+           const total = meals.reduce((acc, m) => {
+               m.foods.forEach(f => {
+                   acc.kcal += Number(f.calories || 0)
+                   acc.p += Number(f.protein || 0)
+                   acc.c += Number(f.carbs || 0)
+                   acc.g += Number(f.fat || 0)
+                   acc.s += Number(f.sodium || 0)
+               })
+               return acc
+           }, { kcal: 0, p: 0, c: 0, g: 0, s: 0 })
 
+           return (
+              <div className="form-card" style={{ padding: 20, marginBottom: 24, background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+                  <h3 style={{ margin: '0 0 16px 0', color: '#0369a1', fontSize: '1.1rem' }}>📊 Resumo Diário Total</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 16, textAlign: 'center' }}>
+                      <div style={{ background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                          <div style={{ fontSize: '0.85em', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Calorias</div>
+                          <div style={{ fontSize: '1.5em', fontWeight: 800, color: '#0369a1' }}>{Math.round(total.kcal)}</div>
+                          <div style={{ fontSize: '0.8em', color: '#94a3b8' }}>kcal</div>
+                      </div>
+                      <div style={{ background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                          <div style={{ fontSize: '0.85em', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Proteína</div>
+                          <div style={{ fontSize: '1.5em', fontWeight: 800, color: '#15803d' }}>{total.p.toFixed(1)}g</div>
+                      </div>
+                      <div style={{ background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                          <div style={{ fontSize: '0.85em', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Carboidrato</div>
+                          <div style={{ fontSize: '1.5em', fontWeight: 800, color: '#1d4ed8' }}>{total.c.toFixed(1)}g</div>
+                      </div>
+                      <div style={{ background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                          <div style={{ fontSize: '0.85em', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Gordura</div>
+                          <div style={{ fontSize: '1.5em', fontWeight: 800, color: '#c2410c' }}>{total.g.toFixed(1)}g</div>
+                      </div>
+                  </div>
+              </div>
+           )
+      })()}
 
       {/* Variantes (Abas) */}
       <div style={{ marginBottom: 24 }}>
@@ -748,9 +785,39 @@ export default function DietCreate() {
                 </div>
 
                 {/* Ações da Refeição */}
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f1f5f9', display: 'flex', gap: 10 }}>
-                     <button className="btn" onClick={() => duplicateMeal(mi)} style={{ fontSize: '0.85em', padding: '6px 12px' }}>Duplicar Refeição</button>
-                     <button className="btn" onClick={() => addMealAfter(mi)} style={{ fontSize: '0.85em', padding: '6px 12px', background: '#10b981' }}>+ Refeição Abaixo</button>
+                <div style={{ marginTop: 0, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+                     {/* Resumo da Refeição */}
+                     {(() => {
+                         const mealTotals = m.foods.reduce((acc, f) => {
+                             acc.kcal += Number(f.calories || 0)
+                             acc.p += Number(f.protein || 0)
+                             acc.c += Number(f.carbs || 0)
+                             acc.g += Number(f.fat || 0)
+                             acc.s += Number(f.sodium || 0)
+                             return acc
+                         }, { kcal: 0, p: 0, c: 0, g: 0, s: 0 })
+                         
+                         if (m.foods.length === 0) return null
+
+                         return (
+                             <div style={{ 
+                                 display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'flex-end', 
+                                 marginBottom: 16, background: '#f8fafc', padding: '8px 16px', borderRadius: 8,
+                                 fontSize: '0.9em', fontWeight: 600, color: '#475569'
+                             }}>
+                                 <span style={{ textTransform: 'uppercase', fontSize: '0.85em', letterSpacing: '0.5px' }}>Total Refeição:</span>
+                                 <span style={{ color: '#0369a1' }}>{Math.round(mealTotals.kcal)} kcal</span>
+                                 <span style={{ color: '#166534' }}>P: {mealTotals.p.toFixed(1)}g</span>
+                                 <span style={{ color: '#1d4ed8' }}>C: {mealTotals.c.toFixed(1)}g</span>
+                                 <span style={{ color: '#c2410c' }}>G: {mealTotals.g.toFixed(1)}g</span>
+                             </div>
+                         )
+                     })()}
+
+                     <div style={{ display: 'flex', gap: 10 }}>
+                         <button className="btn" onClick={() => duplicateMeal(mi)} style={{ fontSize: '0.85em', padding: '6px 12px' }}>Duplicar Refeição</button>
+                         <button className="btn" onClick={() => addMealAfter(mi)} style={{ fontSize: '0.85em', padding: '6px 12px', background: '#10b981' }}>+ Refeição Abaixo</button>
+                     </div>
                 </div>
               </div>
             </div>
