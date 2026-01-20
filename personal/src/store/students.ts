@@ -78,7 +78,8 @@ export async function updateStudent(id: string, updates: Partial<Omit<StudentRec
       dietIds: current.dietIds,
       tempPassword: current.tempPassword,
       status: current.status,
-      avatarUrl: current.avatarUrl // MANTEM A FOTO
+      avatarUrl: current.avatarUrl, // MANTEM A FOTO
+      whatsapp: current.whatsapp // Mantém whatsapp
   } : {}
 
   const dbUpdates: any = {
@@ -94,7 +95,8 @@ export async function updateStudent(id: string, updates: Partial<Omit<StudentRec
       ...(updates.dietIds ? { dietIds: updates.dietIds } : {}),
       ...(updates.tempPassword ? { tempPassword: updates.tempPassword } : {}),
       ...(updates.email ? { email: updates.email } : {}),
-      ...(updates.avatarUrl ? { avatarUrl: updates.avatarUrl } : {}) // Atualiza se vier novo
+      ...(updates.avatarUrl ? { avatarUrl: updates.avatarUrl } : {}), // Atualiza se vier novo
+      ...(updates.whatsapp !== undefined ? { whatsapp: updates.whatsapp } : {})
     }
   }
 

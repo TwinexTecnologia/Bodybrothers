@@ -254,6 +254,7 @@ export default function EditStudent() {
         if (s) {
             setName(s.name)
             setEmail(s.email)
+            setWhatsapp(s.whatsapp || '') // Carrega whatsapp do campo raiz
             setTempPassword(s.tempPassword || '')
             setCep(s.address?.cep || '')
             setStreet(s.address?.street || '')
@@ -519,6 +520,7 @@ export default function EditStudent() {
     const newData = {
         name: name.trim(),
         email: email,
+        whatsapp: whatsapp,
         planId: planId || undefined,
         planStartDate: planStartDate || undefined,
         dueDay: dueDay ? parseInt(dueDay) : undefined,
@@ -533,6 +535,7 @@ export default function EditStudent() {
     await updateStudent(selectedId, {
       name: newData.name,
       email: newData.email,
+      whatsapp: newData.whatsapp,
       address: newData.address,
       planId: newData.planId, // Isso vai atualizar o JSON data->planId
       planStartDate: newData.planStartDate,

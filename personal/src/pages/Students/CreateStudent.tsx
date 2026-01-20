@@ -96,6 +96,7 @@ export default function CreateStudent() {
             const updates = {
                 data: {
                     email: email, // Salva o email no JSON também para facilitar listagem
+                    whatsapp: whatsapp,
                     address: { cep, street, neighborhood, city, state, number, complement },
                     planId: planId || undefined,
                     tempPassword: tempPassword
