@@ -170,7 +170,13 @@ export default function CreateStudent() {
           </label>
           <label className="label">
             WhatsApp
-            <input className="input" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(00) 00000-0000" />
+            <input 
+                className="input" 
+                value={whatsapp} 
+                onChange={(e) => setWhatsapp(e.target.value)} 
+                placeholder="(00) 00000-0000" 
+                autoComplete="off"
+            />
           </label>
         </div>
 
