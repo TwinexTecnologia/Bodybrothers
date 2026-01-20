@@ -23,6 +23,7 @@ export default function EditStudent() {
   // Form States
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [whatsapp, setWhatsapp] = useState('') // Adicionado estado para WhatsApp
   const [tempPassword, setTempPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [cep, setCep] = useState('')
@@ -532,6 +533,7 @@ export default function EditStudent() {
     await updateStudent(selectedId, {
       name: newData.name,
       email: newData.email,
+      whatsapp: whatsapp, // Salva o whatsapp
       address: newData.address,
       planId: newData.planId, // Isso vai atualizar o JSON data->planId
       planStartDate: newData.planStartDate,
