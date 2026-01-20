@@ -5,6 +5,7 @@ export type StudentRecord = {
   personalId: string
   name: string
   email: string
+  whatsapp?: string // Adicionado
   tempPassword?: string
   passwordNeedsReset?: boolean
   address?: {
@@ -122,6 +123,7 @@ export async function getStudent(id: string): Promise<StudentRecord | undefined>
     personalId: data.personal_id,
     name: data.full_name,
     email: data.email,
+    whatsapp: data.data?.whatsapp,
     status: data.data?.status || 'ativo',
     createdAt: data.created_at,
     lastAccess: data.last_login_at,
