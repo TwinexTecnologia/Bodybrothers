@@ -533,7 +533,6 @@ export default function EditStudent() {
     await updateStudent(selectedId, {
       name: newData.name,
       email: newData.email,
-      whatsapp: whatsapp, // Salva o whatsapp
       address: newData.address,
       planId: newData.planId, // Isso vai atualizar o JSON data->planId
       planStartDate: newData.planStartDate,
@@ -647,6 +646,10 @@ export default function EditStudent() {
                         <label className="label">
                             Email
                             <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
+                        </label>
+                        <label className="label">
+                            WhatsApp
+                            <input className="input" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(00) 00000-0000" />
                         </label>
                     </div>
                 </div>
