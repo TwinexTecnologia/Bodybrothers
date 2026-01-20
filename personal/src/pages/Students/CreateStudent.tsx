@@ -21,6 +21,7 @@ export default function CreateStudent() {
   const [personalId, setPersonalId] = useState('')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
   const [tempPassword, setTempPassword] = useState('')
   const [cep, setCep] = useState('')
   const [street, setStreet] = useState('')
@@ -123,6 +124,7 @@ export default function CreateStudent() {
                  // Limpa form apenas se deu tudo certo
                  setName('')
                  setEmail('')
+                 setWhatsapp('')
                  setTempPassword('')
                  setCep('')
                  setStreet('')
