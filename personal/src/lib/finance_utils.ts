@@ -78,7 +78,15 @@ export function generateExpectedCharges(
                  const chargeDate = new Date(current.getFullYear(), current.getMonth(), dueDay)
                  // Só adiciona se <= limite
                  if (chargeDate <= endLimit) {
-                     charges.push(chargeDate)
+                     // Correção: Só adiciona se a data de cobrança for >= data de inicio real do plano
+                     // Isso evita cobrar mensalidades "anteriores" ao inicio do contrato só pq o dia de vencimento é menor que o dia de inicio
+                     // Ex: Inicio dia 20. Vencimento dia 10.
+                     // A cobrança do dia 10 daquele mesmo mês deve ser ignorada (ou cobrada pro-rata, mas aqui assumimos ignorar a passada).
+                     // A primeira cobrança deve ser Fev 10.
+                     
+                     if (chargeDate >= start) {
+                        charges.push(chargeDate)
+                     }
                  }
             }
             
@@ -110,12 +118,28 @@ export function isStudentOverdue(
     yesterday.setDate(yesterday.getDate() - 1)
     
     const dueDates = generateExpectedCharges(student, plan, yesterday)
+
+    // Filtra cobranças muito antigas (mais de 90 dias) se o aluno não tiver nenhum pagamento registrado antigo
+    // Isso evita que alunos antigos (migrados) fiquem com tudo vermelho
+    // Mas se o aluno começou mês passado, cobra tudo.
+    
+    const ninetyDaysAgo = new Date()
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+
+    const recentDueDates = dueDates.filter(d => d >= ninetyDaysAgo)
+
+    // Se a lista filtrada estiver vazia, usa a original (caso recente)
+    // Se tiver cheia, usa a filtrada para o Dashboard?
+    // O usuário quer saber se tem alguem devendo AGORA.
+    // Vamos usar a regra: Considera apenas os últimos 3 meses para fins de "Alerta de Dashboard"
+    
+    const targetDueDates = recentDueDates.length > 0 ? recentDueDates : dueDates.slice(-3) // Pega as ultimas 3 se não tiver recentes no filtro (caso raro)
     
     // Para cada data de vencimento, verifica se existe pagamento
     // A verificação deve ser tolerante ou exata?
     // O sistema grava due_date como YYYY-MM-DD.
     
-    for (const due of dueDates) {
+    for (const due of targetDueDates) {
         const dueStr = due.toISOString().split('T')[0]
         
         // Procura pagamento
@@ -135,7 +159,7 @@ export function isStudentOverdue(
         })
         
         if (!hasPayment) {
-            return true // Achou uma conta não paga no passado
+            return true // Achou uma conta não paga no passado recente
         }
     }
     

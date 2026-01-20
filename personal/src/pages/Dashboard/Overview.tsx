@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { isStudentOverdue, generateExpectedCharges } from '../../lib/finance_utils'
+import type { StudentRecord } from '../../store/students'
+import type { PlanRecord } from '../../store/plans'
+import type { DebitRecord } from '../../store/financial'
 
 export default function Overview() {
   const navigate = useNavigate()
@@ -23,174 +27,201 @@ export default function Overview() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
-        // 1. Alunos (Total, Ativos, Inativos)
-        const { data: students, error: studentsError } = await supabase
-          .from('profiles')
-          .select('id, data')
-          .eq('personal_id', user.id)
-          .eq('role', 'aluno')
-        
-        if (studentsError) console.error('Erro Dash:', studentsError)
-        
-        const totalStudents = students?.length || 0
-        const activeStudents = students?.filter(s => s.data?.status !== 'inativo').length || 0
+        // 1. Carrega TUDO em paralelo para ser rápido
+        const [
+            studentsRes,
+            plansRes,
+            paymentsRes,
+            anamnesisRes,
+            modelsRes,
+            dietsActiveRes,
+            dietsInactiveRes,
+            workoutsActiveRes,
+            workoutsInactiveRes
+        ] = await Promise.all([
+            // Alunos
+            supabase.from('profiles').select('*').eq('personal_id', user.id).eq('role', 'aluno'),
+            // Planos
+            supabase.from('plans').select('*').eq('personal_id', user.id),
+            // Pagamentos (Todos os pagos)
+            supabase.from('debits').select('*').eq('receiver_id', user.id).eq('status', 'paid'),
+            // Anamneses (Todas as respostas)
+            supabase.from('protocols').select('*').eq('personal_id', user.id).eq('type', 'anamnesis'),
+            // Modelos
+            supabase.from('protocols').select('*').eq('personal_id', user.id).eq('type', 'anamnesis_model'),
+            // Contadores
+            supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active'),
+            supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active'),
+            supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').eq('status', 'active'),
+            supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').neq('status', 'active')
+        ])
+
+        // Processa Alunos
+        const studentsRaw = studentsRes.data || []
+        // Mapeia para StudentRecord parcial necessário para as utils
+        const students: StudentRecord[] = studentsRaw.map((d: any) => ({
+            id: d.id,
+            personalId: d.personal_id,
+            name: d.full_name || '',
+            email: d.email || '',
+            status: d.data?.status || 'ativo',
+            createdAt: d.created_at,
+            planId: d.plan_id || d.data?.planId,
+            planStartDate: d.data?.planStartDate,
+            dueDay: d.due_day || d.data?.dueDay,
+            whatsapp: d.data?.whatsapp,
+            // ... outros campos se necessário
+        })) as any
+
+        const totalStudents = students.length
+        const activeStudentsList = students.filter(s => s.status !== 'inativo')
+        const activeStudents = activeStudentsList.length
         const inactiveStudents = totalStudents - activeStudents
 
-        // 2. Anamneses Pendentes (Vencidas)
-        const today = new Date().toISOString().split('T')[0]
-        
-        // Busca Modelos
-        const { data: models } = await supabase
-            .from('protocols')
-            .select('*')
-            .eq('personal_id', user.id)
-            .eq('type', 'anamnesis_model')
-            .not('ends_at', 'is', null)
-        
-        // Busca Respostas
-        const { data: responses } = await supabase
-            .from('protocols')
-            .select('*')
-            .eq('personal_id', user.id)
-            .eq('type', 'anamnesis')
+        // Processa Planos
+        const plans = (plansRes.data || []) as PlanRecord[]
 
-        let pendingAnamnesisCount = 0
-        const now = new Date()
+        // Processa Pagamentos
+        const paymentsRaw = paymentsRes.data || []
+        const allPayments: DebitRecord[] = paymentsRaw.map((d: any) => ({
+            id: d.id,
+            payerId: d.payer_id,
+            receiverId: d.receiver_id,
+            amount: Number(d.amount),
+            dueDate: d.due_date,
+            paidAt: d.paid_at,
+            status: d.status,
+            monthRef: d.saas_ref_month
+        }))
 
-        models?.forEach(m => {
-             // Encontra resposta mais recente
-             const modelResponses = responses?.filter(r => r.data?.modelId === m.id).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-             const lastResponse = modelResponses?.[0]
-
-             if (lastResponse) {
-                 if (lastResponse.renew_in_days) {
-                     const created = new Date(lastResponse.created_at)
-                     const nextDue = new Date(created.getTime() + (lastResponse.renew_in_days * 24 * 60 * 60 * 1000))
-                     // Se venceu o próximo ciclo (dá uma folga de 1 dia para não vencer no mesmo segundo)
-                     // Mas comparando com now é seguro.
-                     if (nextDue < now) {
-                         pendingAnamnesisCount++
-                     }
-                 }
-                 // Se tem resposta e não tem recorrência, considera OK
-             } else {
-                 // Sem resposta, verifica data do modelo
-                 if (m.ends_at) {
-                     const endDate = new Date(m.ends_at)
-                     // Ajusta fuso ou compara string? new Date(string) é UTC as vezes.
-                     // Melhor comparar timestamps.
-                     // ends_at é YYYY-MM-DD. new Date('2023-10-10') é UTC.
-                     // now é local.
-                     // Vamos garantir que ends_at seja fim do dia.
-                     const end = new Date(m.ends_at)
-                     end.setHours(23, 59, 59)
-                     if (end < now) {
-                         pendingAnamnesisCount++
-                     }
-                 }
-             }
-        })
-
-        // 3. Financeiro Pendente (Cálculo Real igual à tela Financeira)
+        // CALCULO FINANCEIRO (Quem deve REALMENTE)
         let pendingFinanceCount = 0
-        
-        // Carrega Planos e Pagamentos do Mês para cruzar dados
-        const { data: plans } = await supabase.from('plans').select('*').eq('personal_id', user.id)
-        
-        // Pega pagamentos (debits pagos) deste mês
         const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
         const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString()
-        
-        const { data: payments } = await supabase
-            .from('debits')
-            .select('student_id, due_date')
-            .eq('receiver_id', user.id)
-            .or(`status.eq.paid,status.eq.pago`) // Pagamentos efetivados
-            .gte('due_date', startOfMonth) // Dentro deste mês (aproximado)
-            .lte('due_date', endOfMonth)
+        const now = new Date()
 
-        // Itera alunos ativos para ver quem deve neste mês
-        students?.forEach(student => {
-            const sData = student.data || {}
-            if (sData.status !== 'ativo' || !sData.planId || !sData.planStartDate) return
-
-            const plan = plans?.find(p => p.id === sData.planId)
+        activeStudentsList.forEach(student => {
+            // Ignora quem não tem plano vinculado ou data de inicio
+            if (!student.planId || !student.planStartDate) return
+            
+            const plan = plans.find(p => p.id === student.planId)
+            // Se o plano não existe mais, ignora
             if (!plan) return
 
-            // Verifica se tem cobrança este mês
-            // Simplificação: Se é mensal e começou antes de hoje, tem cobrança.
-            // Para ser preciso, copiamos a logica de data:
-            const dueDay = sData.dueDay || 10
-            const currentYear = new Date().getFullYear()
-            const currentMonth = new Date().getMonth()
+            // Filtra pagamentos deste aluno
+            const studentPayments = allPayments.filter(p => p.payerId === student.id)
             
-            // Data de vencimento deste mês
-            const thisMonthDue = new Date(currentYear, currentMonth, dueDay)
-            thisMonthDue.setHours(23, 59, 59) // Fim do dia para comparação
-
-            // Se ainda não venceu (ex: hoje é dia 5, vence dia 10), não conta como pendente/atrasado ainda?
-            // Ou conta como "a receber"?
-            // O card diz "Pendente" (geralmente inclui a vencer) ou "Atrasado"?
-            // Se o card diz "Tudo pago", entende-se que não tem nada EM ABERTO VENCIDO.
-            // Vou considerar apenas o que JÁ VENCEU (<= hoje).
+            // Verifica inadimplência APENAS DO MÊS ATUAL
+            // Motivo: O usuário não possui histórico lançado, então olhar para trás gera falsos positivos.
+            // O Dashboard deve refletir o que está na tela "Financeiro" (Mês Atual).
             
-            const now = new Date()
-            if (thisMonthDue < now) { // Já venceu
-                // Verifica se pagou
-                // Procura pagamento deste aluno com data próxima ao vencimento
-                const hasPayment = payments?.some(p => p.student_id === student.id) 
-                // (Verificação simplificada: se tem qualquer pagamento dele neste mês, tá pago. 
-                // Para ser exato precisaria checar a data exata, mas pra dash serve).
+            const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+            const currentMonthEnd = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+            
+            // Gera cobranças apenas dentro deste mês
+            const dueDates = generateExpectedCharges(student, plan, currentMonthEnd)
+            const thisMonthDueDates = dueDates.filter(d => d >= currentMonthStart && d <= currentMonthEnd)
+            
+            let isOverdue = false
+            // const now = new Date() // Já declarado acima
+            
+            for (const due of thisMonthDueDates) {
+                // Se a data de vencimento já passou (Ontem ou antes)
+                const dueLimit = new Date(due)
+                dueLimit.setHours(23, 59, 59)
                 
-                if (!hasPayment) {
-                    pendingFinanceCount++
+                if (now > dueLimit) {
+                    // É um atraso POTENCIAL. Verifica se foi pago.
+                    const dueStr = due.toISOString().split('T')[0]
+                    const hasPayment = studentPayments.some(p => {
+                         if (p.dueDate === dueStr) return true
+                         if (p.monthRef) {
+                             const pDate = new Date(p.monthRef)
+                             return pDate.getMonth() === due.getMonth() && pDate.getFullYear() === due.getFullYear()
+                         }
+                         return false
+                    })
+                    
+                    if (!hasPayment) {
+                        isOverdue = true
+                        break
+                    }
                 }
+            }
+            
+            if (isOverdue) {
+                pendingFinanceCount++
             }
         })
 
+        // CALCULO ANAMNESES (Quem está vencido ou nunca respondeu)
+        let pendingAnamnesisCount = 0
+        const allAnamnesis = anamnesisRes.data || []
+        const allModels = modelsRes.data || []
+        // const now = new Date() // Já declarado acima
 
-        // 4. Dietas (Ativas e Inativas)
-        const { count: activeDietsCount } = await supabase
-          .from('protocols')
-          .select('*', { count: 'exact', head: true })
-          .eq('personal_id', user.id)
-          .eq('type', 'diet')
-          .eq('status', 'active')
+        activeStudentsList.forEach(student => {
+            // Regra:
+            // O usuário solicitou: "só para quem tem anamnese vinculada"
+            // Ou seja, ignorar modelos globais (biblioteca). Apenas modelos onde student_id == student.id
+            
+            const hasLinkedModel = allModels.some(m => m.student_id === student.id)
+            
+            if (!hasLinkedModel) return // Pula este aluno se não tiver anamnese vinculada
 
-        const { count: inactiveDietsCount } = await supabase
-          .from('protocols')
-          .select('*', { count: 'exact', head: true })
-          .eq('personal_id', user.id)
-          .eq('type', 'diet')
-          .neq('status', 'active')
-
-        // 5. Treinos (Ativos e Inativos)
-        const { count: activeWorkoutsCount } = await supabase
-          .from('protocols')
-          .select('*', { count: 'exact', head: true })
-          .eq('personal_id', user.id)
-          .eq('type', 'workout')
-          .eq('status', 'active')
-
-        const { count: inactiveWorkoutsCount } = await supabase
-          .from('protocols')
-          .select('*', { count: 'exact', head: true })
-          .eq('personal_id', user.id)
-          .eq('type', 'workout')
-          .neq('status', 'active')
-
+            // Pega respostas deste aluno
+            const studentResponses = allAnamnesis.filter(a => a.student_id === student.id)
+            
+            if (studentResponses.length === 0) {
+                 // Tem modelo vinculado mas nunca respondeu.
+                 // Pela sua instrução: "esses casos que nunca respondeu nao entra pq nao tem anamnese acoplada neles"
+                 // Isso implica que, se nunca respondeu, não consideramos "vencida" ou pendente.
+                 // Apenas ignoramos.
+            } else {
+                // Tem respostas, pega a mais recente
+                // Ordena por created_at desc
+                studentResponses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                const last = studentResponses[0]
+                
+                // Verifica validade
+                const renewDays = last.renew_in_days || 90 // Default 90 se não definido?
+                if (renewDays) {
+                    const created = new Date(last.created_at)
+                    const expireDate = new Date(created.getTime() + (renewDays * 24 * 60 * 60 * 1000))
+                    
+                    // Zera hora para comparar apenas data (Início do dia)
+                    // Se vence hoje (0 dias), JÁ DEVE CONTAR como vencida para o personal renovar.
+                    expireDate.setHours(0, 0, 0, 0)
+                    
+                    // Se a data de expiração (hoje 00:00) for menor ou igual a agora (hoje 10:00), conta.
+                    // Mas a lógica (expireDate < now) já faz isso se now tiver hora.
+                    // Para garantir: Se expireDate <= now (comparando datas puras), conta.
+                    
+                    const nowZero = new Date(now)
+                    nowZero.setHours(0,0,0,0)
+                    
+                    if (expireDate <= nowZero) {
+                        pendingAnamnesisCount++
+                    }
+                }
+            }
+            // Se nunca respondeu (length === 0), NÃO conta como vencida/pendente.
+            // O sistema só avisa renovação.
+        })
+        
         setStats({
           totalStudents,
           activeStudents,
           inactiveStudents,
-          pendingAnamnesis: pendingAnamnesisCount || 0,
-          pendingFinance: pendingFinanceCount || 0,
-          activeDiets: activeDietsCount || 0,
-          inactiveDiets: inactiveDietsCount || 0,
-          activeWorkouts: activeWorkoutsCount || 0,
-          inactiveWorkouts: inactiveWorkoutsCount || 0,
+          pendingAnamnesis: pendingAnamnesisCount,
+          pendingFinance: pendingFinanceCount,
+          activeDiets: dietsActiveRes.count || 0,
+          inactiveDiets: dietsInactiveRes.count || 0,
+          activeWorkouts: workoutsActiveRes.count || 0,
+          inactiveWorkouts: workoutsInactiveRes.count || 0,
           loading: false
         })
+
       } catch (error) {
         console.error('Erro ao carregar dashboard:', error)
         setStats(prev => ({ ...prev, loading: false }))
