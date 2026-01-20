@@ -168,6 +168,10 @@ export default function CreateStudent() {
             Email
             <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
           </label>
+          <label className="label">
+            WhatsApp
+            <input className="input" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(00) 00000-0000" />
+          </label>
         </div>
 
         <div className="form-section">
