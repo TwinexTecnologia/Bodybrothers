@@ -13,7 +13,7 @@ import StudentAnamnesisModal from '../../components/StudentAnamnesisModal'
 
 // Helper de Status Financeiro
 const getFinancialStatus = (student: StudentRecord, plan: PlanRecord | undefined, payments: DebitRecord[]) => {
-    if (!plan || !student.planStartDate) return { status: 'none', label: '—', color: '#9ca3af', bg: 'transparent' }
+    if (!plan || !student.planStartDate) return { status: 'none', label: '—', color: '#9ca3af', bg: 'transparent', daysDiff: null }
     
     const dueDay = student.dueDay || 10
     const now = new Date()
@@ -28,11 +28,19 @@ const getFinancialStatus = (student: StudentRecord, plan: PlanRecord | undefined
     // Procura pagamento com due_date igual (mesmo que tenha sido pago em outro dia)
     const hasPayment = payments.some(p => p.payerId === student.id && p.dueDate === dueStr)
     
-    if (hasPayment) return { status: 'paid', label: 'PAGO', color: '#166534', bg: '#dcfce7' }
+    const timeDiff = dueThisMonth.getTime() - now.getTime()
+    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24))
     
-    if (now > dueThisMonth) return { status: 'overdue', label: 'ATRASADO', color: '#991b1b', bg: '#fee2e2' }
+    if (hasPayment) return { status: 'paid', label: 'PAGO', color: '#166534', bg: '#dcfce7', daysDiff: null }
     
-    return { status: 'pending', label: 'PENDENTE', color: '#b45309', bg: '#fef3c7' }
+    if (now > dueThisMonth) {
+        // Atrasado
+        // daysDiff será negativo (ex: -5). Invertemos para positivo para mostrar "5 dias"
+        return { status: 'overdue', label: 'ATRASADO', color: '#991b1b', bg: '#fee2e2', daysDiff: Math.abs(daysDiff) }
+    }
+    
+    // Pendente (Vence em X dias)
+    return { status: 'pending', label: 'PENDENTE', color: '#b45309', bg: '#fef3c7', daysDiff: daysDiff }
 }
 
 export default function ListStudents() {
@@ -303,18 +311,30 @@ export default function ListStudents() {
 
                 {/* Financeiro */}
                 <div>
-                    <span style={{ 
-                        background: finStatus.bg, 
-                        color: finStatus.color, 
-                        padding: '2px 8px', borderRadius: 4, fontSize: '0.85em', fontWeight: 600 
-                    }}>
-                        {finStatus.label}
-                    </span>
-                    {s.dueDay && (
-                        <div style={{ fontSize: '0.75em', color: '#94a3b8', marginTop: 2 }}>
-                            Dia {s.dueDay}
-                        </div>
-                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                        <span style={{ 
+                            background: finStatus.bg, 
+                            color: finStatus.color, 
+                            padding: '2px 8px', borderRadius: 4, fontSize: '0.85em', fontWeight: 600 
+                        }}>
+                            {finStatus.label}
+                        </span>
+                        {finStatus.status === 'pending' && finStatus.daysDiff !== null && (
+                            <span style={{ fontSize: '0.75em', color: '#b45309', marginTop: 2, fontWeight: 500 }}>
+                                Vence em {finStatus.daysDiff} dias
+                            </span>
+                        )}
+                        {finStatus.status === 'overdue' && finStatus.daysDiff !== null && (
+                            <span style={{ fontSize: '0.75em', color: '#991b1b', marginTop: 2, fontWeight: 500 }}>
+                                Vencido há {finStatus.daysDiff} dias
+                            </span>
+                        )}
+                        {s.dueDay && (
+                            <div style={{ fontSize: '0.75em', color: '#94a3b8', marginTop: 2 }}>
+                                Dia {s.dueDay}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Último Login */}
