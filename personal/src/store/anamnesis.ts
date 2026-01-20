@@ -275,13 +275,39 @@ export async function listArchivedStudentModels(personalId: string, studentId: s
 }
 
 export async function listLibraryModels(personalId: string): Promise<AnamnesisModel[]> {
+  // Lista modelos da biblioteca (sem student_id) + modelos de ALUNOS INATIVOS que não foram deletados
+  // Na verdade, a biblioteca deve mostrar:
+  // 1. Modelos sem student_id (Padrão)
+  // 2. Modelos com student_id mas que você quer reaproveitar? Geralmente não.
+  // O pedido foi: "quando eu tirar do aluno ele vira biblioteca mas fica arquivado"
+  // E "não deixa como ativo nao se nao fica muito poluido"
+  // Então listLibraryModels deve trazer APENAS os ativos sem student_id.
+  
+  // Se o usuário quiser resgatar um "arquivado", ele precisaria de uma tela de "Arquivados".
+  // OU, podemos fazer com que ao desvincular, ele vire 'ativo' porem sem student_id?
+  // O usuário disse: "vira biblioteca mas fica arquivado ok ? nao deixa como ativo nao"
+  // Isso significa status = 'inativo'.
+  
+  // Então listLibraryModels só pega status = 'ativo' e student_id is null.
+  // Isso já é o padrão.
+  
   const { data, error } = await supabase
     .from('protocols')
     .select('*')
     .eq('personal_id', personalId)
-    .is('student_id', null) // Apenas modelos gerais (sem aluno vinculado)
     .eq('type', 'anamnesis_model')
+    .is('student_id', null)
+    .eq('status', 'active') // Garante que inativos não apareçam
+    .order('title')
   
-  if (error) return []
+  if (error) {
+    console.error('Erro ao listar biblioteca anamnese:', error)
+    return []
+  }
+
   return (data || []).map(mapModelFromDb)
+}
+
+export async function reloadLibraryAnamnesis() {
+  // Função auxiliar para recarregar se necessário, mas o hook no componente já faz
 }

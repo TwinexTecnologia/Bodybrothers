@@ -403,6 +403,49 @@ export default function EditStudent() {
     setMsg('Senha provisória gerada')
   }
   
+  const handleSmartLinkAction = async (action: 'link' | 'copy') => {
+      if (!smartLinkState) return
+      setLoading(true)
+
+      const { type, itemId, days } = smartLinkState
+
+      if (action === 'link') {
+          if (type === 'workout') {
+              await updateWorkout(itemId, { studentId: selectedId })
+              await reloadWorkouts()
+          } else if (type === 'diet') {
+              await updateDiet(itemId, { studentId: selectedId })
+              await reloadStudentDiets()
+          } else if (type === 'anamnesis') {
+              await updateModel(itemId, { studentId: selectedId })
+              await reloadAnamnesis()
+              await reloadLibraryAnamnesis()
+          }
+      } else {
+          // COPY
+          if (type === 'workout') {
+              await duplicateWorkout(itemId, selectedId)
+              await reloadWorkouts()
+          } else if (type === 'diet') {
+              await duplicateDiet(itemId, selectedId)
+              await reloadStudentDiets()
+          } else if (type === 'anamnesis') {
+              await duplicateModel(itemId, selectedId, days || 90)
+              await reloadAnamnesis()
+              await reloadLibraryAnamnesis()
+          }
+      }
+
+      setSmartLinkState(null)
+      // Recarrega bibliotecas
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+          if (type === 'workout') setAllWorkouts(await listActiveWorkouts(user.id))
+          if (type === 'diet') setDiets(await listActiveDiets(user.id))
+      }
+      setLoading(false)
+  }
+
   const handleAddWorkout = async () => {
       if (!libraryWorkoutId) return
       setLoading(true)
@@ -440,11 +483,12 @@ export default function EditStudent() {
       setConfirmModal({
           isOpen: true,
           title: 'Desvincular Treino',
-          message: 'Tem certeza que deseja remover este treino do aluno? Ele permanecerá na lista de Treinos Ativos como não-vinculado.',
+          message: 'Tem certeza que deseja remover este treino do aluno? Ele voltará para a biblioteca geral (desvinculado) mas permanecerá arquivado.',
           type: 'danger',
           onConfirm: async () => {
               setLoading(true)
-              await updateWorkout(wid, { studentId: '' })
+              // Atualiza studentId para null (volta pra biblioteca) E status para 'inativo' (arquivado)
+              await updateWorkout(wid, { studentId: null, status: 'inativo' })
               await reloadWorkouts()
               setLoading(false)
               setConfirmModal(prev => ({ ...prev, isOpen: false }))
