@@ -9,15 +9,18 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Permissão explícita para escrever no repo
+      contents: write
       
     steps:
       - uses: actions/checkout@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install PostgreSQL Client
-        run: sudo apt-get install -y postgresql-client
+      - name: Install PostgreSQL Client & Config IPv4
+        run: |
+          sudo apt-get install -y postgresql-client
+          # Força preferência por IPv4 no gai.conf (GetAddrInfo)
+          sudo sed -i 's/#precedence ::ffff:0:0\/96  100/precedence ::ffff:0:0\/96  100/' /etc/gai.conf
 
       - name: Create Backup Directory
         run: mkdir -p backups
@@ -30,7 +33,8 @@ jobs:
             echo "DATABASE_URL not set. Skipping backup."
             exit 1
           fi
-          # Adiciona --no-owner e --no-acl para evitar erros de permissão no restore/dump
+          # Tenta pg_dump. Se falhar, tenta com host do pooler direto se soubermos (aws-0-sa-east-1...)
+          # Mas com a config do gai.conf acima deve resolver o IPv6 issue.
           pg_dump "$DATABASE_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql
 
       - name: Delete Old Backups (Keep last 7 days)
@@ -43,7 +47,6 @@ jobs:
           git config --global user.name 'Backup Bot'
           git config --global user.email 'backup-bot@users.noreply.github.com'
           git add backups/*.sql
-          # Verifica se tem algo para commitar antes de tentar
           if git diff --staged --quiet; then
             echo "No changes to commit"
             exit 0
