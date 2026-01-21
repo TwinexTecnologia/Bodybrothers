@@ -17,12 +17,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install PostgreSQL Client
-        run: sudo apt-get install -y postgresql-client dnsutils
+        run: sudo apt-get install -y postgresql-client
 
       - name: Create Backup Directory
         run: mkdir -p backups
 
-      - name: Dump Database (Force IPv4)
+      - name: Dump Database (Python DNS Resolve)
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
@@ -31,20 +31,24 @@ jobs:
             exit 1
           fi
 
-          # Extrai o host da URL (tudo entre @ e :)
+          # Extrai o host da URL
           DB_HOST=$(echo $DATABASE_URL | sed -e 's/.*@//' -e 's/:.*//')
           
-          # Resolve para IPv4 explicitamente
-          DB_IP=$(dig +short A $DB_HOST | head -n 1)
+          echo "Resolving IPv4 for $DB_HOST using Python..."
+          
+          # Usa Python para pegar o IP (mais robusto)
+          DB_IP=$(python3 -c "import socket; print(socket.gethostbyname('$DB_HOST'))")
           
           if [ -z "$DB_IP" ]; then
-            echo "Could not resolve IPv4 for host $DB_HOST. Using original URL."
-            FINAL_URL="$DATABASE_URL"
-          else
-            echo "Resolved $DB_HOST to $DB_IP"
-            # Substitui o host pelo IP na URL
-            FINAL_URL=$(echo $DATABASE_URL | sed "s/$DB_HOST/$DB_IP/")
+            echo "Could not resolve IPv4. Trying fallback to Brazil pooler..."
+            # Tenta o pooler da região SP (sa-east-1) como última tentativa
+            DB_IP="aws-0-sa-east-1.pooler.supabase.com"
           fi
+          
+          echo "Resolved to: $DB_IP"
+          
+          # Substitui o host pelo IP na URL
+          FINAL_URL=$(echo $DATABASE_URL | sed "s/$DB_HOST/$DB_IP/")
           
           echo "Starting backup..."
           pg_dump "$FINAL_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql
