@@ -22,81 +22,29 @@ jobs:
       - name: Create Backup Directory
         run: mkdir -p backups
 
-      - name: Dump Database (Multi-Region Fallback)
+      - name: Dump Database
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
+          # Limpa espaços em branco da URL por segurança
           CLEAN_URL=$(echo "$DATABASE_URL" | tr -d '[:space:]')
           
           if [ -z "$CLEAN_URL" ]; then
-            echo "DATABASE_URL not set. Skipping backup."
+            echo "DATABASE_URL not set."
             exit 1
           fi
 
-          echo "Starting backup process..."
+          echo "Starting backup..."
           
-          # Extrai credenciais
-          PROJECT_REF=$(echo $CLEAN_URL | sed -n 's/.*db\.\(.*\)\.supabase\.co.*/\1/p')
-          PASSWORD=$(echo $CLEAN_URL | sed -e 's/.*://' -e 's/@.*//')
+          # Como a URL agora é do Pooler (IPv4), deve funcionar direto
+          pg_dump "$CLEAN_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql
           
-          if [ -z "$PROJECT_REF" ]; then
-             echo "Could not extract Project Ref from URL. Backup failed."
-             exit 1
-          fi
-          
-          echo "Detected Project Ref: $PROJECT_REF"
-          
-          # Lista de hosts para tentar (Direto + Poolers Regionais)
-          # A ordem importa: tenta direto, depois US (padrão), depois BR, depois EU
-          HOSTS=(
-            "aws-0-us-east-1.pooler.supabase.com"
-            "aws-0-sa-east-1.pooler.supabase.com"
-            "aws-0-eu-central-1.pooler.supabase.com"
-          )
-          
-          SUCCESS=false
-          
-          # 1. Tenta conexão direta primeiro (pode falhar por IPv6)
-          echo "Attempting direct connection..."
-          if pg_dump "$CLEAN_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql 2>/dev/null; then
-            echo "Direct connection successful!"
-            SUCCESS=true
-          else
-            echo "Direct connection failed. Trying Regional Poolers..."
-            
-            # Configura variáveis globais para o loop
-            export PGPASSWORD="$PASSWORD"
-            export PGPORT="6543"
-            export PGUSER="postgres.$PROJECT_REF"
-            export PGDATABASE="postgres"
-            
-            for HOST in "${HOSTS[@]}"; do
-              echo "Trying Pooler: $HOST..."
-              export PGHOST="$HOST"
-              
-              if pg_dump --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql 2>/dev/null; then
-                echo "Success! Connected to $HOST"
-                SUCCESS=true
-                break
-              else
-                echo "Failed to connect to $HOST"
-              fi
-            done
-          fi
-          
-          if [ "$SUCCESS" = false ]; then
-             echo "All connection attempts failed."
-             # Mostra o erro da última tentativa para debug
-             export PGHOST="aws-0-us-east-1.pooler.supabase.com"
-             pg_dump --no-owner --no-acl > /dev/null
-             exit 1
-          fi
-          
-          # Verifica se o arquivo foi criado e tem conteúdo
           if [ ! -s "backups/backup_$(date +%Y-%m-%d).sql" ]; then
-             echo "Backup file is empty."
+             echo "Backup failed or file is empty."
              exit 1
           fi
+          
+          echo "Backup successful!"
 
       - name: Delete Old Backups (Keep last 7 days)
         run: |
