@@ -16,16 +16,13 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install PostgreSQL Client & Config IPv4
-        run: |
-          sudo apt-get install -y postgresql-client
-          # Força preferência por IPv4 no gai.conf (GetAddrInfo)
-          sudo sed -i 's/#precedence ::ffff:0:0\/96  100/precedence ::ffff:0:0\/96  100/' /etc/gai.conf
+      - name: Install PostgreSQL Client
+        run: sudo apt-get install -y postgresql-client dnsutils
 
       - name: Create Backup Directory
         run: mkdir -p backups
 
-      - name: Dump Database
+      - name: Dump Database (Force IPv4)
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
@@ -33,9 +30,24 @@ jobs:
             echo "DATABASE_URL not set. Skipping backup."
             exit 1
           fi
-          # Tenta pg_dump. Se falhar, tenta com host do pooler direto se soubermos (aws-0-sa-east-1...)
-          # Mas com a config do gai.conf acima deve resolver o IPv6 issue.
-          pg_dump "$DATABASE_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql
+
+          # Extrai o host da URL (tudo entre @ e :)
+          DB_HOST=$(echo $DATABASE_URL | sed -e 's/.*@//' -e 's/:.*//')
+          
+          # Resolve para IPv4 explicitamente
+          DB_IP=$(dig +short A $DB_HOST | head -n 1)
+          
+          if [ -z "$DB_IP" ]; then
+            echo "Could not resolve IPv4 for host $DB_HOST. Using original URL."
+            FINAL_URL="$DATABASE_URL"
+          else
+            echo "Resolved $DB_HOST to $DB_IP"
+            # Substitui o host pelo IP na URL
+            FINAL_URL=$(echo $DATABASE_URL | sed "s/$DB_HOST/$DB_IP/")
+          fi
+          
+          echo "Starting backup..."
+          pg_dump "$FINAL_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql
 
       - name: Delete Old Backups (Keep last 7 days)
         run: |
