@@ -22,7 +22,7 @@ jobs:
       - name: Create Backup Directory
         run: mkdir -p backups
 
-      - name: Dump Database (Final Fix)
+      - name: Dump Database (Env Vars)
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
@@ -37,16 +37,17 @@ jobs:
           
           # Tenta conexão direta primeiro
           if ! pg_dump "$CLEAN_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql 2> error.log; then
-            echo "Direct connection failed. Trying Pooler with correct username format..."
+            echo "Direct connection failed. Trying Pooler with Env Vars..."
             
-            # Extrai as partes da URL
-            # Formato esperado: postgresql://USER:PASS@db.PROJECT_REF.supabase.co:PORT/DB
+            # Extrai as partes da URL para usar variáveis separadas
+            # Isso evita erros de parsing da URL com @ na senha ou usuário complexo
             
-            # 1. Pega o Project Ref (parte entre 'db.' e '.supabase.co')
-            # Ex: db.cdtouwfxwuhnlzqhcagy.supabase.co -> cdtouwfxwuhnlzqhcagy
+            # 1. Pega o Project Ref
             PROJECT_REF=$(echo $CLEAN_URL | sed -n 's/.*db\.\(.*\)\.supabase\.co.*/\1/p')
             
-            # 2. Pega a senha (entre : e @)
+            # 2. Pega a senha (tudo entre : e @)
+            # Nota: Isso assume que não há : na senha. Se houver, pode falhar.
+            # Mas como pedimos senha simples, deve funcionar.
             PASSWORD=$(echo $CLEAN_URL | sed -e 's/.*://' -e 's/@.*//')
             
             if [ -z "$PROJECT_REF" ]; then
@@ -57,15 +58,16 @@ jobs:
             
             echo "Detected Project Ref: $PROJECT_REF"
             
-            # Monta URL do Pooler correta:
-            # User: postgres.PROJECT_REF
-            # Host: aws-0-sa-east-1.pooler.supabase.com
-            # Port: 6543
+            # Define variáveis de ambiente para o pg_dump
+            # Isso força o pg_dump a usar esses valores explicitamente
+            export PGPASSWORD="$PASSWORD"
+            export PGHOST="aws-0-sa-east-1.pooler.supabase.com"
+            export PGPORT="6543"
+            export PGUSER="postgres.$PROJECT_REF"
+            export PGDATABASE="postgres"
             
-            POOLER_URL="postgresql://postgres.$PROJECT_REF:$PASSWORD@aws-0-sa-east-1.pooler.supabase.com:6543/postgres"
-            
-            echo "Connecting to Pooler..."
-            pg_dump "$POOLER_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql
+            echo "Connecting to Pooler ($PGHOST)..."
+            pg_dump --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql
           fi
           
           if [ ! -s "backups/backup_$(date +%Y-%m-%d).sql" ]; then
