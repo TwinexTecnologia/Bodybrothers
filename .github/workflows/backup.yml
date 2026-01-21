@@ -22,11 +22,10 @@ jobs:
       - name: Create Backup Directory
         run: mkdir -p backups
 
-      - name: Dump Database (Robust)
+      - name: Dump Database (Final Fix)
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          # Limpa espaços em branco da URL
           CLEAN_URL=$(echo "$DATABASE_URL" | tr -d '[:space:]')
           
           if [ -z "$CLEAN_URL" ]; then
@@ -36,21 +35,39 @@ jobs:
 
           echo "Starting backup..."
           
-          # Tenta backup direto. Se falhar, tenta usar o pooler AWS SA East 1 (comum para BR)
+          # Tenta conexão direta primeiro
           if ! pg_dump "$CLEAN_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql 2> error.log; then
-            echo "First attempt failed. Checking logs..."
-            cat error.log
+            echo "Direct connection failed. Trying Pooler with correct username format..."
             
-            echo "Trying fallback to AWS SA East 1 Pooler..."
-            # Tenta substituir o host pelo pooler da AWS SA East 1
-            # Extrai usuario e senha
-            CREDENTIALS=$(echo $CLEAN_URL | sed -e 's/postgresql:\/\///' -e 's/@.*//')
-            FALLBACK_URL="postgresql://$CREDENTIALS@aws-0-sa-east-1.pooler.supabase.com:6543/postgres"
+            # Extrai as partes da URL
+            # Formato esperado: postgresql://USER:PASS@db.PROJECT_REF.supabase.co:PORT/DB
             
-            pg_dump "$FALLBACK_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql
+            # 1. Pega o Project Ref (parte entre 'db.' e '.supabase.co')
+            # Ex: db.cdtouwfxwuhnlzqhcagy.supabase.co -> cdtouwfxwuhnlzqhcagy
+            PROJECT_REF=$(echo $CLEAN_URL | sed -n 's/.*db\.\(.*\)\.supabase\.co.*/\1/p')
+            
+            # 2. Pega a senha (entre : e @)
+            PASSWORD=$(echo $CLEAN_URL | sed -e 's/.*://' -e 's/@.*//')
+            
+            if [ -z "$PROJECT_REF" ]; then
+               echo "Could not extract Project Ref. Backup failed."
+               cat error.log
+               exit 1
+            fi
+            
+            echo "Detected Project Ref: $PROJECT_REF"
+            
+            # Monta URL do Pooler correta:
+            # User: postgres.PROJECT_REF
+            # Host: aws-0-sa-east-1.pooler.supabase.com
+            # Port: 6543
+            
+            POOLER_URL="postgresql://postgres.$PROJECT_REF:$PASSWORD@aws-0-sa-east-1.pooler.supabase.com:6543/postgres"
+            
+            echo "Connecting to Pooler..."
+            pg_dump "$POOLER_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql
           fi
           
-          # Verifica se o arquivo foi criado e tem conteúdo
           if [ ! -s "backups/backup_$(date +%Y-%m-%d).sql" ]; then
              echo "Backup failed completely."
              exit 1
