@@ -18,7 +18,6 @@ jobs:
 
       - name: Install PostgreSQL 17 Client
         run: |
-          # Adiciona o repositório oficial do Postgres para pegar a versão 17
           sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
           sudo apt-get update
@@ -31,7 +30,6 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          # Limpa espaços em branco da URL por segurança
           CLEAN_URL=$(echo "$DATABASE_URL" | tr -d '[:space:]')
           
           if [ -z "$CLEAN_URL" ]; then
@@ -41,8 +39,17 @@ jobs:
 
           echo "Starting backup..."
           
-          # Roda o dump com a versão correta
-          pg_dump "$CLEAN_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql
+          # Tenta usar o binário específico da versão 17
+          if [ -f "/usr/lib/postgresql/17/bin/pg_dump" ]; then
+             PG_DUMP_CMD="/usr/lib/postgresql/17/bin/pg_dump"
+          else
+             # Fallback para o comando padrão se não achar o caminho
+             PG_DUMP_CMD="pg_dump"
+          fi
+          
+          echo "Using pg_dump from: $PG_DUMP_CMD"
+          
+          $PG_DUMP_CMD "$CLEAN_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql
           
           if [ ! -s "backups/backup_$(date +%Y-%m-%d).sql" ]; then
              echo "Backup failed or file is empty."
