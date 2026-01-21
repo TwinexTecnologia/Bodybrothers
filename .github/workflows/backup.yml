@@ -16,8 +16,13 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install PostgreSQL Client
-        run: sudo apt-get install -y postgresql-client
+      - name: Install PostgreSQL 17 Client
+        run: |
+          # Adiciona o repositório oficial do Postgres para pegar a versão 17
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
 
       - name: Create Backup Directory
         run: mkdir -p backups
@@ -36,7 +41,7 @@ jobs:
 
           echo "Starting backup..."
           
-          # Como a URL agora é do Pooler (IPv4), deve funcionar direto
+          # Roda o dump com a versão correta
           pg_dump "$CLEAN_URL" --no-owner --no-acl > backups/backup_$(date +%Y-%m-%d).sql
           
           if [ ! -s "backups/backup_$(date +%Y-%m-%d).sql" ]; then
