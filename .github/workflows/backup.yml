@@ -1,0 +1,48 @@
+name: Daily Database Backup
+
+on:
+  schedule:
+    # Roda todo dia à meia-noite (UTC)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Permite rodar manualmente clicando num botão no GitHub
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install PostgreSQL Client
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Create Backup Directory
+        run: mkdir -p backups
+
+      - name: Dump Database
+        env:
+          # Você precisa adicionar essa Secret no seu repositório GitHub
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL not set. Skipping backup."
+            exit 1
+          fi
+          # Cria arquivo com data (ex: backup_2024-05-20.sql)
+          pg_dump "$DATABASE_URL" > backups/backup_$(date +%Y-%m-%d).sql
+
+      - name: Delete Old Backups (Optional - Keep last 7 days)
+        run: |
+          cd backups
+          ls -tp | grep -v '/$' | tail -n +8 | xargs -I {} rm -- {} || true
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name 'Backup Bot'
+          git config --global user.email 'backup-bot@users.noreply.github.com'
+          git add backups/*.sql
+          # Só commita se houver mudanças
+          git commit -m "chore: daily database backup [skip ci]" || exit 0
+          git push
