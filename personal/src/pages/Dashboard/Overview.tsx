@@ -18,6 +18,7 @@ export default function Overview() {
     inactiveDiets: 0,
     activeWorkouts: 0,
     inactiveWorkouts: 0,
+    monthlyRevenue: 0,
     loading: true
   })
 
@@ -80,6 +81,42 @@ export default function Overview() {
 
         // Processa Planos
         const plans = (plansRes.data || []) as PlanRecord[]
+
+        // CALCULO DE RECEITA MENSAL RECORRENTE (MRR)
+        // Baseado em alunos ativos e seus planos
+        let monthlyRevenue = 0
+        
+        activeStudentsList.forEach(student => {
+            if (!student.planId) return
+            const plan = plans.find(p => p.id === student.planId)
+            if (!plan) return
+            
+            const price = Number(plan.price) || 0
+            
+            // Normaliza para valor mensal
+            switch (plan.frequency) {
+                case 'weekly':
+                    monthlyRevenue += price * 4
+                    break
+                case 'monthly':
+                    monthlyRevenue += price
+                    break
+                case 'bimonthly': // Bimestral
+                    monthlyRevenue += price / 2
+                    break
+                case 'quarterly': // Trimestral
+                    monthlyRevenue += price / 3
+                    break
+                case 'semiannual': // Semestral
+                    monthlyRevenue += price / 6
+                    break
+                case 'annual': // Anual
+                    monthlyRevenue += price / 12
+                    break
+                default:
+                    monthlyRevenue += price // Fallback (assume mensal)
+            }
+        })
 
         // Processa Pagamentos
         const paymentsRaw = paymentsRes.data || []
@@ -219,6 +256,7 @@ export default function Overview() {
           inactiveDiets: dietsInactiveRes.count || 0,
           activeWorkouts: workoutsActiveRes.count || 0,
           inactiveWorkouts: workoutsInactiveRes.count || 0,
+          monthlyRevenue,
           loading: false
         })
 
@@ -276,6 +314,17 @@ export default function Overview() {
           <div style={subValueStyle}>
             <span style={{ color: '#16a34a' }}>{stats.activeStudents} ativos</span> • 
             <span style={{ color: '#94a3b8' }}> {stats.inactiveStudents} inativos</span>
+          </div>
+        </div>
+
+        {/* Bloco Receita Mensal Estimada (MRR) */}
+        <div style={cardStyle}>
+          <h3 style={labelStyle}>Faturamento Mensal Est.</h3>
+          <div style={{ ...valueStyle, color: '#0ea5e9' }}>
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.monthlyRevenue)}
+          </div>
+          <div style={subValueStyle}>
+             Baseado nos planos ativos
           </div>
         </div>
 
