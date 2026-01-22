@@ -96,8 +96,11 @@ export default function ListWorkouts() {
 
   useEffect(() => {
     if (user) {
-        loadData()
-        loadFrequency()
+        // Limpa sessões antigas antes de carregar dados
+        autoCloseStaleSessions().then(() => {
+            loadData()
+            loadFrequency()
+        })
     }
     return () => clearInterval(timerRef.current)
   }, [user])
@@ -112,6 +115,56 @@ export default function ListWorkouts() {
     }
     return () => clearInterval(timerRef.current)
   }, [session.active])
+
+  // Função para fechar sessões esquecidas (mais de 4h)
+  async function autoCloseStaleSessions() {
+      if (!user) return
+      
+      try {
+          // Busca sessões abertas (finished_at is null) deste aluno
+          const { data: staleSessions, error } = await supabase
+              .from('workout_history')
+              .select('id, started_at')
+              .eq('student_id', user.id)
+              .is('finished_at', null)
+          
+          if (error || !staleSessions) return
+
+          const now = new Date()
+          const fourHoursMs = 4 * 60 * 60 * 1000
+
+          const sessionsToClose = staleSessions.filter(s => {
+              const start = new Date(s.started_at)
+              const diff = now.getTime() - start.getTime()
+              return diff > fourHoursMs
+          })
+
+          if (sessionsToClose.length > 0) {
+              console.log(`Fechando ${sessionsToClose.length} sessões antigas...`)
+              
+              for (const s of sessionsToClose) {
+                  // Define data de fim como data de início + 4h (ou fim do dia)
+                  // Mas para simplificar e garantir validade, vamos usar started_at + 1h (tempo médio)
+                  // Ou usar a hora atual se fizer sentido. O pedido foi: "se nao finalizar finaliza com o dia o treino"
+                  
+                  const start = new Date(s.started_at)
+                  // Define fim como 1h depois do início para não ficar zerado, ou 4h (limite)
+                  const autoFinishTime = new Date(start.getTime() + 60 * 60 * 1000).toISOString() 
+                  
+                  await supabase
+                      .from('workout_history')
+                      .update({
+                          finished_at: autoFinishTime,
+                          feedback: 'Finalizado automaticamente pelo sistema (Aluno não encerrou)',
+                          duration_seconds: 3600 // 1 hora padrão
+                      })
+                      .eq('id', s.id)
+              }
+          }
+      } catch (err) {
+          console.error('Erro ao limpar sessões antigas:', err)
+      }
+  }
 
   async function loadFrequency() {
       if (!user) return
@@ -166,13 +219,6 @@ export default function ListWorkouts() {
           return
       }
 
-      // Bloqueia se o treino for de um dia anterior (Opcional, mas parece ser o que você pediu)
-      // Se a ideia é bloquear clicar no treino de "ontem" para iniciar hoje, precisamos checar o agendamento
-      // Mas como a lista de treinos já filtra por dia, o usuário só vê os treinos de hoje ou gerais.
-      // Se a intenção é "Não deixa eu registrar OUTRO treino se eu já treinei hoje", a lógica acima já resolve.
-      
-      // Se a intenção é "Não deixar clicar nas bolinhas passadas", elas não são clicáveis para iniciar treino.
-      
       try {
           const s = await startSession(w.id, w.title, user.id)
           setSession({
@@ -209,7 +255,6 @@ export default function ListWorkouts() {
       if (!user) return
       if (!confirm('Isso vai apagar o ÚLTIMO treino registrado para você testar novamente. Confirmar?')) return
       
-      // Busca o último treino registrado
       const { data: lastWorkout, error: fetchError } = await supabase
           .from('workout_history')
           .select('id')
@@ -222,8 +267,6 @@ export default function ListWorkouts() {
           alert('Nenhum treino encontrado para apagar.')
           return
       }
-
-      console.log('Apagando treino ID:', lastWorkout.id)
 
       const { error } = await supabase
           .from('workout_history')
