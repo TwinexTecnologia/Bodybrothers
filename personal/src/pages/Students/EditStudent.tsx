@@ -506,46 +506,55 @@ export default function EditStudent() {
       })
   }
 
+  // Função auxiliar para recarregar biblioteca de anamneses
+  const reloadLibraryList = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+          const list = await listLibraryModels(user.id)
+          setLibraryAnamnesis(list)
+      }
+  }
+
   const handleAddAnamnesis = async () => {
       if (!selectedAnamnesisId) return
       setLoading(true)
-      const days = parseInt(validityDays) || 90
-
-      // Verifica se é um item da biblioteca que PARECE ser do aluno
-      const anamnesis = libraryAnamnesis.find(a => a.id === selectedAnamnesisId)
-      const currentStudent = students.find(s => s.id === selectedId)
       
-      let shouldMove = false
-      if (anamnesis && !anamnesis.studentId && currentStudent) {
-          const firstName = currentStudent.name.split(' ')[0]
-          if (anamnesis.name.toLowerCase().includes(firstName.toLowerCase())) {
-              shouldMove = true
-          }
-      }
+      const days = parseInt(validityDays) || 90
+      
+      try {
+        // Sempre duplica (cria instância para o aluno) pois anamnese é individual
+        // Se o usuário achar que está duplicando visualmente, pode ser porque a lista não atualizou
+        await duplicateModel(selectedAnamnesisId, selectedId, days)
 
-      if (shouldMove) {
-           if (confirm('Este modelo parece pertencer a este aluno. Deseja VINCULAR (remover da biblioteca) em vez de criar uma cópia? Clique em OK para Vincular ou Cancelar para Copiar.')) {
-              await updateModel(selectedAnamnesisId, { studentId: selectedId })
-          } else {
-              await duplicateModel(selectedAnamnesisId, selectedId, days)
-          }
-      } else {
-          await duplicateModel(selectedAnamnesisId, selectedId, days)
+        await reloadAnamnesis()
+        await reloadLibraryList()
+        setSelectedAnamnesisId('')
+      } catch (error) {
+        console.error('Erro:', error)
+        alert('Erro ao adicionar. Tente novamente.')
+      } finally {
+        setLoading(false)
       }
-
-      await reloadAnamnesis()
-      await reloadLibraryAnamnesis()
-      setSelectedAnamnesisId('')
-      setLoading(false)
   }
 
   const handleRemoveAnamnesis = async (aid: string) => {
-      if (!confirm('Tem certeza que deseja remover esta anamnese do aluno? Ela voltará para a biblioteca geral.')) return
+      if (!confirm('Tem certeza que deseja remover esta anamnese do aluno?')) return
+      
       setLoading(true)
-      await updateModel(aid, { studentId: '' }) // Unlink instead of delete
-      await reloadAnamnesis()
-      await reloadLibraryAnamnesis() // Recarrega biblioteca para aparecer no dropdown
-      setLoading(false)
+      try {
+        // Se foi duplicada, o correto seria deletar (deleteModel) e não apenas desvincular (updateModel)
+        // Pois se desvincular, ela volta pra biblioteca como uma "cópia perdida"
+        // Vou assumir que devemos DELETAR a instância do aluno para limpar o banco
+        await deleteModel(aid) 
+        
+        await reloadAnamnesis()
+        await reloadLibraryList() 
+      } catch (error) {
+        console.error('Erro:', error)
+        alert('Erro ao remover.')
+      } finally {
+        setLoading(false)
+      }
   }
 
   const save = async () => {
