@@ -17,6 +17,7 @@ import AnamnesisApply from './pages/Protocols/AnamnesisApply'
 import AnamnesisPending from './pages/Protocols/AnamnesisPending'
 import ViewAnamnesis from './pages/Protocols/ViewAnamnesis'
 import StudentEvolution from './pages/Students/StudentEvolution'
+import EvolutionCentral from './pages/Evolution/EvolutionCentral' // Import novo
 import ExercisesLibrary from './pages/Protocols/ExercisesLibrary'
 import PlanCreate from './pages/Protocols/PlanCreate'
 import PlanEdit from './pages/Protocols/PlanEdit'
@@ -61,6 +62,7 @@ export default function AppRoutes() {
       <Route path="/students/edit" element={<Protected><EditStudent /></Protected>} />
       <Route path="/students/toggle-active" element={<Protected><ToggleActive /></Protected>} />
       <Route path="/students/evolution/:id" element={<Protected><StudentEvolution /></Protected>} />
+      <Route path="/evolution/central" element={<Protected><EvolutionCentral /></Protected>} />
 
       <Route path="/protocols/workout-create" element={<Protected><WorkoutCreate /></Protected>} />
       <Route path="/protocols/workouts/edit/:id" element={<Protected><WorkoutCreate /></Protected>} />

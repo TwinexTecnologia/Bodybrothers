@@ -30,6 +30,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   })
   
   const [perms, setPerms] = useState<Record<string, boolean> | null>(null)
+  const [evolutionMode, setEvolutionMode] = useState<string>('anamnesis') // anamnesis | standalone
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -41,8 +42,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                     // 1. Carregar Permissões
                     if (profileData.permissions) setPerms(profileData.permissions)
                     else setPerms({}) 
+                    
+                    // 2. Carregar Modo de Evolução
+                    if (profileData.config?.evolutionMode) {
+                        setEvolutionMode(profileData.config.evolutionMode)
+                    }
 
-                    // 2. Carregar Branding e atualizar LocalStorage para limpar cache antigo
+                    // 3. Carregar Branding e atualizar LocalStorage para limpar cache antigo
                     if (profileData.branding) {
                         const newBranding = {
                             brandTitle: profileData.branding.brandName || 'Personal Panel',
@@ -126,6 +132,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           {open.students && (
             <div className="submenu">
               <NavLink to="/students/list">Gerenciar Alunos</NavLink>
+              {evolutionMode === 'standalone' && (
+                  <NavLink to="/evolution/central" style={{ color: '#0ea5e9' }}>📸 Evolução Fotográfica</NavLink>
+              )}
             </div>
           )}
         </div>
