@@ -27,10 +27,14 @@ export const commonFoods = [
     // Carboidratos
     { id: 'local_arroz_branco', name: 'Arroz Branco Cozido', calories: 128, protein: 2.5, carbs: 28.1, fat: 0.2, unit_weight: 150, sodium: 1 }, // Sem sal
     { id: 'local_arroz_integral', name: 'Arroz Integral Cozido', calories: 124, protein: 2.6, carbs: 25.8, fat: 1.0, unit_weight: 150, sodium: 1 },
+    { id: 'local_farinha_arroz', name: 'Farinha de Arroz', calories: 363, protein: 7.2, carbs: 79.9, fat: 1.3, unit_weight: 30, sodium: 5 },
+    { id: 'local_creme_arroz', name: 'Creme de Arroz (Pó)', calories: 370, protein: 7.0, carbs: 82.0, fat: 1.0, unit_weight: 30, sodium: 10 },
     { id: 'local_batata_doce', name: 'Batata Doce Cozida', calories: 77, protein: 0.6, carbs: 18.4, fat: 0.1, unit_weight: 150, sodium: 27 },
     { id: 'local_batata_inglesa', name: 'Batata Inglesa Cozida', calories: 52, protein: 1.2, carbs: 11.9, fat: 0.0, unit_weight: 150, sodium: 4 },
     { id: 'local_mandioca', name: 'Mandioca Cozida', calories: 125, protein: 0.6, carbs: 30.1, fat: 0.3, unit_weight: 100, sodium: 14 },
     { id: 'local_aveia', name: 'Aveia em Flocos', calories: 394, protein: 13.9, carbs: 66.6, fat: 8.5, unit_weight: 15, sodium: 2 },
+    { id: 'local_farinha_aveia', name: 'Farinha de Aveia', calories: 390, protein: 14.0, carbs: 65.0, fat: 8.0, unit_weight: 15, sodium: 2 },
+    { id: 'local_farelo_aveia', name: 'Farelo de Aveia', calories: 350, protein: 17.0, carbs: 45.0, fat: 9.0, unit_weight: 15, sodium: 2 },
     { id: 'local_tapioca', name: 'Tapioca (Goma)', calories: 242, protein: 0.0, carbs: 60.0, fat: 0.0, unit_weight: 20, sodium: 1 },
     { id: 'local_pao_frances', name: 'Pão Francês', calories: 300, protein: 8.0, carbs: 58.6, fat: 3.1, unit_weight: 50, sodium: 648 }, // Alto sódio
     { id: 'local_bisnaguinha', name: 'Bisnaguinha (Tipo Seven Boys)', calories: 300, protein: 8.0, carbs: 55.0, fat: 5.0, unit_weight: 20, sodium: 450 },
@@ -57,6 +61,9 @@ export const commonFoods = [
     // Laticínios e Outros
     { id: 'local_leite_integral', name: 'Leite Integral', calories: 60, protein: 3.0, carbs: 4.5, fat: 3.0, unit_weight: 200, sodium: 50 },
     { id: 'local_leite_desnatado', name: 'Leite Desnatado', calories: 35, protein: 3.0, carbs: 4.5, fat: 0.0, unit_weight: 200, sodium: 52 },
+    { id: 'local_iogurte_natural', name: 'Iogurte Natural', calories: 61, protein: 4.1, carbs: 5.6, fat: 3.0, unit_weight: 170, sodium: 50 },
+    { id: 'local_iogurte_desnatado', name: 'Iogurte Natural Desnatado', calories: 45, protein: 4.5, carbs: 6.0, fat: 0.1, unit_weight: 170, sodium: 55 },
+    { id: 'local_iogurte_grego', name: 'Iogurte Grego Tradicional', calories: 110, protein: 4.0, carbs: 13.0, fat: 4.0, unit_weight: 100, sodium: 40 },
     { id: 'local_queijo_minas', name: 'Queijo Minas Frescal', calories: 264, protein: 17.4, carbs: 3.2, fat: 20.2, unit_weight: 30, sodium: 300 }, // Queijos variam muito
     { id: 'local_requeijao', name: 'Requeijão Cremoso Tradicional', calories: 280, protein: 9.0, carbs: 2.0, fat: 27.0, unit_weight: 30, sodium: 600 },
     { id: 'local_requeijao_light', name: 'Requeijão Light', calories: 180, protein: 10.0, carbs: 4.0, fat: 14.0, unit_weight: 30, sodium: 500 },
@@ -67,4 +74,5 @@ export const commonFoods = [
     { id: 'local_geleia_diet', name: 'Geleia de Frutas (Diet/Zero)', calories: 50, protein: 0.5, carbs: 12.0, fat: 0.1, unit_weight: 20, sodium: 30 },
     { id: 'local_azeite', name: 'Azeite de Oliva', calories: 884, protein: 0.0, carbs: 0.0, fat: 100.0, unit_weight: 13, sodium: 0 },
     { id: 'local_whey', name: 'Whey Protein (Padrão)', calories: 400, protein: 80.0, carbs: 10.0, fat: 5.0, unit_weight: 30, sodium: 150 }, // Varia
+    { id: 'local_creatina', name: 'Creatina Monohidratada', calories: 0, protein: 0.0, carbs: 0.0, fat: 0.0, unit_weight: 5, sodium: 0 },
 ]
