@@ -34,6 +34,7 @@ export default function Overview() {
     activeWorkouts: 0,
     inactiveWorkouts: 0,
     monthlyRevenue: 0,
+    monthlyCash: 0, // Novo estado para Caixa
     loading: true
   })
 
@@ -170,16 +171,30 @@ export default function Overview() {
         })
 
         // CALCULO DO CARD "Faturamento Mensal (Mês Atual)"
-        // Baseado na competência dos pagamentos JÁ RECEBIDOS.
+        // 1. Regime de Competência (monthlyRevenue)
         let monthlyRevenue = 0
         const now = new Date()
         const currentMonth = now.getMonth()
         const currentYear = now.getFullYear()
 
+        // 2. Regime de Caixa (monthlyCash) - O que realmente entrou na conta
+        let monthlyCash = 0
+
         allPayments.forEach(payment => {
             if (!payment.paidAt && !payment.dueDate) return
-            const baseDate = new Date(payment.dueDate || payment.paidAt!)
             
+            // Calculo Caixa: Se pagou neste mês, soma
+            if (payment.paidAt) {
+                const paidDate = new Date(payment.paidAt)
+                // Ajuste de fuso horário simples para garantir dia correto se necessário
+                // Mas new Date(iso) costuma funcionar bem.
+                if (paidDate.getMonth() === currentMonth && paidDate.getFullYear() === currentYear) {
+                    monthlyCash += payment.amount
+                }
+            }
+
+            // Calculo Competência (mantendo lógica anterior)
+            const baseDate = new Date(payment.dueDate || payment.paidAt!)
             const student = activeStudentsList.find(s => s.id === payment.payerId)
             let monthsToDistribute = 1
             if (student && student.planId) {
@@ -283,6 +298,7 @@ export default function Overview() {
           activeWorkouts: workoutsActiveRes.count || 0,
           inactiveWorkouts: workoutsInactiveRes.count || 0,
           monthlyRevenue,
+          monthlyCash,
           loading: false
         })
 
@@ -348,12 +364,20 @@ export default function Overview() {
 
         {/* Bloco Receita Mensal Estimada (MRR) */}
         <div style={cardStyle}>
-          <h3 style={labelStyle}>Faturamento ({currentMonthLabel})</h3>
-          <div style={{ ...valueStyle, color: '#0ea5e9' }}>
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.monthlyRevenue)}
+          <h3 style={labelStyle}>Financeiro ({currentMonthLabel})</h3>
+          
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 2 }}>RECEBIDO (CAIXA)</div>
+            <div style={{ ...valueStyle, color: '#16a34a' }}>
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.monthlyCash)}
+            </div>
           </div>
-          <div style={subValueStyle}>
-             Baseado em pagamentos recebidos
+
+          <div>
+             <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 2 }}>FATURAMENTO (COMPETÊNCIA)</div>
+             <div style={{ ...valueStyle, color: '#0ea5e9', fontSize: 20 }}>
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.monthlyRevenue)}
+             </div>
           </div>
         </div>
 
@@ -518,7 +542,7 @@ export default function Overview() {
           
           <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <BarChart data={chartData} margin={{ top: 30, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis 
                           dataKey="name" 
@@ -532,6 +556,7 @@ export default function Overview() {
                           tickLine={false} 
                           tick={{ fill: '#64748b', fontSize: 12 }}
                           tickFormatter={(value) => `R$ ${value}`}
+                          domain={[0, (dataMax: number) => (dataMax * 1.2)]}
                       />
                       <Tooltip 
                           cursor={{ fill: '#f1f5f9' }}
