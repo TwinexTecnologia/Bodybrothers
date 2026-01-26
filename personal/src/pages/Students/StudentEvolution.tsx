@@ -18,28 +18,54 @@ export default function StudentEvolution() {
     
     const [idA, setIdA] = useState('')
     const [idB, setIdB] = useState('')
+    
+    // Novos estados para modo Standalone
+    const [evolutionMode, setEvolutionMode] = useState('anamnesis')
+    const [isUploading, setIsUploading] = useState(false)
+    const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0])
+    const [uploadFiles, setUploadFiles] = useState<FileList | null>(null)
+    const [uploading, setUploading] = useState(false)
 
     useEffect(() => {
         if (id) {
-            loadStudent()
-            loadPhotos()
+            loadConfigAndPhotos()
         }
     }, [id])
 
-    async function loadStudent() {
-        const { data } = await supabase.from('profiles').select('full_name').eq('id', id).single()
-        if (data) setStudentName(data.full_name)
+    async function loadConfigAndPhotos() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        // 1. Carrega Nome do Aluno
+        const { data: student } = await supabase.from('profiles').select('full_name').eq('id', id).single()
+        if (student) setStudentName(student.full_name)
+
+        // 2. Carrega Config do Personal
+        const { data: personal } = await supabase.from('profiles').select('data').eq('id', user.id).single()
+        const mode = personal?.data?.config?.evolutionMode || 'anamnesis'
+        setEvolutionMode(mode)
+
+        // 3. Carrega Fotos baseadas no modo
+        loadPhotos(mode)
     }
 
-    async function loadPhotos() {
-        const { data, error } = await supabase
+    async function loadPhotos(mode: string) {
+        let query = supabase
             .from('protocols')
             .select('*')
             .eq('student_id', id)
-            .eq('type', 'anamnesis')
             .order('created_at', { ascending: true })
 
+        if (mode === 'standalone') {
+            query = query.eq('type', 'photos')
+        } else {
+            query = query.eq('type', 'anamnesis')
+        }
+
+        const { data, error } = await query
+
         if (error || !data || data.length === 0) {
+            setHistory([]) // Limpa histórico se não tiver nada
             setLoading(false)
             return
         }
@@ -103,6 +129,61 @@ export default function StudentEvolution() {
 
     const getRecord = (recordId: string) => history.find(h => h.id === recordId)
 
+    const handleUpload = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!uploadFiles || uploadFiles.length === 0) return
+        setUploading(true)
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) throw new Error('Usuário não logado')
+
+            const uploadedUrls: string[] = []
+
+            for (let i = 0; i < uploadFiles.length; i++) {
+                const file = uploadFiles[i]
+                const fileExt = file.name.split('.').pop()
+                const fileName = `${id}/${Date.now()}_${i}.${fileExt}`
+
+                const { error: uploadError } = await supabase.storage
+                    .from('anamnesis-files')
+                    .upload(fileName, file)
+
+                if (uploadError) throw uploadError
+
+                const { data } = supabase.storage.from('anamnesis-files').getPublicUrl(fileName)
+                uploadedUrls.push(data.publicUrl)
+            }
+
+            // Salvar no banco
+            const { error: dbError } = await supabase.from('protocols').insert({
+                student_id: id,
+                personal_id: user.id,
+                type: 'photos',
+                status: 'active',
+                title: 'Evolução Fotográfica',
+                data: {
+                    date: uploadDate,
+                    photos: uploadedUrls
+                },
+                created_at: new Date(uploadDate).toISOString() // Usa a data selecionada para ordenação
+            })
+
+            if (dbError) throw dbError
+
+            setIsUploading(false)
+            setUploadFiles(null)
+            loadPhotos('standalone')
+            alert('Fotos adicionadas com sucesso!')
+
+        } catch (error: any) {
+            console.error(error)
+            alert('Erro ao enviar fotos: ' + error.message)
+        } finally {
+            setUploading(false)
+        }
+    }
+
     if (loading) return <div className="p-8 text-center text-gray-500">Carregando fotos...</div>
 
     const recordA = getRecord(idA)
@@ -110,6 +191,44 @@ export default function StudentEvolution() {
 
     return (
         <div style={{ maxWidth: 1200, margin: '0 auto', paddingBottom: 40 }}>
+            {/* Modal de Upload */}
+            {isUploading && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                    <div style={{ background: '#fff', padding: 24, borderRadius: 16, width: '100%', maxWidth: 500 }}>
+                        <h3 style={{ marginTop: 0, marginBottom: 16 }}>Adicionar Fotos de Evolução</h3>
+                        <form onSubmit={handleUpload}>
+                            <label style={{ display: 'block', marginBottom: 16 }}>
+                                <span style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Data das Fotos</span>
+                                <input 
+                                    type="date" 
+                                    value={uploadDate} 
+                                    onChange={e => setUploadDate(e.target.value)}
+                                    style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #cbd5e1' }}
+                                    required
+                                />
+                            </label>
+                            <label style={{ display: 'block', marginBottom: 24 }}>
+                                <span style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Selecione as Fotos (Frente, Costas, Lado...)</span>
+                                <input 
+                                    type="file" 
+                                    multiple 
+                                    accept="image/*"
+                                    onChange={e => setUploadFiles(e.target.files)}
+                                    style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #cbd5e1' }}
+                                    required
+                                />
+                            </label>
+                            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                                <button type="button" onClick={() => setIsUploading(false)} style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>Cancelar</button>
+                                <button type="submit" disabled={uploading} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#0f172a', color: '#fff', cursor: 'pointer', opacity: uploading ? 0.7 : 1 }}>
+                                    {uploading ? 'Enviando...' : 'Salvar Fotos'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             <button 
                 onClick={() => navigate(-1)} 
                 style={{ 
@@ -121,11 +240,28 @@ export default function StudentEvolution() {
                 <ArrowLeft size={20} /> Voltar
             </button>
 
-            <header style={{ marginBottom: 32 }}>
-                <h1 style={{ fontSize: '1.8rem', color: '#0f172a', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <Camera /> Evolução: {studentName}
-                </h1>
-                <p style={{ color: '#64748b', margin: 0 }}>Comparativo fotográfico baseado nas anamneses respondidas.</p>
+            <header style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h1 style={{ fontSize: '1.8rem', color: '#0f172a', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Camera /> Evolução: {studentName}
+                    </h1>
+                    <p style={{ color: '#64748b', margin: 0 }}>
+                        {evolutionMode === 'standalone' 
+                            ? 'Gerencie as fotos de evolução diretamente na biblioteca.' 
+                            : 'Comparativo fotográfico baseado nas anamneses respondidas.'}
+                    </p>
+                </div>
+                {evolutionMode === 'standalone' && (
+                    <button 
+                        onClick={() => setIsUploading(true)}
+                        style={{ 
+                            background: '#0f172a', color: '#fff', border: 'none', 
+                            padding: '12px 24px', borderRadius: 8, cursor: 'pointer', fontWeight: 600 
+                        }}
+                    >
+                        + Adicionar Fotos
+                    </button>
+                )}
             </header>
 
             {history.length === 0 ? (

@@ -36,8 +36,26 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         if (user) {
             supabase.from('profiles').select('data').eq('id', user.id).single()
                 .then(({ data }) => {
-                    if (data?.data?.permissions) setPerms(data.data.permissions)
+                    const profileData = data?.data || {}
+                    
+                    // 1. Carregar Permissões
+                    if (profileData.permissions) setPerms(profileData.permissions)
                     else setPerms({}) 
+
+                    // 2. Carregar Branding e atualizar LocalStorage para limpar cache antigo
+                    if (profileData.branding) {
+                        const newBranding = {
+                            brandTitle: profileData.branding.brandName || 'Personal Panel',
+                            brandLogoUrl: profileData.branding.logoUrl || ''
+                        }
+                        setBranding(newBranding)
+                        localStorage.setItem('personal_branding', JSON.stringify(newBranding))
+                    } else {
+                        // Se não tiver branding, limpa o antigo para não mostrar lixo de outro user
+                        const defaultBranding = { brandTitle: 'Personal Panel', brandLogoUrl: '' }
+                        setBranding(defaultBranding)
+                        localStorage.setItem('personal_branding', JSON.stringify(defaultBranding))
+                    }
                 })
         }
     })

@@ -105,7 +105,14 @@ export default function CreatePersonal() {
                 data: {
                     full_name: name,
                     role: 'personal', // Importante: Metadado que o trigger usa
-                    phone: phone
+                    phone: phone,
+                    branding: {
+                        brandName,
+                        logoUrl
+                    },
+                    config: {
+                        evolutionMode: 'anamnesis' // Default config
+                    }
                 }
             }
         })

@@ -20,6 +20,7 @@ export default function EditPersonal() {
     const [brandName, setBrandName] = useState('')
     const [logoUrl, setLogoUrl] = useState('')
     const [uploadingLogo, setUploadingLogo] = useState(false)
+    const [evolutionMode, setEvolutionMode] = useState('anamnesis') // 'anamnesis' | 'standalone'
 
     useEffect(() => {
         if (!id) {
@@ -50,6 +51,7 @@ export default function EditPersonal() {
         setStatus(data.data?.status || 'active')
         setBrandName(data.data?.branding?.brandName || '')
         setLogoUrl(data.data?.branding?.logoUrl || '')
+        setEvolutionMode(data.data?.config?.evolutionMode || 'anamnesis')
         setLoading(false)
     }
 
@@ -103,6 +105,10 @@ export default function EditPersonal() {
                 ...(currentData.branding || {}),
                 brandName,
                 logoUrl
+            },
+            config: {
+                ...(currentData.config || {}),
+                evolutionMode
             }
         }
 
@@ -168,6 +174,24 @@ export default function EditPersonal() {
                                 <option value="inactive">Inativo</option>
                                 <option value="blocked">Bloqueado</option>
                             </select>
+                        </label>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <span style={{ fontWeight: 500, color: '#475569' }}>Modo de Evolução Fotográfica</span>
+                            <select 
+                                value={evolutionMode} 
+                                onChange={e => setEvolutionMode(e.target.value)}
+                                style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }}
+                            >
+                                <option value="anamnesis">Via Anamnese (Padrão)</option>
+                                <option value="standalone">Avulso / Biblioteca (Sem Anamnese)</option>
+                            </select>
+                            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                <strong>Via Anamnese:</strong> Fotos são extraídas automaticamente das respostas das anamneses.<br/>
+                                <strong>Avulso:</strong> O personal envia fotos diretamente na tela de evolução, sem precisar de formulário.
+                            </span>
                         </label>
                     </div>
 
