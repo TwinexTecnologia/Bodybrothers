@@ -15,8 +15,28 @@ import StudentAnamnesisModal from '../../components/StudentAnamnesisModal'
 const getFinancialStatus = (student: StudentRecord, plan: PlanRecord | undefined, payments: DebitRecord[]) => {
     if (!plan || !student.planStartDate) return { status: 'none', label: '—', color: '#9ca3af', bg: 'transparent', daysDiff: null }
     
-    const dueDay = student.dueDay || 10
+    // Verifica Periodicidade
+    const [sYear, sMonth] = student.planStartDate.split('-').map(Number)
+    const startMonthIndex = sMonth - 1 
+    
     const now = new Date()
+    const currentMonthIndex = now.getMonth()
+    const currentYear = now.getFullYear()
+    
+    const diffMonths = (currentYear - sYear) * 12 + (currentMonthIndex - startMonthIndex)
+    
+    let interval = 1
+    if (plan.frequency === 'bimonthly') interval = 2
+    else if (plan.frequency === 'quarterly') interval = 3
+    else if (plan.frequency === 'semiannual') interval = 6
+    else if (plan.frequency === 'annual') interval = 12
+    
+    // Se não for mês de cobrança (e plano já tiver começado)
+    if (diffMonths >= 0 && plan.frequency !== 'monthly' && plan.frequency !== 'weekly' && diffMonths % interval !== 0) {
+        return { status: 'paid', label: 'PAGO', color: '#166534', bg: '#dcfce7', daysDiff: null }
+    }
+
+    const dueDay = student.dueDay || 10
     const dueThisMonth = new Date(now.getFullYear(), now.getMonth(), dueDay)
     dueThisMonth.setHours(23,59,59)
     
