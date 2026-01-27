@@ -206,18 +206,53 @@ export default function ListStudents() {
     }
     
     return true
-  })
+  }).sort((a, b) => a.name.localeCompare(b.name))
+
+  const inputStyle = {
+      padding: '10px 14px',
+      borderRadius: 8,
+      border: '1px solid #e2e8f0',
+      backgroundColor: '#fff',
+      fontSize: '0.9rem',
+      color: '#334155',
+      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+      outline: 'none',
+      minWidth: 160
+  }
 
   return (
     <div>
-      <h1>Alunos • Gerenciar Alunos</h1>
-      <div style={{ marginBottom: 10, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input placeholder="Buscar por nome ou email" value={query} onChange={(e) => setQuery(e.target.value)} style={{ padding: '8px', borderRadius: 6, border: '1px solid #ccc', minWidth: 200, flex: 1 }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <h1 style={{ margin: 0, fontSize: '1.8rem', color: '#0f172a' }}>Gerenciar Alunos</h1>
+        <button className="btn" style={{ background: '#10b981', padding: '10px 20px', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 8 }} onClick={() => navigate('/students/create')}>
+            <span>+</span> Novo Aluno
+        </button>
+      </div>
+
+      <div style={{ 
+          marginBottom: 24, 
+          display: 'flex', 
+          gap: 12, 
+          flexWrap: 'wrap', 
+          alignItems: 'center',
+          background: '#f8fafc',
+          padding: 16,
+          borderRadius: 12,
+          border: '1px solid #f1f5f9'
+      }}>
+        <div style={{ flex: 1, minWidth: 250 }}>
+            <input 
+                placeholder="Buscar por nome ou email..." 
+                value={query} 
+                onChange={(e) => setQuery(e.target.value)} 
+                style={{ ...inputStyle, width: '100%' }} 
+            />
+        </div>
         
         <select 
             value={planFilter} 
             onChange={e => setPlanFilter(e.target.value)}
-            style={{ padding: '8px', borderRadius: 6, border: '1px solid #ccc', minWidth: 140 }}
+            style={inputStyle}
         >
             <option value="all">Todos Planos</option>
             {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -226,7 +261,7 @@ export default function ListStudents() {
         <select 
             value={statusFilter} 
             onChange={e => setStatusFilter(e.target.value)}
-            style={{ padding: '8px', borderRadius: 6, border: '1px solid #ccc', minWidth: 140 }}
+            style={inputStyle}
         >
             <option value="all">Todos Status</option>
             <option value="ativo">Ativo</option>
@@ -236,7 +271,7 @@ export default function ListStudents() {
         <select 
             value={anamnesisFilter} 
             onChange={e => setAnamnesisFilter(e.target.value)}
-            style={{ padding: '8px', borderRadius: 6, border: '1px solid #ccc', minWidth: 150 }}
+            style={inputStyle}
         >
             <option value="all">Todas Anamneses</option>
             <option value="ok">Em Dia</option>
@@ -246,7 +281,7 @@ export default function ListStudents() {
         <select 
             value={financialFilter} 
             onChange={e => setFinancialFilter(e.target.value)}
-            style={{ padding: '8px', borderRadius: 6, border: '1px solid #ccc', minWidth: 150 }}
+            style={inputStyle}
         >
             <option value="all">Todos Financeiro</option>
             <option value="paid">Pagos</option>
@@ -254,8 +289,19 @@ export default function ListStudents() {
             <option value="overdue">Atrasados</option>
         </select>
 
-        <button className="btn" onClick={loadData}>Atualizar</button>
-        <button className="btn" style={{ background: '#10b981', marginLeft: 'auto' }} onClick={() => navigate('/students/create')}>+ Novo Aluno</button>
+        <button 
+            className="btn" 
+            onClick={loadData}
+            style={{ 
+                background: '#3b82f6', 
+                padding: '10px 16px', 
+                borderRadius: 8,
+                fontSize: '0.9rem',
+                height: 42
+            }}
+        >
+            Atualizar
+        </button>
       </div>
       
       {loading ? <div>Carregando...</div> : (
