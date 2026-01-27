@@ -361,6 +361,15 @@ export default function ListWorkouts() {
 
   // --- Renderização ---
 
+  // Detecta mobile para ajustar layout
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+      const checkMobile = () => setIsMobile(window.innerWidth < 640)
+      checkMobile()
+      window.addEventListener('resize', checkMobile)
+      return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
   if (session.active && session.workout) {
       // Modo Sessão (Mantido com melhorias sutis)
       return (
@@ -889,7 +898,7 @@ export default function ListWorkouts() {
                                 padding: '12px', 
                                 marginBottom: 12, 
                                 display: 'flex', 
-                                flexDirection: 'row', 
+                                flexDirection: isMobile ? 'column' : 'row', // Responsivo
                                 gap: 16, 
                                 boxShadow: '0 2px 8px rgba(0,0,0,0.04)', 
                                 border: '1px solid #f1f5f9', 
@@ -992,8 +1001,8 @@ export default function ListWorkouts() {
                                     <div 
                                         onClick={() => setVideoModalUrl(ex.videoUrl || null)}
                                         style={{ 
-                                            width: 180,
-                                            height: 270,
+                                            width: isMobile ? '100%' : 180,
+                                            height: isMobile ? 200 : 270,
                                             alignSelf: 'center',
                                             borderRadius: 12, 
                                             overflow: 'hidden', 
@@ -1028,7 +1037,9 @@ export default function ListWorkouts() {
                                     </div>
                                 ) : (
                                     <div style={{ 
-                                        width: 180, height: 270, alignSelf: 'center', background: '#f8fafc', 
+                                        width: isMobile ? '100%' : 180, 
+                                        height: isMobile ? 100 : 270, 
+                                        alignSelf: 'center', background: '#f8fafc', 
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         borderRadius: 12, border: '1px solid #e2e8f0', flexShrink: 0
                                     }}>
