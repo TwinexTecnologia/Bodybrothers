@@ -884,7 +884,7 @@ export default function ListWorkouts() {
                                         <MessageSquare size={20} style={{ color: '#ea580c' }} />
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ea580c', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.5px' }}>Observações do Treino</div>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ea580c', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.5px' }}>Observações Gerais</div>
                                         <span style={{ color: '#9a3412', fontSize: '0.95rem', lineHeight: 1.6 }}>{selectedWorkout.data.notes}</span>
                                     </div>
                                 </div>
