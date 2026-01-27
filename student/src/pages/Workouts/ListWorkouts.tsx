@@ -96,14 +96,63 @@ export default function ListWorkouts() {
 
   useEffect(() => {
     if (user) {
-        // Limpa sessões antigas antes de carregar dados
+        // Limpa sessões antigas E TENTA RETOMAR SESSÃO ATIVA antes de carregar dados
         autoCloseStaleSessions().then(() => {
-            loadData()
-            loadFrequency()
+            resumeActiveSession().then(() => {
+                loadData()
+                loadFrequency()
+            })
         })
     }
     return () => clearInterval(timerRef.current)
   }, [user])
+
+  // Função para retomar sessão ativa (< 4h)
+  async function resumeActiveSession() {
+      if (!user) return
+
+      try {
+        // Busca sessão ativa mais recente
+        const { data: activeSession, error } = await supabase
+            .from('workout_history')
+            .select('id, workout_id, started_at')
+            .eq('student_id', user.id)
+            .is('finished_at', null)
+            .order('started_at', { ascending: false })
+            .limit(1)
+            .single()
+
+        if (error || !activeSession) return
+
+        const start = new Date(activeSession.started_at)
+        const now = new Date()
+        const diffMs = now.getTime() - start.getTime()
+        const fourHoursMs = 4 * 60 * 60 * 1000 // 4 horas
+
+        if (diffMs < fourHoursMs) {
+            console.log('Retomando sessão...', activeSession.id)
+            
+            // Busca os dados do treino
+            const { data: workoutData, error: workoutError } = await supabase
+                .from('protocols')
+                .select('*')
+                .eq('id', activeSession.workout_id)
+                .single()
+            
+            if (workoutError || !workoutData) return
+
+            setSession({
+                active: true,
+                sessionId: activeSession.id,
+                workout: workoutData,
+                startTime: start,
+                elapsedSeconds: Math.floor(diffMs / 1000)
+            })
+        }
+      } catch (err) {
+          console.error('Erro ao retomar sessão:', err)
+      }
+  }
 
   useEffect(() => {
     if (session.active) {
