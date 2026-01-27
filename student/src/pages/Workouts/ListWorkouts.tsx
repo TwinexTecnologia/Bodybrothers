@@ -92,6 +92,7 @@ export default function ListWorkouts() {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [showSummaryModal, setShowSummaryModal] = useState(false)
   const [sessionNotes, setSessionNotes] = useState('')
+  const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null)
   const timerRef = useRef<any>(null)
 
   useEffect(() => {
@@ -559,6 +560,40 @@ export default function ListWorkouts() {
                   </div>
               )}
 
+              {videoModalUrl && (
+                  <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 3100, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(10px)' }} onClick={() => setVideoModalUrl(null)}>
+                      <div style={{ width: '100%', maxWidth: 800, aspectRatio: '16/9', background: '#000', borderRadius: 16, overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+                          {(() => {
+                              const isYoutube = videoModalUrl.includes('youtube.com') || videoModalUrl.includes('youtu.be');
+                              if (isYoutube) {
+                                  const videoId = videoModalUrl.split('v=')[1]?.split('&')[0] || videoModalUrl.split('/').pop();
+                                  return (
+                                      <iframe 
+                                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} 
+                                          title="Video"
+                                          style={{ width: '100%', height: '100%', border: 'none' }}
+                                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                          allowFullScreen
+                                      />
+                                  );
+                              } else {
+                                  return (
+                                      <video 
+                                          src={videoModalUrl} 
+                                          controls 
+                                          autoPlay
+                                          style={{ width: '100%', height: '100%' }}
+                                      />
+                                  );
+                              }
+                          })()}
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); setVideoModalUrl(null); }} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                          <X size={24} />
+                      </button>
+                  </div>
+              )}
+
               {showFinishModal && (
                   <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(8px)' }}>
                       <div style={{ background: '#fff', width: '100%', maxWidth: 400, borderRadius: 24, padding: 32, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
@@ -831,16 +866,45 @@ export default function ListWorkouts() {
                 {/* Lista de Exercícios OTIMIZADA */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
                     <div style={{ maxWidth: 800, margin: '0 auto' }}>
+                        
+                        {/* Observações Gerais */}
+                        {selectedWorkout.data.notes && (
+                            <div style={{ marginBottom: 24 }}>
+                                <div style={{ background: '#fff7ed', padding: '16px', borderRadius: 16, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 12, boxShadow: '0 2px 6px rgba(249, 115, 22, 0.05)' }}>
+                                    <div style={{ background: '#ffedd5', padding: 8, borderRadius: '50%', display: 'flex' }}>
+                                        <MessageSquare size={20} style={{ color: '#ea580c' }} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ea580c', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.5px' }}>Observações do Treino</div>
+                                        <span style={{ color: '#9a3412', fontSize: '0.95rem', lineHeight: 1.6 }}>{selectedWorkout.data.notes}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {selectedWorkout.data.exercises.map((ex, i) => (
-                            <div key={i} style={{ background: '#fff', borderRadius: 16, padding: '16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 16, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden' }}>
+                            <div key={i} style={{ 
+                                background: '#fff', 
+                                borderRadius: 16, 
+                                padding: '12px', 
+                                marginBottom: 12, 
+                                display: 'flex', 
+                                flexDirection: 'row', 
+                                gap: 16, 
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.04)', 
+                                border: '1px solid #f1f5f9', 
+                                position: 'relative', 
+                                overflow: 'hidden',
+                                minHeight: 110
+                            }}>
                                 
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 20 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                        <span style={{ fontSize: '1rem', fontWeight: 800, color: '#94a3b8', background: '#f8fafc', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', flexShrink: 0 }}>{i + 1}</span>
-                                        <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a', fontWeight: 800, lineHeight: 1.2 }}>{ex.name}</h3>
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 10 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#94a3b8', background: '#f8fafc', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', flexShrink: 0 }}>{i + 1}</span>
+                                        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a', fontWeight: 700, lineHeight: 1.2 }}>{ex.name}</h3>
                                     </div>
                                     
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 0 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 0 }}>
                                         {(() => {
                                             // Normaliza sets: usa o do banco se existir, ou constrói a partir dos campos antigos
                                             let setsToRender: ExerciseSet[] = ex.sets || []
@@ -889,18 +953,18 @@ export default function ListWorkouts() {
                                                             }
 
                                                             return (
-                                                                <div key={setIdx} style={{ display: 'flex', flexDirection: 'column', gap: 4, background: bg, padding: '10px 14px', borderRadius: 10, border: `1px solid ${color}30` }}>
+                                                                <div key={setIdx} style={{ display: 'flex', flexDirection: 'column', gap: 4, background: bg, padding: '8px 12px', borderRadius: 8, border: `1px solid ${color}30` }}>
                                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                                            <span style={{ fontWeight: 800, color: color, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', background: '#fff', padding: '2px 6px', borderRadius: 4, border: `1px solid ${color}20` }}>{label}</span>
-                                                                            <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '1rem' }}>{set.series} x {set.reps}</span>
+                                                                            <span style={{ fontWeight: 800, color: color, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.5px', background: '#fff', padding: '2px 6px', borderRadius: 4, border: `1px solid ${color}20` }}>{label}</span>
+                                                                            <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.9rem' }}>{set.series} x {set.reps}</span>
                                                                         </div>
-                                                                        {set.load && <span style={{ fontWeight: 600, color: '#475569', fontSize: '0.9rem' }}>Carga: {set.load}</span>}
+                                                                        {set.load && <span style={{ fontWeight: 600, color: '#475569', fontSize: '0.8rem' }}>{set.load}</span>}
                                                                     </div>
                                                                     {set.rest && (
-                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: '#64748b', marginTop: 2 }}>
-                                                                             <Clock size={14} />
-                                                                             <span>Descanso: {set.rest}</span>
+                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>
+                                                                             <Clock size={12} />
+                                                                             <span>{set.rest}</span>
                                                                          </div>
                                                                     )}
                                                                 </div>
@@ -909,60 +973,66 @@ export default function ListWorkouts() {
                                                     </div>
                                                 )
                                             } else {
-                                                return <div style={{ color: '#94a3b8', fontStyle: 'italic', padding: 10 }}>Sem séries definidas.</div>
+                                                return <div style={{ color: '#94a3b8', fontStyle: 'italic', padding: 8, fontSize: '0.9rem' }}>Sem séries definidas.</div>
                                             }
                                         })()}
                                         
                                         {/* Obs */}
                                         {ex.notes && (
-                                            <div style={{ fontSize: '0.9rem', color: '#64748b', background: '#fff7ed', padding: '10px 14px', borderRadius: 10, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
-                                                <MessageSquare size={16} style={{ marginTop: 3, flexShrink: 0, color: '#f97316' }} /> 
-                                                <span style={{ color: '#c2410c', lineHeight: 1.5 }}>{ex.notes}</span>
+                                            <div style={{ fontSize: '0.8rem', color: '#64748b', background: '#fff7ed', padding: '8px 10px', borderRadius: 8, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
+                                                <MessageSquare size={14} style={{ marginTop: 2, flexShrink: 0, color: '#f97316' }} /> 
+                                                <span style={{ color: '#c2410c', lineHeight: 1.4 }}>{ex.notes}</span>
                                             </div>
                                         )}
                                     </div>
                                 </div>
                                 
-                                {/* Video Player Vertical Maior */}
+                                {/* Video Thumbnail (Vertical-ish) */}
                                 {ex.videoUrl ? (
-                                    <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', background: '#000', flexShrink: 0, position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                                    <div 
+                                        onClick={() => setVideoModalUrl(ex.videoUrl || null)}
+                                        style={{ 
+                                            width: 180,
+                                            height: 270,
+                                            alignSelf: 'center',
+                                            borderRadius: 12, 
+                                            overflow: 'hidden', 
+                                            background: '#000', 
+                                            flexShrink: 0, 
+                                            position: 'relative', 
+                                            cursor: 'pointer',
+                                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                        }}
+                                    >
                                         {(() => {
                                             const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
-                                            
+                                            let thumbUrl = '';
                                             if (isYoutube) {
                                                 const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
-                                                return (
-                                                    <>
-                                                        <iframe 
-                                                            src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&controls=0`} 
-                                                            title={ex.name}
-                                                            style={{ width: '100%', height: '100%', border: 'none', objectFit: 'cover' }}
-                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                                            allowFullScreen
-                                                        />
-                                                        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', background: 'rgba(0,0,0,0.3)', borderRadius: '50%', padding: 12 }}>
-                                                            <Play size={32} fill="#fff" color="#fff" />
-                                                        </div>
-                                                    </>
-                                                );
-                                            } else {
-                                                return (
-                                                    <video 
-                                                        src={ex.videoUrl} 
-                                                        controls 
-                                                        playsInline
-                                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                                    />
-                                                );
+                                                thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
                                             }
+                                            
+                                            return (
+                                                <>
+                                                    {thumbUrl ? (
+                                                        <img src={thumbUrl} alt={ex.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    ) : (
+                                                        <video src={ex.videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    )}
+                                                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.4)', borderRadius: '50%', padding: 8, backdropFilter: 'blur(2px)', pointerEvents: 'none' }}>
+                                                        <Play size={20} fill="#fff" color="#fff" />
+                                                    </div>
+                                                </>
+                                            );
                                         })()}
                                     </div>
                                 ) : (
-                                    <div className="video-container" style={{ 
-                                        background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        border: '1px solid #e2e8f0', flexShrink: 0, height: 100
+                                    <div style={{ 
+                                        width: 180, height: 270, alignSelf: 'center', background: '#f8fafc', 
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        borderRadius: 12, border: '1px solid #e2e8f0', flexShrink: 0
                                     }}>
-                                        <Dumbbell size={40} color="#cbd5e1" />
+                                        <Dumbbell size={24} color="#cbd5e1" />
                                     </div>
                                 )}
                             </div>
@@ -984,6 +1054,42 @@ export default function ListWorkouts() {
                     <button onClick={() => setShowSuccessModal(false)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '14px 32px', borderRadius: 16, fontSize: '1rem', fontWeight: 700, cursor: 'pointer', width: '100%', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.4)' }}>Fechar</button>
                 </div>
                 <style>{`@keyframes popIn { from { opacity: 0; transform: scale(0.8) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }`}</style>
+            </div>
+        )}
+
+        {videoModalUrl && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(10px)' }} onClick={() => setVideoModalUrl(null)}>
+                <div style={{ width: '100%', maxWidth: 800, aspectRatio: '16/9', background: '#000', borderRadius: 16, overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+                    {(() => {
+                        const isYoutube = videoModalUrl.includes('youtube.com') || videoModalUrl.includes('youtu.be');
+                        if (isYoutube) {
+                            const videoId = videoModalUrl.split('v=')[1]?.split('&')[0] || videoModalUrl.split('/').pop();
+                            return (
+                                <iframe 
+                                    src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&rel=0&modestbranding=1`} 
+                                    title="Video"
+                                    style={{ width: '100%', height: '100%', border: 'none' }}
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                    allowFullScreen
+                                />
+                            );
+                        } else {
+                            return (
+                                <video 
+                                    src={videoModalUrl} 
+                                    controls 
+                                    autoPlay
+                                    muted
+                                    playsInline
+                                    style={{ width: '100%', height: '100%' }}
+                                />
+                            );
+                        }
+                    })()}
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); setVideoModalUrl(null); }} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                    <X size={24} />
+                </button>
             </div>
         )}
       </div>
