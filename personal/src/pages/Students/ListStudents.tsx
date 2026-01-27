@@ -43,6 +43,53 @@ const getFinancialStatus = (student: StudentRecord, plan: PlanRecord | undefined
     return { status: 'pending', label: 'PENDENTE', color: '#b45309', bg: '#fef3c7', daysDiff: daysDiff }
 }
 
+const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], allResponses: AnamnesisResponse[]) => {
+    const studentAnamneses = allAnamneses.filter(a => a.studentId === studentId)
+    
+    if (studentAnamneses.length === 0) return { status: 'pending', label: 'Pendente', color: '#9ca3af', fontWeight: 400 }
+
+    try {
+        const sorted = studentAnamneses.sort((a, b) => {
+            const da = a.validUntil ? new Date(a.validUntil).getTime() : Infinity
+            const db = b.validUntil ? new Date(b.validUntil).getTime() : Infinity
+            return da - db
+        })
+        const nearest = sorted[0]
+        
+        if (nearest.validUntil) {
+            const modelResponses = allResponses.filter(r => r.modelId === nearest.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            const lastResponse = modelResponses[0]
+
+            const validDate = new Date(nearest.validUntil)
+            if (!isNaN(validDate.getTime())) {
+                let daysLeft = Math.ceil((validDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                
+                if (lastResponse) {
+                    let nextDueDate = new Date(nearest.validUntil!)
+                    const now = new Date()
+                    while (nextDueDate < now) {
+                        nextDueDate.setMonth(nextDueDate.getMonth() + 1)
+                    }
+                    daysLeft = Math.ceil((nextDueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                    return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
+                } else if (daysLeft < 0) {
+                    return { status: 'overdue', label: '🔴 Vencida', color: '#ef4444', fontWeight: 600 }
+                } else if (daysLeft <= 7) {
+                    return { status: 'warning', label: `🟡 Vence em ${daysLeft} dias`, color: '#f59e0b', fontWeight: 600 }
+                } else {
+                    return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
+                }
+            } else {
+                return { status: 'error', label: 'Data Inválida', color: '#f59e0b', fontWeight: 400 }
+            }
+        } else {
+            return { status: 'none', label: 'Sem validade', color: '#6b7280', fontWeight: 400 }
+        }
+    } catch (err) {
+        return { status: 'error', label: 'Erro Data', color: '#ef4444', fontWeight: 400 }
+    }
+}
+
 export default function ListStudents() {
   const navigate = useNavigate()
   const [students, setStudents] = useState<StudentRecord[]>([])
@@ -58,6 +105,9 @@ export default function ListStudents() {
   
   const [query, setQuery] = useState('')
   const [financialFilter, setFinancialFilter] = useState('all')
+  const [planFilter, setPlanFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [anamnesisFilter, setAnamnesisFilter] = useState('all')
   const [loading, setLoading] = useState(true)
 
   async function loadData() {
@@ -131,25 +181,74 @@ export default function ListStudents() {
     const matchesQuery = s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q) || addr.includes(q)
     
     if (!matchesQuery) return false
-    if (financialFilter === 'all') return true
+
+    // Status Aluno
+    if (statusFilter !== 'all' && s.status !== statusFilter) return false
     
+    // Plano
+    if (planFilter !== 'all' && s.planId !== planFilter) return false
+    
+    // Financeiro
     const plan = plans.find(p => p.id === s.planId)
     const finStatus = getFinancialStatus(s, plan, payments).status
-    return finStatus === financialFilter
+    if (financialFilter !== 'all' && finStatus !== financialFilter) return false
+
+    // Anamnese
+    if (anamnesisFilter !== 'all') {
+        const anamStatus = getAnamnesisStatus(s.id, anamneses, responses).status
+        // 'ok': ok, warning
+        // 'pending': pending, overdue, error, none
+        if (anamnesisFilter === 'ok') {
+            if (anamStatus !== 'ok' && anamStatus !== 'warning') return false
+        } else if (anamnesisFilter === 'pending') {
+            if (anamStatus !== 'pending' && anamStatus !== 'overdue' && anamStatus !== 'error' && anamStatus !== 'none') return false
+        }
+    }
+    
+    return true
   })
 
   return (
     <div>
       <h1>Alunos • Gerenciar Alunos</h1>
-      <div style={{ marginBottom: 10, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <input placeholder="Buscar por nome ou email" value={query} onChange={(e) => setQuery(e.target.value)} style={{ padding: '8px', borderRadius: 6, border: '1px solid #ccc', minWidth: 250 }} />
+      <div style={{ marginBottom: 10, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input placeholder="Buscar por nome ou email" value={query} onChange={(e) => setQuery(e.target.value)} style={{ padding: '8px', borderRadius: 6, border: '1px solid #ccc', minWidth: 200, flex: 1 }} />
         
+        <select 
+            value={planFilter} 
+            onChange={e => setPlanFilter(e.target.value)}
+            style={{ padding: '8px', borderRadius: 6, border: '1px solid #ccc', minWidth: 140 }}
+        >
+            <option value="all">Todos Planos</option>
+            {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+
+        <select 
+            value={statusFilter} 
+            onChange={e => setStatusFilter(e.target.value)}
+            style={{ padding: '8px', borderRadius: 6, border: '1px solid #ccc', minWidth: 140 }}
+        >
+            <option value="all">Todos Status</option>
+            <option value="ativo">Ativo</option>
+            <option value="inativo">Inativo</option>
+        </select>
+
+        <select 
+            value={anamnesisFilter} 
+            onChange={e => setAnamnesisFilter(e.target.value)}
+            style={{ padding: '8px', borderRadius: 6, border: '1px solid #ccc', minWidth: 150 }}
+        >
+            <option value="all">Todas Anamneses</option>
+            <option value="ok">Em Dia</option>
+            <option value="pending">Pendentes/Vencidas</option>
+        </select>
+
         <select 
             value={financialFilter} 
             onChange={e => setFinancialFilter(e.target.value)}
             style={{ padding: '8px', borderRadius: 6, border: '1px solid #ccc', minWidth: 150 }}
         >
-            <option value="all">Todos Status Financ.</option>
+            <option value="all">Todos Financeiro</option>
             <option value="paid">Pagos</option>
             <option value="pending">Pendentes</option>
             <option value="overdue">Atrasados</option>
@@ -207,62 +306,8 @@ export default function ListStudents() {
                 : <span style={{ color: '#9ca3af', fontSize: '0.9em' }}>Sem dietas</span>
 
             // Anamnese
-            const studentAnamneses = anamneses.filter(a => a.studentId === s.id)
-            let anamnesisStatus = <span style={{ color: '#9ca3af', fontSize: '0.9em' }}>Pendente</span>
-            
-            if (studentAnamneses.length > 0) {
-                try {
-                    // Pega a com menor validade (mais urgente)
-                    const sorted = studentAnamneses.sort((a, b) => {
-                        const da = a.validUntil ? new Date(a.validUntil).getTime() : Infinity
-                        const db = b.validUntil ? new Date(b.validUntil).getTime() : Infinity
-                        return da - db
-                    })
-                    const nearest = sorted[0]
-                    
-                    if (nearest.validUntil) {
-                        // Verifica se já respondeu (pega a mais recente)
-                        const modelResponses = responses.filter(r => r.modelId === nearest.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                        const lastResponse = modelResponses[0]
-
-                        const validDate = new Date(nearest.validUntil)
-                        // Verifica se data é válida
-                        if (!isNaN(validDate.getTime())) {
-                            let daysLeft = Math.ceil((validDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-                            
-                            // Lógica de Recorrência Visual (Projeção Mensal)
-                            // Se já respondeu, calculamos o próximo vencimento (próximo mês no mesmo dia)
-                            if (lastResponse) {
-                                let nextDueDate = new Date(nearest.validUntil!)
-                                const now = new Date()
-                                
-                                // Se a data original já passou, projeta para o próximo mês
-                                while (nextDueDate < now) {
-                                    nextDueDate.setMonth(nextDueDate.getMonth() + 1)
-                                }
-                                
-                                daysLeft = Math.ceil((nextDueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-                                
-                                // Se respondeu, mostra sempre verde com a contagem para o próximo
-                                anamnesisStatus = <span style={{ color: '#10b981', fontWeight: 600, fontSize: '0.9em' }}>✅ {daysLeft} dias</span>
-                            } else if (daysLeft < 0) {
-                                anamnesisStatus = <span style={{ color: '#ef4444', fontWeight: 600, fontSize: '0.9em' }}>🔴 Vencida</span>
-                            } else if (daysLeft <= 7) {
-                                anamnesisStatus = <span style={{ color: '#f59e0b', fontWeight: 600, fontSize: '0.9em' }}>🟡 Vence em {daysLeft} dias</span>
-                            } else {
-                                anamnesisStatus = <span style={{ color: '#10b981', fontWeight: 600, fontSize: '0.9em' }}>✅ {daysLeft} dias</span>
-                            }
-                        } else {
-                            anamnesisStatus = <span style={{ color: '#f59e0b', fontSize: '0.9em' }}>Data Inválida</span>
-                        }
-                    } else {
-                        anamnesisStatus = <span style={{ color: '#6b7280', fontSize: '0.9em' }}>Sem validade</span>
-                    }
-                } catch (err) {
-                    console.error('Erro ao calcular data anamnese:', err)
-                    anamnesisStatus = <span style={{ color: '#ef4444', fontSize: '0.9em' }}>Erro Data</span>
-                }
-            }
+            const anamData = getAnamnesisStatus(s.id, anamneses, responses)
+            const anamnesisStatus = <span style={{ color: anamData.color, fontWeight: anamData.fontWeight, fontSize: '0.9em' }}>{anamData.label}</span>
 
             const isInactive = s.status === 'inativo'
             return (
