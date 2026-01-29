@@ -115,18 +115,22 @@ export default function FoodAutocomplete({
                 }
 
                 setSuggestions(prev => {
-                    if (!Array.isArray(prev)) return apiMatches
+                    // Substitui resultados da API pelos novos, mantendo apenas os locais que ainda dão match
+                    // Isso evita o crescimento infinito da lista que causava lentidão
+                    const term = text.toLowerCase()
                     
-                    // MERGE: Mantém os atuais (locais) e adiciona os da API sem duplicar
-                    const currentNames = new Set(prev.map(m => (m.food_name || '').toLowerCase()))
-                    const newItems = [...prev]
-                    
-                    apiMatches.forEach(apiItem => {
-                        if (apiItem.food_name && !currentNames.has(apiItem.food_name.toLowerCase())) {
-                            newItems.push(apiItem)
-                        }
-                    })
-                    return newItems
+                    // Recalcula locais para garantir que ainda batem com o texto atual
+                    const validLocals = commonFoods
+                        .filter(f => f.name.toLowerCase().includes(term))
+                        .map(f => ({
+                            food_id: f.id,
+                            food_name: f.name,
+                            food_description: 'Alimento Natural / Básico',
+                            _local: f
+                        }))
+                        .slice(0, 10) // Limita locais para não poluir
+
+                    return [...validLocals, ...apiMatches]
                 })
         } catch (err: any) {
             if (err.name === 'AbortError') return 
