@@ -15,6 +15,7 @@ type HistoryItem = {
     finished_at: string | null
     notes?: string
     feedback?: string
+    duration_seconds?: number
 }
 
 export default function StudentFeedbackModal({ studentId, studentName, onClose }: Props) {
@@ -67,9 +68,9 @@ export default function StudentFeedbackModal({ studentId, studentName, onClose }
                         .from('workout_history')
                         .update({
                             finished_at: autoFinishTime,
-                            feedback: 'Finalizado automaticamente pelo sistema (Aluno não encerrou)',
-                            notes: 'Finalizado automaticamente pelo sistema (Aluno não encerrou)',
-                            duration_seconds: 3600
+                            feedback: 'Encerrado por não finalizar',
+                            notes: 'Encerrado por não finalizar',
+                            duration_seconds: 14400 // 4 horas
                         })
                         .eq('id', s.id)
                 }
@@ -91,7 +92,14 @@ export default function StudentFeedbackModal({ studentId, studentName, onClose }
     // Função para verificar se foi fechado pelo sistema
     const isSystemClosed = (text?: string) => {
         if (!text) return false
-        return text.includes('Finalizado automaticamente') || text.includes('Aluno não finalizou')
+        return text.includes('Finalizado automaticamente') || text.includes('Aluno não finalizou') || text.includes('Encerrado por não finalizar')
+    }
+
+    const formatDuration = (seconds?: number) => {
+        if (!seconds) return ''
+        const h = Math.floor(seconds / 3600)
+        const m = Math.floor((seconds % 3600) / 60)
+        return h > 0 ? `${h}h ${m}m` : `${m}m`
     }
 
     return (
@@ -119,7 +127,10 @@ export default function StudentFeedbackModal({ studentId, studentName, onClose }
                                                 <div key={item.id} style={{ background: isRunning ? '#fff7ed' : '#f8fafc', padding: 12, borderRadius: 8, border: `1px solid ${isRunning ? '#fdba74' : '#e2e8f0'}` }}>
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                         <div style={{ fontWeight: 600, color: '#334155', marginBottom: 4 }}>{item.workout_title}</div>
-                                                        {isRunning && <span style={{ fontSize: '0.75rem', background: '#fff7ed', color: '#c2410c', padding: '2px 6px', borderRadius: 4, border: '1px solid #ffedd5' }}>Em andamento</span>}
+                                                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                            {item.duration_seconds && <span style={{ fontSize: '0.75rem', color: '#64748b', background: '#e2e8f0', padding: '2px 6px', borderRadius: 4 }}>⏱ {formatDuration(item.duration_seconds)}</span>}
+                                                            {isRunning && <span style={{ fontSize: '0.75rem', background: '#fff7ed', color: '#c2410c', padding: '2px 6px', borderRadius: 4, border: '1px solid #ffedd5' }}>Em andamento</span>}
+                                                        </div>
                                                     </div>
 
                                                     {item.notes ? (
@@ -135,7 +146,7 @@ export default function StudentFeedbackModal({ studentId, studentName, onClose }
                                                                 <MessageSquare size={16} color="#f59e0b" style={{ flexShrink: 0, marginTop: 2 }} />
                                                             )}
                                                             <div style={{ fontSize: '0.9rem', color: autoClosed ? '#6b7280' : '#475569', fontStyle: autoClosed ? 'italic' : 'normal' }}>
-                                                                {autoClosed ? "Finalizado automaticamente pelo sistema" : `"${item.notes}"`}
+                                                                "{item.notes}"
                                                             </div>
                                                         </div>
                                                     ) : (

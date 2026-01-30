@@ -205,8 +205,8 @@ export default function ListWorkouts() {
                       .from('workout_history')
                       .update({
                           finished_at: autoFinishTime,
-                          feedback: 'Finalizado automaticamente pelo sistema (Aluno não encerrou)',
-                          duration_seconds: 3600 // 1 hora padrão
+                          notes: 'Encerrado por não finalizar',
+                          duration_seconds: 14400 // 4 horas
                       })
                       .eq('id', s.id)
               }
