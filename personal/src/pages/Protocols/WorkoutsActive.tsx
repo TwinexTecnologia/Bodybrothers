@@ -1,22 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { listActiveWorkouts, setWorkoutStatus, updateWorkout, toggleWorkoutFavorite, duplicateWorkout, type WorkoutRecord } from '../../store/workouts'
-  import { supabase } from '../../lib/supabase'
-  import { Star, Copy } from 'lucide-react'
-  import Modal from '../../components/Modal'
+import { supabase } from '../../lib/supabase'
+import { Star, Copy } from 'lucide-react'
+import Modal from '../../components/Modal'
 
 export default function WorkoutsActive() {
+  const navigate = useNavigate()
   const [items, setItems] = useState<WorkoutRecord[]>([])
   const [studentNames, setStudentNames] = useState<Record<string, string>>({})
   const [filterType, setFilterType] = useState<'all' | 'library' | 'student'>('all')
   const [selectedStudentId, setSelectedStudentId] = useState('')
   const [q, setQ] = useState('')
-  const [editingId, setEditingId] = useState('')
-  const [eName, setEName] = useState('')
-  const [eGoal, setEGoal] = useState('')
-  const [eCreatedAt, setECreatedAt] = useState('')
-  const [eValidUntil, setEValidUntil] = useState('')
-  const [eNotes, setENotes] = useState('')
-  const [eExercises, setEExercises] = useState<Array<WorkoutRecord['exercises'][number]>>([])
+  
   const [loading, setLoading] = useState(true)
   const [personalId, setPersonalId] = useState('')
 
@@ -104,55 +100,7 @@ export default function WorkoutsActive() {
   }
 
   const startEdit = (w: WorkoutRecord) => {
-    setEditingId(w.id)
-    setEName(w.name)
-    setEGoal(w.goal || '')
-    setECreatedAt(w.createdAt || '')
-    setEValidUntil(w.validUntil || '')
-    setENotes(w.notes || '')
-    setEExercises(w.exercises.slice())
-  }
-
-  const cancelEdit = () => {
-    setEditingId('')
-    setEName('')
-    setEGoal('')
-    setECreatedAt('')
-    setEValidUntil('')
-    setENotes('')
-    setEExercises([])
-  }
-
-  const updateEx = (idx: number, patch: Partial<WorkoutRecord['exercises'][number]>) => {
-    const next = eExercises.slice()
-    next[idx] = { ...next[idx], ...patch }
-    setEExercises(next)
-  }
-
-  const addEx = () => setEExercises([...eExercises, { name: '', group: '', series: '', reps: '', load: '', rest: '' }])
-  const removeEx = (idx: number) => setEExercises(eExercises.filter((_, i) => i !== idx))
-
-  const onUpload = (idx: number, file?: File) => {
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => updateEx(idx, { videoUrl: String(reader.result) })
-    reader.readAsDataURL(file)
-  }
-
-  const saveEdit = async () => {
-    if (!editingId) return
-    const rec = await updateWorkout(editingId, {
-      name: eName.trim(),
-      goal: eGoal || undefined,
-      createdAt: eCreatedAt || undefined,
-      validUntil: eValidUntil || undefined,
-      notes: eNotes || undefined,
-      exercises: eExercises,
-    })
-    if (rec) {
-        setItems(prev => prev.map(x => x.id === rec.id ? rec : x))
-    }
-    cancelEdit()
+    navigate(`/protocols/workout-create?id=${w.id}`)
   }
 
   const openAssignModal = (w: WorkoutRecord) => {
@@ -400,97 +348,7 @@ export default function WorkoutsActive() {
               ))}
             </div>
 
-            {editingId === w.id && (
-              <div className="form-section" style={{ marginTop: 12 }}>
-                <div className="form-title">Editar Treino</div>
-                <div className="form-grid">
-                  <label className="label">
-                    Nome do treino
-                    <input className="input" value={eName} onChange={(e) => setEName(e.target.value)} />
-                  </label>
-                  <label className="label">
-                    Objetivo
-                    <input className="input" value={eGoal} onChange={(e) => setEGoal(e.target.value)} />
-                  </label>
-                  <label className="label">
-                    Data de criação
-                    <input className="input" type="date" value={eCreatedAt} onChange={(e) => setECreatedAt(e.target.value)} />
-                  </label>
-                  <label className="label">
-                    Validade (opcional)
-                    <input className="input" type="date" value={eValidUntil} onChange={(e) => setEValidUntil(e.target.value)} />
-                  </label>
-                </div>
-                <label className="label">
-                  Observações
-                  <textarea className="input" value={eNotes} onChange={(e) => setENotes(e.target.value)} />
-                </label>
 
-                <div className="form-section">
-                  <div className="form-title">Exercícios</div>
-                  <div className="form-actions" style={{ marginBottom: 10 }}>
-                    <button className="btn" onClick={addEx}>Adicionar exercício</button>
-                  </div>
-                  <div className="form-grid" style={{ gridTemplateColumns: '1fr', gap: 12 }}>
-                    {eExercises.map((ex, idx) => (
-                      <div key={idx} className="form-card" style={{ padding: 12 }}>
-                        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                          <label className="label">
-                            Nome
-                            <input className="input" value={ex.name} onChange={(e) => updateEx(idx, { name: e.target.value })} />
-                          </label>
-                          <label className="label">
-                            Grupo muscular
-                            <input className="input" value={ex.group} onChange={(e) => updateEx(idx, { group: e.target.value })} />
-                          </label>
-                          <label className="label">
-                            Séries
-                            <input className="input" value={ex.series} onChange={(e) => updateEx(idx, { series: e.target.value })} />
-                          </label>
-                          <label className="label">
-                            Repetições
-                            <input className="input" value={ex.reps} onChange={(e) => updateEx(idx, { reps: e.target.value })} />
-                          </label>
-                          <label className="label">
-                            Carga
-                            <input className="input" value={ex.load} onChange={(e) => updateEx(idx, { load: e.target.value })} />
-                          </label>
-                          <label className="label">
-                            Descanso
-                            <input className="input" value={ex.rest} onChange={(e) => updateEx(idx, { rest: e.target.value })} />
-                          </label>
-                        </div>
-
-                        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                          <label className="label">
-                            Vídeo (URL)
-                            <input className="input" value={ex.videoUrl || ''} onChange={(e) => updateEx(idx, { videoUrl: e.target.value })} placeholder="https://..." />
-                          </label>
-                          <label className="label">
-                            Upload de vídeo
-                            <input className="input" type="file" accept="video/*" onChange={(e) => onUpload(idx, e.target.files?.[0])} />
-                          </label>
-                        </div>
-                        {ex.videoUrl && (
-                          <div style={{ marginTop: 8, display: 'grid', placeItems: 'center' }}>
-                            <video src={ex.videoUrl} controls style={{ width: '100%', maxWidth: 480, aspectRatio: '16 / 9', borderRadius: 8, background: '#000' }} />
-                          </div>
-                        )}
-
-                        <div className="form-actions" style={{ marginTop: 8 }}>
-                          <button className="btn" onClick={() => removeEx(idx)} style={{ background: '#ef4444' }}>Remover</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="form-actions" style={{ marginTop: 10 }}>
-                  <button className="btn" onClick={saveEdit}>Salvar alterações</button>
-                  <button className="btn" onClick={cancelEdit} style={{ background: '#e5e7eb', color: '#000' }}>Cancelar</button>
-                </div>
-              </div>
-            )}
           </div>
         ))}
         {filtered.length === 0 && (
