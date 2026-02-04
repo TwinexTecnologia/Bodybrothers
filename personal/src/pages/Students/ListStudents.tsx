@@ -11,56 +11,61 @@ import { MessageSquare, BarChart2, ClipboardList } from 'lucide-react'
 import StudentFeedbackModal from '../../components/StudentFeedbackModal'
 import StudentAnamnesisModal from '../../components/StudentAnamnesisModal'
 
-// Helper de Status Financeiro
+// Helper de Status Financeiro (Baseado em Validade Real)
 const getFinancialStatus = (student: StudentRecord, plan: PlanRecord | undefined, payments: DebitRecord[]) => {
     if (!plan || !student.planStartDate) return { status: 'none', label: '—', color: '#9ca3af', bg: 'transparent', daysDiff: null }
     
-    // Verifica Periodicidade
-    const [sYear, sMonth] = student.planStartDate.split('-').map(Number)
-    const startMonthIndex = sMonth - 1 
-    
+    // 1. Pega último pagamento
+    const myPayments = payments.filter(p => p.payerId === student.id).sort((a, b) => {
+        const dateA = new Date(a.paidAt || a.dueDate || 0).getTime()
+        const dateB = new Date(b.paidAt || b.dueDate || 0).getTime()
+        return dateB - dateA
+    })
+    const lastPayment = myPayments[0]
     const now = new Date()
-    const currentMonthIndex = now.getMonth()
-    const currentYear = now.getFullYear()
-    
-    const diffMonths = (currentYear - sYear) * 12 + (currentMonthIndex - startMonthIndex)
-    
-    let interval = 1
-    if (plan.frequency === 'bimonthly') interval = 2
-    else if (plan.frequency === 'quarterly') interval = 3
-    else if (plan.frequency === 'semiannual') interval = 6
-    else if (plan.frequency === 'annual') interval = 12
-    
-    // Se não for mês de cobrança (e plano já tiver começado)
-    if (diffMonths >= 0 && plan.frequency !== 'monthly' && plan.frequency !== 'weekly' && diffMonths % interval !== 0) {
-        return { status: 'paid', label: 'PAGO', color: '#166534', bg: '#dcfce7', daysDiff: null }
+
+    // 2. Se nunca pagou
+    if (!lastPayment) {
+        const start = new Date(student.planStartDate)
+        const diffTime = now.getTime() - start.getTime()
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+        
+        // Se começou há menos de 5 dias, considera Pendente (Amarelo)
+        if (diffDays <= 5) return { status: 'pending', label: 'NOVO', color: '#f59e0b', bg: '#fef3c7', daysDiff: diffDays }
+        // Se já passou, Atrasado (Vermelho)
+        return { status: 'overdue', label: 'ATRASADO', color: '#ef4444', bg: '#fee2e2', daysDiff: diffDays }
     }
 
-    const dueDay = student.dueDay || 10
-    const dueThisMonth = new Date(now.getFullYear(), now.getMonth(), dueDay)
-    dueThisMonth.setHours(23,59,59)
-    
-    // Formata data YYYY-MM-DD localmente (gambiarra segura para fuso)
-    const offset = dueThisMonth.getTimezoneOffset()
-    const localDate = new Date(dueThisMonth.getTime() - (offset*60*1000))
-    const dueStr = localDate.toISOString().split('T')[0]
-    
-    // Procura pagamento com due_date igual (mesmo que tenha sido pago em outro dia)
-    const hasPayment = payments.some(p => p.payerId === student.id && p.dueDate === dueStr)
-    
-    const timeDiff = dueThisMonth.getTime() - now.getTime()
-    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24))
-    
-    if (hasPayment) return { status: 'paid', label: 'PAGO', color: '#166534', bg: '#dcfce7', daysDiff: null }
-    
-    if (now > dueThisMonth) {
-        // Atrasado
-        // daysDiff será negativo (ex: -5). Invertemos para positivo para mostrar "5 dias"
-        return { status: 'overdue', label: 'ATRASADO', color: '#991b1b', bg: '#fee2e2', daysDiff: Math.abs(daysDiff) }
+    // 3. Calcula validade
+    let validityDays = 30
+    switch (plan.frequency) {
+        case 'weekly': validityDays = 7; break
+        case 'monthly': validityDays = 30; break
+        case 'bimonthly': validityDays = 60; break
+        case 'quarterly': validityDays = 90; break
+        case 'semiannual': validityDays = 180; break
+        case 'annual': validityDays = 365; break
     }
-    
-    // Pendente (Vence em X dias)
-    return { status: 'pending', label: 'PENDENTE', color: '#b45309', bg: '#fef3c7', daysDiff: daysDiff }
+
+    const refDate = new Date(lastPayment.paidAt || lastPayment.dueDate || 0)
+    const validUntil = new Date(refDate)
+    validUntil.setDate(validUntil.getDate() + validityDays)
+
+    // Dias restantes para vencer (negativo = vencido)
+    const diffTime = validUntil.getTime() - now.getTime()
+    const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    if (daysRemaining < 0) {
+        // Vencido
+        // Se venceu há pouco tempo (até 3 dias), mostra como pendente/atenção
+        if (daysRemaining > -4) return { status: 'pending', label: 'VENCEU', color: '#f59e0b', bg: '#fef3c7', daysDiff: Math.abs(daysRemaining) }
+        return { status: 'overdue', label: 'ATRASADO', color: '#ef4444', bg: '#fee2e2', daysDiff: Math.abs(daysRemaining) }
+    } else {
+        // Em dia
+        // Se falta pouco para vencer (5 dias), avisa
+        if (daysRemaining <= 5) return { status: 'warning', label: 'VENCE LOGO', color: '#f59e0b', bg: '#fffbeb', daysDiff: daysRemaining }
+        return { status: 'paid', label: 'EM DIA', color: '#166534', bg: '#dcfce7', daysDiff: daysRemaining }
+    }
 }
 
 const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], allResponses: AnamnesisResponse[]) => {

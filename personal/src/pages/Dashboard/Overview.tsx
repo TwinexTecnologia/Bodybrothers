@@ -53,6 +53,9 @@ export default function Overview() {
       // Itera APENAS pagamentos recebidos (Caixa -> Competência)
       payments.forEach(payment => {
           if (!payment.paidAt && !payment.dueDate) return
+          // Filtra valores absurdos de teste que quebram o gráfico
+          if (payment.amount > 100000) return
+
           const baseDate = new Date(payment.dueDate || payment.paidAt!)
           
           const student = students.find(s => s.id === payment.payerId)
@@ -88,8 +91,11 @@ export default function Overview() {
       
       for (let m = startMonth; m <= endMonth; m++) {
           const monthStart = new Date(year, m, 1)
-          const total = monthTotals[m]
+          let total = monthTotals[m]
           
+          // Trava de segurança final: Remove outliers extremos que quebram a escala do gráfico
+          if (total > 500000) total = 0
+
           if (Math.round(total) > 0) {
               newChartData.push({
                   name: monthStart.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase(),
@@ -233,32 +239,53 @@ export default function Overview() {
             const plan = plans.find(p => p.id === student.planId)
             if (!plan) return
             const studentPayments = allPayments.filter(p => p.payerId === student.id)
-            const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-            const currentMonthEnd = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
-            const dueDates = generateExpectedCharges(student, plan, currentMonthEnd)
-            const thisMonthDueDates = dueDates.filter(d => d >= currentMonthStart && d <= currentMonthEnd)
+            // NOVA LÓGICA DE VENCIMENTO REAL (HISTÓRICO)
+            // Não olha apenas o mês atual, mas sim se o último pagamento cobre o dia de hoje.
             
-            let isOverdue = false
-            for (const due of thisMonthDueDates) {
-                const dueLimit = new Date(due)
-                dueLimit.setHours(23, 59, 59)
-                if (now > dueLimit) {
-                    const dueStr = due.toISOString().split('T')[0]
-                    const hasPayment = studentPayments.some(p => {
-                         if (p.dueDate === dueStr) return true
-                         if (p.monthRef) {
-                             const pDate = new Date(p.monthRef)
-                             return pDate.getMonth() === due.getMonth() && pDate.getFullYear() === due.getFullYear()
-                         }
-                         return false
-                    })
-                    if (!hasPayment) {
-                        isOverdue = true
-                        break
+            // 1. Pega todos os pagamentos deste aluno ordenados por data (mais recente primeiro)
+            const myPayments = studentPayments.sort((a, b) => {
+                const dateA = new Date(a.paidAt || a.dueDate || 0).getTime()
+                const dateB = new Date(b.paidAt || b.dueDate || 0).getTime()
+                return dateB - dateA
+            })
+
+            const lastPayment = myPayments[0]
+            
+            // Se nunca pagou e já passou da data de início + tolerância, está devendo
+            if (!lastPayment) {
+                if (student.planStartDate) {
+                    const start = new Date(student.planStartDate)
+                    const gracePeriod = new Date(start)
+                    gracePeriod.setDate(gracePeriod.getDate() + 5) // 5 dias de tolerância inicial
+                    if (now > gracePeriod) {
+                        pendingFinanceCount++
                     }
                 }
+                return
             }
-            if (isOverdue) pendingFinanceCount++
+
+            // 2. Calcula a validade do último pagamento
+            const refDate = new Date(lastPayment.paidAt || lastPayment.dueDate || 0)
+            let validityDays = 30 // Padrão mensal
+
+            switch (plan.frequency) {
+                case 'weekly': validityDays = 7; break
+                case 'monthly': validityDays = 30; break
+                case 'bimonthly': validityDays = 60; break
+                case 'quarterly': validityDays = 90; break
+                case 'semiannual': validityDays = 180; break
+                case 'annual': validityDays = 365; break
+            }
+
+            const validUntil = new Date(refDate)
+            validUntil.setDate(validUntil.getDate() + validityDays)
+            // Adiciona uma margem de tolerância de 3 dias para não ficar vermelho no fds
+            validUntil.setDate(validUntil.getDate() + 3)
+
+            // Se a validade já passou, está pendente
+            if (now > validUntil) {
+                pendingFinanceCount++
+            }
         })
 
         // CALCULO ANAMNESES
@@ -556,7 +583,7 @@ export default function Overview() {
                           tickLine={false} 
                           tick={{ fill: '#64748b', fontSize: 12 }}
                           tickFormatter={(value) => `R$ ${value}`}
-                          domain={[0, (dataMax: number) => (dataMax * 1.2)]}
+                          // domain removido para auto-scale padrão
                       />
                       <Tooltip 
                           cursor={{ fill: '#f1f5f9' }}
