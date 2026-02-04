@@ -529,25 +529,6 @@ export default function CRM() {
                 <div style={{ display: 'flex', gap: 12 }}>
                     <button 
                         className="btn" 
-                        onClick={(e) => { e.preventDefault(); syncData(); }} 
-                        title="Sincronizar dados locais com a nuvem"
-                        style={{ 
-                            background: '#fff', 
-                            border: '1px solid #cbd5e1', 
-                            padding: '8px 16px', 
-                            borderRadius: 8, 
-                            display: 'flex', 
-                            gap: 8, 
-                            alignItems: 'center', 
-                            cursor: 'pointer',
-                            color: '#3b82f6', 
-                            fontWeight: 500
-                        }}
-                    >
-                        <RefreshCw size={18} /> Sync
-                    </button>
-                    <button 
-                        className="btn" 
                         onClick={() => navigate('/crm/dashboard')} 
                         style={{ 
                             background: '#fff', 
