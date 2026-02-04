@@ -245,27 +245,31 @@ export default function CRM() {
 
         try {
             if (user) {
-                // Tenta atualizar no banco PRIMEIRO
-                const { data, error } = await supabase
+                console.log('Usuario Autenticado:', user.id)
+                
+                // Tenta atualizar no banco PRIMEIRO e pede contagem
+                const { data, error, count } = await supabase
                     .from('crm_leads')
                     .update({ active: false })
                     .eq('id', leadToDelete)
-                    .select()
+                    .select('*', { count: 'exact' })
                 
-                console.log('Resposta do Supabase:', { data, error })
+                console.log('Resposta do Supabase (Update):', { data, error, count })
 
                 if (error) {
                     alert('Erro ao excluir no banco: ' + error.message)
-                    return // Para tudo se der erro
+                    return 
                 }
                 
-                if (!data || data.length === 0) {
-                    alert('Atenção: O banco não retornou confirmação. Verifique se o lead existe lá.')
-                    // Não retornamos aqui, deixamos remover da tela por garantia, mas avisamos.
+                // Se count for 0, o banco ignorou o comando (ID não encontrado ou Permissão negada)
+                if (count === 0) {
+                    alert('FALHA: O banco ignorou o comando. Verifique se o lead pertence a você (RLS) ou se o ID está correto.')
+                    console.warn('Update retornou 0 linhas afetadas. Possível bloqueio de RLS.')
+                    return // Não remove da tela para você ver que falhou
                 }
             }
 
-            // Se deu certo no banco (ou usuário offline), remove da tela
+            // Se deu certo (count > 0), remove da tela
             const updatedLeads = leads.filter(l => l.id !== leadToDelete)
             setLeads(updatedLeads)
             localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
