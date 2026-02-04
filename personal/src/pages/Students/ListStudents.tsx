@@ -4,7 +4,7 @@ import { listPlans, type PlanRecord } from '../../store/plans'
 import { listActiveWorkouts, type WorkoutRecord } from '../../store/workouts'
 import { listAllAnamnesis, listResponsesByPersonal, type AnamnesisModel, type AnamnesisResponse } from '../../store/anamnesis'
 import { listAllDietsByPersonal, type DietRecord } from '../../store/diets'
-import { listMonthPayments, type DebitRecord } from '../../store/financial'
+import { listRecentPayments, type DebitRecord } from '../../store/financial'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { MessageSquare, BarChart2, ClipboardList } from 'lucide-react'
@@ -168,7 +168,7 @@ export default function ListStudents() {
             listAllAnamnesis(user.id),
             listResponsesByPersonal(user.id),
             listAllDietsByPersonal(user.id),
-            listMonthPayments(user.id, new Date())
+            listRecentPayments(user.id)
         ]).then(([p, w, a, r, d, pay]) => {
             console.log('Detalhes carregados em background')
             setPlans(p)
@@ -435,7 +435,12 @@ export default function ListStudents() {
                         }}>
                             {finStatus.label}
                         </span>
-                        {finStatus.status === 'pending' && finStatus.daysDiff !== null && (
+                        {finStatus.status === 'paid' && finStatus.daysDiff !== null && (
+                            <span style={{ fontSize: '0.75em', color: '#15803d', marginTop: 2, fontWeight: 500 }}>
+                                Vence em {finStatus.daysDiff} dias
+                            </span>
+                        )}
+                        {finStatus.status === 'warning' && finStatus.daysDiff !== null && (
                             <span style={{ fontSize: '0.75em', color: '#b45309', marginTop: 2, fontWeight: 500 }}>
                                 Vence em {finStatus.daysDiff} dias
                             </span>

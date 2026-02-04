@@ -43,6 +43,23 @@ export async function listMonthPayments(personalId: string, monthDate: Date): Pr
   return (data || []).map(mapDebitFromDb)
 }
 
+export async function listRecentPayments(personalId: string): Promise<DebitRecord[]> {
+    // Busca pagamentos dos últimos 6 meses para garantir cobertura de planos semestrais
+    const d = new Date()
+    d.setMonth(d.getMonth() - 6)
+    const start = d.toISOString().split('T')[0]
+
+    const { data, error } = await supabase
+        .from('debits')
+        .select('*')
+        .eq('receiver_id', personalId)
+        .eq('status', 'paid')
+        .gte('paid_at', start) // Pega pagos recentemente
+    
+    if (error) return []
+    return (data || []).map(mapDebitFromDb)
+}
+
 export async function registerPayment(data: {
     personalId: string
     studentId: string
