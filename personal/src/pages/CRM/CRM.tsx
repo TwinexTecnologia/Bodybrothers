@@ -241,29 +241,41 @@ export default function CRM() {
     const confirmDelete = async () => {
         if (!leadToDelete) return
         
-        console.log('Tentando inativar lead:', leadToDelete)
+        console.log('Tentando inativar lead (Iniciando)...', leadToDelete)
 
-        const updatedLeads = leads.filter(l => l.id !== leadToDelete)
-        setLeads(updatedLeads)
-        localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
-        
-        // Soft Delete: Apenas marca como inativo
-        if (user) {
-            const { data, error } = await supabase
-                .from('crm_leads')
-                .update({ active: false })
-                .eq('id', leadToDelete)
-                .select()
-            
-            if (error) {
-                console.error('Erro no Soft Delete:', error)
-                alert('Erro ao inativar no banco. Verifique o console.')
-            } else {
-                console.log('Lead inativado com sucesso:', data)
+        try {
+            if (user) {
+                // Tenta atualizar no banco PRIMEIRO
+                const { data, error } = await supabase
+                    .from('crm_leads')
+                    .update({ active: false })
+                    .eq('id', leadToDelete)
+                    .select()
+                
+                console.log('Resposta do Supabase:', { data, error })
+
+                if (error) {
+                    alert('Erro ao excluir no banco: ' + error.message)
+                    return // Para tudo se der erro
+                }
+                
+                if (!data || data.length === 0) {
+                    alert('Atenção: O banco não retornou confirmação. Verifique se o lead existe lá.')
+                    // Não retornamos aqui, deixamos remover da tela por garantia, mas avisamos.
+                }
             }
+
+            // Se deu certo no banco (ou usuário offline), remove da tela
+            const updatedLeads = leads.filter(l => l.id !== leadToDelete)
+            setLeads(updatedLeads)
+            localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
+            
+            setDeleteModalOpen(false); setLeadToDelete(null)
+            
+        } catch (err: any) {
+            console.error('Erro Fatal:', err)
+            alert('Erro de Exceção: ' + (err.message || err))
         }
-        
-        setDeleteModalOpen(false); setLeadToDelete(null)
     }
 
     // Config Colunas
