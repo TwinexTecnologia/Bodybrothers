@@ -118,6 +118,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           {open.dashboard && (
             <div className="submenu">
               <NavLink to="/dashboard/overview">Visão Geral</NavLink>
+              <NavLink to="/crm" style={{ color: '#8b5cf6' }}>CRM • Vendas</NavLink>
             </div>
           )}
         </div>
