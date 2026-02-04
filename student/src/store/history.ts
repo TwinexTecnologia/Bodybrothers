@@ -87,11 +87,13 @@ export async function getWeeklyFrequency(studentId: string): Promise<number> {
     const today = new Date()
     const firstDay = new Date(today.setDate(today.getDate() - today.getDay())).toISOString()
 
+    // Conta treinos que foram INICIADOS nesta semana e já estão finalizados
     const { count, error } = await supabase
         .from('workout_history')
         .select('*', { count: 'exact', head: true })
         .eq('student_id', studentId)
-        .gte('finished_at', firstDay)
+        .gte('started_at', firstDay) // Mudança aqui: finished_at -> started_at
+        .not('finished_at', 'is', null) // Garante que foi finalizado
     
     if (error) return 0
     return count || 0
@@ -107,16 +109,17 @@ export async function getWeeklyActivity(studentId: string): Promise<number[]> {
 
     const { data, error } = await supabase
         .from('workout_history')
-        .select('finished_at')
+        .select('started_at, finished_at') // Busca started_at também
         .eq('student_id', studentId)
-        .gte('finished_at', firstDay.toISOString())
+        .gte('started_at', firstDay.toISOString()) // Mudança aqui: finished_at -> started_at
+        .not('finished_at', 'is', null) // Garante que foi finalizado
     
     if (error || !data) return []
 
-    // Mapeia para dias da semana (0-6)
+    // Mapeia para dias da semana (0-6) usando a DATA DE INÍCIO
     const activeDays = data.map(row => {
-        if (!row.finished_at) return -1
-        return new Date(row.finished_at).getDay()
+        if (!row.started_at) return -1
+        return new Date(row.started_at).getDay() // Mudança aqui: finished_at -> started_at
     }).filter(d => d >= 0)
 
     // Remove duplicatas

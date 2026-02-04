@@ -81,7 +81,8 @@ export default function StudentFeedbackModal({ studentId, studentName, onClose }
     }
 
     const grouped = history.reduce((acc, item) => {
-        const refDate = item.finished_at ? item.finished_at : item.started_at
+        // Agrupa sempre pela data de INÍCIO para manter consistência com treinos que viram a noite
+        const refDate = item.started_at
         const date = new Date(refDate).toLocaleDateString('pt-BR')
         
         if (!acc[date]) acc[date] = []
