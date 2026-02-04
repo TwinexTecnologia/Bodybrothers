@@ -67,14 +67,25 @@ export default function CRMDashboard() {
                 
                 // Se vier do banco, usa o banco.
                 if (leads) { // Mesmo se vier vazio, usa o vazio do banco pois é a verdade
-                    finalLeads = leads.map(l => ({
-                        id: l.id,
-                        name: l.name,
-                        source: l.source || 'Manual',
-                        status: l.status_column_id,
-                        createdAt: l.created_at,
-                        history: l.history
-                    }))
+                    finalLeads = leads.map(l => {
+                        const statusExists = cols?.some(c => c.id === l.status_column_id)
+                        let targetStatus = l.status_column_id
+
+                        if (!statusExists && cols && cols.length > 0) {
+                             // Tenta recuperar coluna pelo nome se possível, ou usa a primeira
+                             const defaultCol = cols.find(c => c.title.toLowerCase().includes('novos')) || cols[0]
+                             targetStatus = defaultCol.id
+                        }
+
+                        return {
+                            id: l.id,
+                            name: l.name,
+                            source: l.source || 'Manual',
+                            status: targetStatus,
+                            createdAt: l.created_at,
+                            history: l.history
+                        }
+                    })
                 }
             }
             
