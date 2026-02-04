@@ -272,6 +272,13 @@ export default function CRM() {
 
     return (
         <div style={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
+            <style>{`
+                .crm-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+                    border-color: #cbd5e1 !important;
+                }
+            `}</style>
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <div>
@@ -332,34 +339,75 @@ export default function CRM() {
             </div>
 
             {/* Kanban */}
-            <div style={{ flex: 1, display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 20 }}>
+            <div style={{ flex: 1, display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start' }}>
                 {columns.map(col => (
-                    <div key={col.id} style={{ flex: '0 0 300px', display: 'flex', flexDirection: 'column', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', maxHeight: '100%' }}>
-                        <div style={{ padding: 16, borderBottom: `3px solid ${col.color}`, background: '#fff', borderRadius: '12px 12px 0 0', display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                {col.title}
-                                {finalizerColumnId === col.id && <Trophy size={14} color="#f59e0b" fill="#f59e0b" />}
+                    <div key={col.id} style={{ flex: '1 0 270px', maxWidth: 350, display: 'flex', flexDirection: 'column', background: '#f1f5f9', borderRadius: 12, maxHeight: '100%', border: '1px solid #cbd5e1' }}>
+                        
+                        {/* Header da Coluna Profissional */}
+                        <div style={{ padding: '12px 14px', background: '#fff', borderRadius: '11px 11px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ width: 10, height: 10, borderRadius: '50%', background: col.color, boxShadow: `0 0 0 2px ${col.bg}` }}></div>
+                                <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    {col.title}
+                                    {finalizerColumnId === col.id && <Trophy size={14} color="#f59e0b" fill="#f59e0b" />}
+                                </span>
+                            </div>
+                            <span style={{ background: '#f8fafc', color: '#64748b', padding: '2px 8px', borderRadius: 6, fontSize: '0.75em', fontWeight: 600, border: '1px solid #e2e8f0' }}>
+                                {filteredLeads.filter(l => l.status === col.id).length}
                             </span>
-                            <span style={{ background: col.bg, color: col.color, padding: '2px 8px', borderRadius: 12, fontSize: '0.8em', fontWeight: 600 }}>{filteredLeads.filter(l => l.status === col.id).length}</span>
                         </div>
-                        <div style={{ padding: 12, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                        {/* Corpo da Coluna */}
+                        <div style={{ padding: 10, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
                             {filteredLeads.filter(l => l.status === col.id).map(lead => (
-                                <div key={lead.id} style={{ background: '#fff', padding: 16, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
+                                <div key={lead.id} 
+                                    className="crm-card" // Classe para hover (vou adicionar style tag no final)
+                                    style={{ 
+                                        background: '#fff', 
+                                        padding: 14, 
+                                        borderRadius: 8, 
+                                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)', 
+                                        border: '1px solid #e2e8f0',
+                                        borderLeft: `3px solid ${col.color}`, // Borda lateral colorida
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
                                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                            <span style={{ fontSize: '0.75em', color: '#94a3b8', background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>{lead.source}</span>
-                                            {lead.createdAt && <span style={{ fontSize: '0.7em', color: '#cbd5e1' }}>{new Date(lead.createdAt).toLocaleDateString('pt-BR')}</span>}
+                                            <span style={{ fontSize: '0.7em', color: '#64748b', background: '#f8fafc', padding: '2px 6px', borderRadius: 4, border: '1px solid #f1f5f9', fontWeight: 500 }}>{lead.source}</span>
+                                            {lead.createdAt && <span style={{ fontSize: '0.65em', color: '#94a3b8' }}>{new Date(lead.createdAt).toLocaleDateString('pt-BR')}</span>}
                                         </div>
-                                        <div style={{ display: 'flex', gap: 8 }}>
-                                            <button onClick={() => openEditLead(lead)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8' }}><Edit size={16} /></button>
-                                            <button onClick={() => deleteLead(lead.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444' }}><Trash2 size={16} /></button>
+                                        <div style={{ display: 'flex', gap: 4, opacity: 0.6 }} onMouseEnter={e => e.currentTarget.style.opacity = '1'} onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}>
+                                            <button onClick={() => openEditLead(lead)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', padding: 2 }}><Edit size={14} /></button>
+                                            <button onClick={() => deleteLead(lead.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', padding: 2 }}><Trash2 size={14} /></button>
                                         </div>
                                     </div>
-                                    <h4 style={{ margin: '0 0 4px 0', color: '#1e293b' }}>{lead.name}</h4>
-                                    {lead.notes && <p style={{ fontSize: '0.85em', color: '#64748b', fontStyle: 'italic' }}>"{lead.notes}"</p>}
-                                    <div style={{ marginTop: 12, borderTop: '1px solid #f1f5f9', paddingTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                                        <select value="" onChange={(e) => moveLead(lead.id, e.target.value)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '4px 8px', fontSize: '0.8em' }}>
-                                            <option value="" disabled>Mover...</option>
+                                    
+                                    <h4 style={{ margin: '0 0 4px 0', color: '#0f172a', fontSize: '0.95rem', fontWeight: 600 }}>{lead.name}</h4>
+                                    
+                                    {lead.notes && (
+                                        <p style={{ fontSize: '0.8em', color: '#64748b', margin: '4px 0 8px 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                            {lead.notes}
+                                        </p>
+                                    )}
+
+                                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
+                                        <select 
+                                            value="" 
+                                            onChange={(e) => moveLead(lead.id, e.target.value)} 
+                                            style={{ 
+                                                background: 'transparent', 
+                                                border: 'none', 
+                                                color: '#3b82f6', 
+                                                fontSize: '0.75em', 
+                                                fontWeight: 600, 
+                                                cursor: 'pointer', 
+                                                outline: 'none',
+                                                textAlign: 'right',
+                                                paddingRight: 0
+                                            }}
+                                        >
+                                            <option value="" disabled>Mover para...</option>
                                             {columns.filter(c => c.id !== col.id).map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
                                         </select>
                                     </div>
