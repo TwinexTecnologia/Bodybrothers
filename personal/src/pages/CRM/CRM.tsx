@@ -244,8 +244,15 @@ export default function CRM() {
         console.log('Tentando inativar lead (Iniciando)...', leadToDelete)
 
         try {
-            if (user) {
-                console.log('Usuario Autenticado:', user.id)
+            // BLINDAGEM: Garante usuário mesmo se o hook falhar
+            let currentUser = user
+            if (!currentUser) {
+                const { data } = await supabase.auth.getUser()
+                currentUser = data.user
+            }
+
+            if (currentUser) {
+                console.log('Usuario Autenticado:', currentUser.id)
                 
                 // Tenta atualizar no banco PRIMEIRO e pede contagem
                 const { data, error, count } = await supabase
@@ -267,6 +274,9 @@ export default function CRM() {
                     console.warn('Update retornou 0 linhas afetadas. Possível bloqueio de RLS.')
                     return // Não remove da tela para você ver que falhou
                 }
+            } else {
+                alert('Erro Crítico: Você parece estar desconectado. Recarregue a página.')
+                return
             }
 
             // Se deu certo (count > 0), remove da tela
