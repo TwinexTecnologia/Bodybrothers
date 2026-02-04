@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, MoreHorizontal, Phone, Settings, Trash2, GripVertical, Check, X, UserPlus, Edit, Search, Filter, Trophy, BarChart } from 'lucide-react'
+import { Plus, MoreHorizontal, Phone, Settings, Trash2, GripVertical, Check, X, UserPlus, Edit, Search, Filter, Trophy, BarChart, RefreshCw } from 'lucide-react'
 import Modal from '../../components/Modal'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/useAuth'
@@ -307,6 +307,70 @@ export default function CRM() {
         setWinModalOpen(false); setLeadToWin(null)
     }
 
+    const syncData = async () => {
+        if (!confirm('Deseja enviar os dados locais para a nuvem? Isso corrigirá a visualização na Vercel.')) return
+        if (!user) return
+        
+        setIsLoading(true)
+        try {
+            // 1. Sincronizar Colunas (Garante que elas existem no banco)
+            const colsMap: Record<string, string> = {} // LocalID -> RealID
+            
+            for (const col of columns) {
+                // Tenta encontrar pelo título
+                const { data: existing } = await supabase.from('crm_columns').select('id').eq('title', col.title).eq('user_id', user.id).single()
+                
+                let realId = existing?.id
+                
+                if (!realId) {
+                    const { data: newCol } = await supabase.from('crm_columns').insert({
+                         title: col.title, color: col.color, bg_color: col.bg, order: columns.indexOf(col), user_id: user.id
+                    }).select().single()
+                    realId = newCol?.id
+                }
+                
+                if (realId) colsMap[col.id] = realId
+            }
+
+            // 2. Sincronizar Leads
+            let count = 0
+            for (const lead of leads) {
+                // Descobre o ID real da coluna
+                const realStatusId = colsMap[lead.status] || lead.status
+                
+                // Payload
+                const payload: any = {
+                    name: lead.name,
+                    email: lead.email,
+                    phone: lead.phone,
+                    source: lead.source,
+                    goal: lead.goal,
+                    notes: lead.notes,
+                    status_column_id: realStatusId,
+                    user_id: user.id,
+                    history: lead.history
+                }
+
+                // Se ID for local (tem ponto decimal), insere novo. Se for UUID, atualiza.
+                if (lead.id.includes('.')) {
+                     await supabase.from('crm_leads').insert(payload)
+                } else {
+                     payload.id = lead.id
+                     await supabase.from('crm_leads').upsert(payload)
+                }
+                count++
+            }
+            alert(`Sincronizado com sucesso! ${count} leads processados.`)
+            window.location.reload()
+            
+        } catch (err) {
+            alert('Erro ao sincronizar. Veja o console.')
+            console.error(err)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     return (
         <div style={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
             <style>{`
@@ -323,6 +387,25 @@ export default function CRM() {
                     <p style={{ margin: '4px 0 0 0', color: '#64748b' }}>Funil de vendas personalizável</p>
                 </div>
                 <div style={{ display: 'flex', gap: 12 }}>
+                    <button 
+                        className="btn" 
+                        onClick={syncData} 
+                        title="Sincronizar dados locais com a nuvem"
+                        style={{ 
+                            background: '#fff', 
+                            border: '1px solid #cbd5e1', 
+                            padding: '8px 16px', 
+                            borderRadius: 8, 
+                            display: 'flex', 
+                            gap: 8, 
+                            alignItems: 'center', 
+                            cursor: 'pointer',
+                            color: '#3b82f6', 
+                            fontWeight: 500
+                        }}
+                    >
+                        <RefreshCw size={18} /> Sync
+                    </button>
                     <button 
                         className="btn" 
                         onClick={() => navigate('/crm/dashboard')} 
