@@ -346,7 +346,10 @@ export default function CRMDashboard() {
                                             <Clock size={16} color={col?.color || '#64748b'} />
                                         </div>
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 600, color: '#334155', fontSize: '1rem' }}>{col?.title || 'Etapa Desconhecida'}</div>
+                                            <div style={{ fontWeight: 600, color: col ? '#334155' : '#64748b', fontSize: '1rem' }}>
+                                                {col?.title || (idx === 0 ? 'Entrada no Funil' : 'Etapa Anterior')}
+                                                {!col && idx !== 0 && <span style={{fontSize: '0.75em', fontWeight: 400, marginLeft: 6, fontStyle: 'italic'}}>(Coluna excluída)</span>}
+                                            </div>
                                             <div style={{ fontSize: '0.85em', color: '#94a3b8', marginBottom: 6 }}>{startDate.toLocaleString('pt-BR')}</div>
                                             
                                             <div style={{ fontSize: '0.85em', color: '#475569', background: '#f8fafc', padding: '6px 10px', borderRadius: 6, display: 'inline-block', border: '1px solid #e2e8f0' }}>
