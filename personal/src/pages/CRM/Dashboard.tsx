@@ -79,6 +79,19 @@ export default function CRMDashboard() {
                 color: col.color
             }))
 
+            // Adicionar categoria "Não Classificado" se houver leads sobrando (Debug)
+            const classifiedCount = byStatus.reduce((acc, curr) => acc + curr.count, 0)
+            const unclassifiedCount = finalLeads.length - classifiedCount
+            
+            if (unclassifiedCount > 0) {
+                byStatus.push({
+                    id: 'unknown',
+                    name: 'Não Classificado',
+                    count: unclassifiedCount,
+                    color: '#94a3b8'
+                })
+            }
+
             // Processa Origem (Source)
             const sourceMap = finalLeads.reduce((acc: any, lead) => {
                 const source = lead.source || 'Manual'
