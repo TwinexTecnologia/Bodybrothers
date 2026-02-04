@@ -24,12 +24,16 @@ export default function CRMDashboard() {
     const [historyOpen, setHistoryOpen] = useState(false)
     const [selectedLead, setSelectedLead] = useState<any>(null)
 
+    const [debugInfo, setDebugInfo] = useState<any>({})
+
     useEffect(() => {
         loadStats()
     }, [user])
 
     const loadStats = async () => {
         try {
+            setDebugInfo(prev => ({ ...prev, step: 'Iniciando loadStats', userId: user?.id }))
+            
             // 1. Carregar LocalStorage
             let localCols: any[] = []
             let localLeads: any[] = []
@@ -38,8 +42,6 @@ export default function CRMDashboard() {
                 const savedLeads = localStorage.getItem('crm_leads_offline')
                 if (savedCols) localCols = JSON.parse(savedCols)
                 if (savedLeads) localLeads = JSON.parse(savedLeads)
-                
-                console.log('📦 LocalStorage:', { leads: localLeads.length, cols: localCols.length })
             } catch (e) { void 0 }
 
             // 2. Carregar Supabase
@@ -50,24 +52,34 @@ export default function CRMDashboard() {
                 const { data: cols, error: errCols } = await supabase.from('crm_columns').select('*').eq('user_id', user.id).order('order')
                 const { data: leads, error: errLeads } = await supabase.from('crm_leads').select('*').eq('user_id', user.id)
                 
-                console.log('🌐 Supabase:', { leads: leads?.length, cols: cols?.length, errLeads, errCols })
+                setDebugInfo(prev => ({ 
+                    ...prev, 
+                    supabaseCols: cols?.length, 
+                    supabaseLeads: leads?.length, 
+                    errCols, 
+                    errLeads,
+                    leadsSample: leads ? leads.slice(0, 1) : 'null'
+                }))
 
                 if (cols && cols.length > 0) {
                     finalCols = cols.map(c => ({ id: c.id, title: c.title, color: c.color, bg: c.bg_color }))
                 }
-                if (leads && leads.length > 0) {
+                
+                // Se vier do banco, usa o banco.
+                if (leads) { // Mesmo se vier vazio, usa o vazio do banco pois é a verdade
                     finalLeads = leads.map(l => ({
                         id: l.id,
                         name: l.name,
                         source: l.source || 'Manual',
                         status: l.status_column_id,
                         createdAt: l.created_at,
-                        history: l.history || localLeads.find((loc: any) => loc.id === l.id)?.history
+                        history: l.history
                     }))
                 }
             }
             
-            console.log('📊 Final Stats:', { leads: finalLeads.length, cols: finalCols.length })
+            // ... (resto do código igual)
+
 
             if (!finalCols.length) return
 
@@ -335,6 +347,11 @@ export default function CRMDashboard() {
                     })()}
                 </div>
             </Modal>
+            
+            <div style={{ marginTop: 50, padding: 20, background: '#1e293b', color: '#fff', borderRadius: 8, fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                <h3>Debug Info (Vercel)</h3>
+                <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+            </div>
         </div>
     )
 }
