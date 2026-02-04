@@ -26,6 +26,26 @@ export default function CRMDashboard() {
 
     // const [debugInfo, setDebugInfo] = useState<any>({})
 
+    const runDiagnostics = async () => {
+        try {
+            const { data: session } = await supabase.auth.getSession()
+            const currentUser = session?.session?.user
+            
+            if (!currentUser) {
+                alert('Diagnóstico: USUÁRIO NÃO LOGADO (Sessão nula)')
+                return
+            }
+            
+            const { data: leads, error: leadsError } = await supabase.from('crm_leads').select('*').eq('user_id', currentUser.id)
+            const { data: cols, error: colsError } = await supabase.from('crm_columns').select('*').eq('user_id', currentUser.id)
+            
+            alert(`DIAGNÓSTICO:\n\nUser ID: ${currentUser.id}\n\nLeads encontrados: ${leads?.length}\nColunas encontradas: ${cols?.length}\n\nErro Leads: ${JSON.stringify(leadsError)}\nErro Colunas: ${JSON.stringify(colsError)}`)
+            
+        } catch (err) {
+            alert('Erro ao rodar diagnóstico: ' + err)
+        }
+    }
+
     useEffect(() => {
         loadStats()
     }, [user])
@@ -160,6 +180,9 @@ export default function CRMDashboard() {
                     <h1 style={{ margin: 0, fontSize: '1.8rem', color: '#0f172a' }}>Relatórios do CRM</h1>
                     <p style={{ margin: 0, color: '#64748b' }}>Fotografia completa do seu funil de vendas</p>
                 </div>
+                <button onClick={runDiagnostics} style={{ marginLeft: 'auto', padding: '8px 16px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
+                    🛠️ Diagnóstico
+                </button>
             </div>
 
             {/* Cards de Resumo */}
