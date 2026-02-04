@@ -10,6 +10,7 @@ type LeadStatus = string
 
 type LeadHistory = {
     statusId: string
+    statusName?: string
     date: string
 }
 
@@ -115,7 +116,7 @@ export default function CRM() {
                      // (Opcional: Poderíamos restaurar padrão, mas você quer fidelidade ao banco)
                 }
 
-                const { data: leadsData } = await supabase.from('crm_leads').select('*').eq('user_id', user.id)
+                const { data: leadsData } = await supabase.from('crm_leads').select('*').eq('user_id', user.id).neq('active', false)
                 
                 // Prioridade Total ao Banco (Online First)
                 if (leadsData) { // Se array existe (mesmo vazio)
@@ -141,19 +142,22 @@ export default function CRM() {
     }
 
     const moveLead = async (id: string, newStatusId: string) => {
+        const newColName = columns.find(c => c.id === newStatusId)?.title || 'Etapa'
+
         const updatedLeads = leads.map(l => {
             if (l.id === id) {
                 const history = l.history || []
                 // Se for o primeiro movimento e não tiver histórico inicial, adiciona o status anterior com data de criação (retroativo)
                 let newHistory = [...history]
                 if (newHistory.length === 0 && l.createdAt) {
-                    newHistory.push({ statusId: l.status, date: l.createdAt })
+                    const startColName = columns.find(c => c.id === l.status)?.title || 'Entrada'
+                    newHistory.push({ statusId: l.status, statusName: startColName, date: l.createdAt })
                 }
                 
                 return { 
                     ...l, 
                     status: newStatusId,
-                    history: [...newHistory, { statusId: newStatusId, date: new Date().toISOString() }]
+                    history: [...newHistory, { statusId: newStatusId, statusName: newColName, date: new Date().toISOString() }]
                 }
             }
             return l
@@ -239,7 +243,10 @@ export default function CRM() {
         const updatedLeads = leads.filter(l => l.id !== leadToDelete)
         setLeads(updatedLeads)
         localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
-        if (user) await supabase.from('crm_leads').delete().eq('id', leadToDelete)
+        
+        // Soft Delete: Apenas marca como inativo
+        if (user) await supabase.from('crm_leads').update({ active: false }).eq('id', leadToDelete)
+        
         setDeleteModalOpen(false); setLeadToDelete(null)
     }
 

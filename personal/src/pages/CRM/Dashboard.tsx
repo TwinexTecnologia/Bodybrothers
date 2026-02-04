@@ -337,6 +337,10 @@ export default function CRMDashboard() {
                                 
                                 const col = stats.columnsList.find(c => c.id === h.statusId)
                                 
+                                // Prioriza o nome salvo no histórico, depois tenta buscar na lista atual, depois fallback
+                                const displayTitle = h.statusName || col?.title || (idx === 0 ? 'Entrada no Funil' : 'Etapa Anterior')
+                                const isDeleted = !col && !h.statusName && idx !== 0 // Só mostra aviso se não tiver nem ID nem Nome salvo
+
                                 return (
                                     <div key={idx} style={{ display: 'flex', gap: 16, position: 'relative', paddingBottom: 30 }}>
                                         {idx !== history.length - 1 && (
@@ -346,9 +350,9 @@ export default function CRMDashboard() {
                                             <Clock size={16} color={col?.color || '#64748b'} />
                                         </div>
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 600, color: col ? '#334155' : '#64748b', fontSize: '1rem' }}>
-                                                {col?.title || (idx === 0 ? 'Entrada no Funil' : 'Etapa Anterior')}
-                                                {!col && idx !== 0 && <span style={{fontSize: '0.75em', fontWeight: 400, marginLeft: 6, fontStyle: 'italic'}}>(Coluna excluída)</span>}
+                                            <div style={{ fontWeight: 600, color: '#334155', fontSize: '1rem' }}>
+                                                {displayTitle}
+                                                {isDeleted && <span style={{fontSize: '0.75em', fontWeight: 400, marginLeft: 6, fontStyle: 'italic'}}>(Coluna excluída)</span>}
                                             </div>
                                             <div style={{ fontSize: '0.85em', color: '#94a3b8', marginBottom: 6 }}>{startDate.toLocaleString('pt-BR')}</div>
                                             
