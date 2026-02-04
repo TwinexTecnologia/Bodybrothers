@@ -279,11 +279,18 @@ export default function CRM() {
 
     const optimizeColumns = async () => {
         if (!confirm('Isso vai remover colunas com nomes duplicados e unificar os leads na primeira coluna encontrada. Continuar?')) return
-        if (!user) return alert('Precisa estar online.')
+        
+        let currentUser = user
+        if (!currentUser) {
+            const { data } = await supabase.auth.getUser()
+            currentUser = data.user
+        }
+
+        if (!currentUser) return alert('Precisa estar online.')
         
         try {
             // 1. Pega todas as colunas
-            const { data: cols } = await supabase.from('crm_columns').select('*').eq('user_id', user.id)
+            const { data: cols } = await supabase.from('crm_columns').select('*').eq('user_id', currentUser.id)
             if (!cols) return
 
             // 2. Agrupa por nome
