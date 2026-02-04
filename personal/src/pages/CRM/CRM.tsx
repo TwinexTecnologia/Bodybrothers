@@ -277,6 +277,59 @@ export default function CRM() {
         window.location.reload()
     }
 
+    const optimizeColumns = async () => {
+        if (!confirm('Isso vai remover colunas com nomes duplicados e unificar os leads na primeira coluna encontrada. Continuar?')) return
+        if (!user) return alert('Precisa estar online.')
+        
+        try {
+            // 1. Pega todas as colunas
+            const { data: cols } = await supabase.from('crm_columns').select('*').eq('user_id', user.id)
+            if (!cols) return
+
+            // 2. Agrupa por nome
+            const groups: Record<string, string[]> = {}
+            cols.forEach(c => {
+                if (!groups[c.title]) groups[c.title] = []
+                groups[c.title].push(c.id)
+            })
+
+            // 3. Processa
+            let moved = 0
+            let deleted = 0
+
+            for (const title in groups) {
+                const ids = groups[title]
+                if (ids.length > 1) {
+                    const keeper = ids[0] // Mantém o primeiro
+                    const toDelete = ids.slice(1) // Apaga o resto
+
+                    console.log(`Otimizando "${title}": Mantendo ${keeper}, apagando ${toDelete.length} duplicatas.`)
+
+                    // Move leads para o keeper
+                    await supabase.from('crm_leads')
+                        .update({ status_column_id: keeper })
+                        .in('status_column_id', toDelete)
+                    
+                    moved++
+
+                    // Apaga colunas duplicadas
+                    await supabase.from('crm_columns')
+                        .delete()
+                        .in('id', toDelete)
+                    
+                    deleted += toDelete.length
+                }
+            }
+
+            alert(`Otimização concluída!\nColunas duplicadas removidas: ${deleted}\nGrupos unificados: ${moved}`)
+            window.location.reload()
+
+        } catch (e) {
+            console.error(e)
+            alert('Erro ao otimizar: ' + e)
+        }
+    }
+
     const filteredLeads = leads.filter(l => {
         const matchesSearch = l.name.toLowerCase().includes(searchTerm.toLowerCase()) || l.phone.includes(searchTerm)
         const matchesSource = sourceFilter === 'all' || l.source === sourceFilter
@@ -635,7 +688,10 @@ export default function CRM() {
                             </div>
                         ))}
                     </div>
-                    <button onClick={resetCRM} style={{ marginTop: 20, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Resetar Padrões</button>
+                    <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between' }}>
+                        <button onClick={resetCRM} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Resetar Padrões</button>
+                        <button onClick={optimizeColumns} style={{ color: '#f59e0b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>🧹 Otimizar Banco (Remover Duplicatas)</button>
+                    </div>
                 </div>
             </Modal>
             
