@@ -55,7 +55,8 @@ export default function CRMDashboard() {
 
             if (currentUser) {
                 const { data: cols, error: errCols } = await supabase.from('crm_columns').select('*').eq('user_id', currentUser.id).order('order')
-                const { data: leads, error: errLeads } = await supabase.from('crm_leads').select('*').eq('user_id', currentUser.id)
+                // Correção: Filtrar leads ativos (Soft Delete)
+                const { data: leads, error: errLeads } = await supabase.from('crm_leads').select('*').eq('user_id', currentUser.id).neq('active', false)
                 
                 // ... (rest of the logic using currentUser instead of user)
                 
