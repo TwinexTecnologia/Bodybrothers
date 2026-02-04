@@ -165,6 +165,9 @@ export default function CRM() {
             }).eq('id', id)
         }
 
+        // Auto-Sync após mover
+        syncData(true)
+
         if (newStatusId === finalizerColumnId) {
             const lead = updatedLeads.find(l => l.id === id)
             if (lead) { setLeadToWin(lead); setWinModalOpen(true) }
@@ -212,6 +215,10 @@ export default function CRM() {
                 })
             }
         }
+        
+        // Auto-Sync após criar/editar
+        syncData(true)
+
         setNewLeadData({ name: '', phone: '', email: '', goal: '', notes: '', source: 'Instagram', customSource: '' })
         setEditingLeadId(null)
         setNewLeadOpen(false)
@@ -367,27 +374,29 @@ export default function CRM() {
         setWinModalOpen(false); setLeadToWin(null)
     }
 
-    const syncData = async () => {
-        console.log('🔄 Tentando iniciar Sync...')
-        if (!window.confirm('Deseja enviar os dados locais para a nuvem? Isso corrigirá a visualização na Vercel.')) return
-        
-        setIsLoading(true)
+    const syncData = async (silent = false) => {
+        if (!silent) {
+            console.log('🔄 Tentando iniciar Sync Manual...')
+            if (!window.confirm('Deseja enviar os dados locais para a nuvem? Isso corrigirá a visualização na Vercel.')) return
+            setIsLoading(true)
+        } else {
+             console.log('🔄 Sync Automático iniciado...')
+        }
         
         // Tenta obter usuário manualmente se o hook falhou
         let currentUser = user
         if (!currentUser) {
-            console.log('⚠️ Usuário não encontrado no contexto. Buscando sessão manualmente...')
             const { data } = await supabase.auth.getUser()
             currentUser = data.user
         }
 
         if (!currentUser) {
-            setIsLoading(false)
-            alert('Erro Crítico: Você não está logado no Supabase. Por favor, faça logout e login novamente.')
+            if (!silent) {
+                setIsLoading(false)
+                alert('Erro Crítico: Você não está logado no Supabase.')
+            }
             return
         }
-        
-        console.log('🚀 Iniciando processo de Sync para usuário:', currentUser.id)
         
         try {
             // 1. Mapeamento de Colunas (Evita duplicatas e garante IDs reais)
@@ -468,16 +477,29 @@ export default function CRM() {
                      else count++
                 }
             }
-            alert(`Sincronização Finalizada!\n\nSucesso: ${count}\nErros: ${errorCount}\n\nAgora verifique na Vercel.`)
-            window.location.reload()
+            if (!silent) {
+                alert(`Sincronização Finalizada!\n\nSucesso: ${count}\nErros: ${errorCount}\n\nAgora verifique na Vercel.`)
+                window.location.reload()
+            } else {
+                console.log(`✅ Auto-Sync finalizado. ${count} leads processados.`)
+            }
             
         } catch (err) {
-            alert('Erro Fatal no Sync. Verifique o console.')
+            if (!silent) alert('Erro Fatal no Sync. Verifique o console.')
             console.error(err)
         } finally {
-            setIsLoading(false)
+            if (!silent) setIsLoading(false)
         }
     }
+
+    // Auto-Sync ao carregar a página
+    useEffect(() => {
+        if (user) {
+            // Aguarda 3 segundos para garantir que tudo carregou e roda sync silencioso
+            const timer = setTimeout(() => syncData(true), 3000)
+            return () => clearTimeout(timer)
+        }
+    }, [user])
 
     return (
         <div style={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
