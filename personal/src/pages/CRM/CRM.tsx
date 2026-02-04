@@ -330,20 +330,34 @@ export default function CRM() {
         console.log('🚀 Iniciando processo de Sync para usuário:', currentUser.id)
         
         try {
-            // 1. Sincronizar Colunas (Garante que elas existem no banco)
+            // 1. Mapeamento de Colunas (Evita duplicatas e garante IDs reais)
             const colsMap: Record<string, string> = {} // LocalID -> RealID
+            const colsNameMap: Record<string, string> = {} // Name -> RealID (Fallback)
+
+            // Carrega colunas existentes no banco
+            const { data: existingCols } = await supabase.from('crm_columns').select('*').eq('user_id', currentUser.id)
+            if (existingCols) {
+                existingCols.forEach(c => {
+                    colsNameMap[c.title] = c.id
+                })
+            }
             
             for (const col of columns) {
-                // Tenta encontrar pelo título
-                const { data: existing } = await supabase.from('crm_columns').select('id').eq('title', col.title).eq('user_id', currentUser.id).single()
-                
-                let realId = existing?.id
+                // Tenta encontrar pelo título no mapa carregado do banco
+                let realId = colsNameMap[col.title]
                 
                 if (!realId) {
-                    const { data: newCol } = await supabase.from('crm_columns').insert({
+                    // Cria nova coluna se não existir no banco
+                    const { data: newCol, error: createError } = await supabase.from('crm_columns').insert({
                          title: col.title, color: col.color, bg_color: col.bg, order: columns.indexOf(col), user_id: currentUser.id
                     }).select().single()
-                    realId = newCol?.id
+                    
+                    if (createError) {
+                        console.error('Erro ao criar coluna:', col.title, createError)
+                        continue
+                    }
+                    realId = newCol.id
+                    colsNameMap[col.title] = realId // Atualiza mapa
                 }
                 
                 if (realId) colsMap[col.id] = realId
@@ -351,11 +365,24 @@ export default function CRM() {
 
             // 2. Sincronizar Leads
             let count = 0
+            let errorCount = 0
+            
             for (const lead of leads) {
                 // Descobre o ID real da coluna
-                const realStatusId = colsMap[lead.status] || lead.status
+                let realStatusId = colsMap[lead.status] || colsNameMap[columns.find(c => c.id === lead.status)?.title || '']
                 
-                // Payload
+                // Se ainda não achou, usa a primeira coluna disponível no banco (Fallback seguro)
+                if (!realStatusId) {
+                    const firstCol = Object.values(colsNameMap)[0]
+                    if (firstCol) realStatusId = firstCol
+                    else {
+                        console.error('Nenhuma coluna disponível para o lead', lead.name)
+                        errorCount++
+                        continue
+                    }
+                }
+                
+                // Payload Limpo
                 const payload: any = {
                     name: lead.name,
                     email: lead.email,
@@ -363,25 +390,29 @@ export default function CRM() {
                     source: lead.source,
                     goal: lead.goal,
                     notes: lead.notes,
-                    status_column_id: realStatusId,
+                    status_column_id: realStatusId, // UUID Válido garantido
                     user_id: currentUser.id,
                     history: lead.history
                 }
 
-                // Se ID for local (tem ponto decimal), insere novo. Se for UUID, atualiza.
+                // IMPORTANTE: Se ID for local (tem ponto), NÃO envia o ID, deixa o banco criar novo UUID.
+                // Se for UUID válido, faz upsert.
                 if (lead.id.includes('.')) {
-                     await supabase.from('crm_leads').insert(payload)
+                     const { error } = await supabase.from('crm_leads').insert(payload)
+                     if (error) { console.error('Erro insert lead:', lead.name, error); errorCount++ }
+                     else count++
                 } else {
                      payload.id = lead.id
-                     await supabase.from('crm_leads').upsert(payload)
+                     const { error } = await supabase.from('crm_leads').upsert(payload)
+                     if (error) { console.error('Erro upsert lead:', lead.name, error); errorCount++ }
+                     else count++
                 }
-                count++
             }
-            alert(`Sincronizado com sucesso! ${count} leads processados.`)
+            alert(`Sincronização Finalizada!\n\nSucesso: ${count}\nErros: ${errorCount}\n\nAgora verifique na Vercel.`)
             window.location.reload()
             
         } catch (err) {
-            alert('Erro ao sincronizar. Veja o console.')
+            alert('Erro Fatal no Sync. Verifique o console.')
             console.error(err)
         } finally {
             setIsLoading(false)
