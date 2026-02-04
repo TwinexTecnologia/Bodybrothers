@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { addStudent } from '../../store/students'
 import { listPlans, type PlanRecord } from '../../store/plans'
 import { supabase } from '../../lib/supabase'
@@ -18,6 +19,7 @@ const supabaseCreator = createClient(supabaseUrl, supabaseAnonKey, {
 })
 
 export default function CreateStudent() {
+  const [searchParams] = useSearchParams()
   const [personalId, setPersonalId] = useState('')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -36,6 +38,7 @@ export default function CreateStudent() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    // Carrega Personal e Planos
     supabase.auth.getUser().then(async ({ data: { user } }) => {
         if (user) {
             setPersonalId(user.id)
@@ -43,7 +46,19 @@ export default function CreateStudent() {
             setPlans(p)
         }
     })
-  }, [])
+
+    // Preenche dados da URL (vindo do CRM)
+    const urlName = searchParams.get('name')
+    const urlEmail = searchParams.get('email')
+    const urlPhone = searchParams.get('phone')
+
+    console.log('DEBUG URL:', window.location.search) // Ver o que chega cru
+    console.log('Params:', { urlName, urlEmail, urlPhone })
+
+    if (urlName) setName(urlName)
+    if (urlEmail) setEmail(urlEmail)
+    if (urlPhone) setWhatsapp(urlPhone)
+  }, [searchParams])
 
   const onCepBlur = async () => {
     const onlyDigits = cep.replace(/\D/g, '')
@@ -163,11 +178,23 @@ export default function CreateStudent() {
         <div className="form-grid">
           <label className="label">
             Nome
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+            <input 
+                className="input" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)} 
+                autoComplete="off"
+                name="student_name_field"
+            />
           </label>
           <label className="label">
             Email
-            <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input 
+                className="input" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                autoComplete="off"
+                name="student_email_field"
+            />
           </label>
           <label className="label">
             WhatsApp
@@ -177,6 +204,7 @@ export default function CreateStudent() {
                 onChange={(e) => setWhatsapp(e.target.value)} 
                 placeholder="(00) 00000-0000" 
                 autoComplete="off"
+                name="student_whatsapp_field"
             />
           </label>
         </div>
@@ -185,7 +213,15 @@ export default function CreateStudent() {
           <div className="form-title">Acesso</div>
           <label className="label">
             Senha provisória
-            <input className="input" type="password" value={tempPassword} onChange={(e) => setTempPassword(e.target.value)} placeholder="Opcional (padrão: mudar123)" />
+            <input 
+                className="input" 
+                type="password" 
+                value={tempPassword} 
+                onChange={(e) => setTempPassword(e.target.value)} 
+                placeholder="Opcional (padrão: mudar123)" 
+                autoComplete="new-password"
+                name="student_password_field"
+            />
           </label>
         </div>
 

@@ -35,6 +35,7 @@ import SyncCredentials from './pages/SyncCredentials'
 import TestConnection from './pages/TestConnection'
 import Migration from './pages/Migration'
 import CRM from './pages/CRM/CRM'
+import CRMDashboard from './pages/CRM/Dashboard'
 
 function DefaultRedirect() {
   const { isAuthenticated } = useAuth()
@@ -57,6 +58,7 @@ export default function AppRoutes() {
       <Route path="/migration" element={<Protected><Migration /></Protected>} />
       
       <Route path="/crm" element={<Protected><CRM /></Protected>} />
+      <Route path="/crm/dashboard" element={<Protected><CRMDashboard /></Protected>} />
 
       <Route path="/dashboard/overview" element={<Protected><Overview /></Protected>} />
 
