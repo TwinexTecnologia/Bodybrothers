@@ -202,7 +202,7 @@ export default function CRM() {
             if (user) await supabase.from('crm_leads').update({ name: newLeadData.name, email: newLeadData.email, phone: newLeadData.phone, goal: newLeadData.goal, notes: newLeadData.notes, source: finalSource }).eq('id', editingLeadId)
         } else {
             const newLead = { 
-                id: Math.random().toString(), 
+                id: crypto.randomUUID(), // Gera UUID v4 válido nativo do navegador
                 ...newLeadData, 
                 source: finalSource, 
                 status: columns[0].id, 
@@ -473,17 +473,16 @@ export default function CRM() {
                     history: lead.history 
                 }
 
-                // IMPORTANTE: Se ID for local (tem ponto), NÃO envia o ID, deixa o banco criar novo UUID.
-                // Se for UUID válido, faz upsert.
-                if (lead.id.includes('.')) {
-                     const { error } = await supabase.from('crm_leads').insert(payload)
-                     if (error) { console.error('Erro insert lead:', lead.name, error); errorCount++ }
-                     else count++
+                // IMPORTANTE: Agora usamos UUIDs nativos, então sempre podemos usar Upsert.
+                // O banco vai aceitar o ID que geramos no front.
+                payload.id = lead.id
+                const { error } = await supabase.from('crm_leads').upsert(payload)
+                
+                if (error) { 
+                    console.error('Erro upsert lead:', lead.name, error); 
+                    errorCount++ 
                 } else {
-                     payload.id = lead.id
-                     const { error } = await supabase.from('crm_leads').upsert(payload)
-                     if (error) { console.error('Erro upsert lead:', lead.name, error); errorCount++ }
-                     else count++
+                    count++
                 }
             }
             if (!silent) {
