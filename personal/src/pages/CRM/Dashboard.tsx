@@ -24,7 +24,7 @@ export default function CRMDashboard() {
     const [historyOpen, setHistoryOpen] = useState(false)
     const [selectedLead, setSelectedLead] = useState<any>(null)
 
-    const [debugInfo, setDebugInfo] = useState<any>({})
+    // const [debugInfo, setDebugInfo] = useState<any>({})
 
     useEffect(() => {
         loadStats()
@@ -32,7 +32,7 @@ export default function CRMDashboard() {
 
     const loadStats = async () => {
         try {
-            setDebugInfo(prev => ({ ...prev, step: 'Iniciando loadStats', userId: user?.id }))
+            // setDebugInfo(prev => ({ ...prev, step: 'Iniciando loadStats', userId: user?.id }))
             
             // 1. Carregar LocalStorage
             let localCols: any[] = []
@@ -52,6 +52,7 @@ export default function CRMDashboard() {
                 const { data: cols, error: errCols } = await supabase.from('crm_columns').select('*').eq('user_id', user.id).order('order')
                 const { data: leads, error: errLeads } = await supabase.from('crm_leads').select('*').eq('user_id', user.id)
                 
+                /*
                 setDebugInfo(prev => ({ 
                     ...prev, 
                     supabaseCols: cols?.length, 
@@ -60,6 +61,7 @@ export default function CRMDashboard() {
                     errLeads,
                     leadsSample: leads ? leads.slice(0, 1) : 'null'
                 }))
+                */
 
                 if (cols && cols.length > 0) {
                     finalCols = cols.map(c => ({ id: c.id, title: c.title, color: c.color, bg: c.bg_color }))
@@ -358,11 +360,6 @@ export default function CRMDashboard() {
                     })()}
                 </div>
             </Modal>
-            
-            <div style={{ marginTop: 50, padding: 20, background: '#1e293b', color: '#fff', borderRadius: 8, fontSize: '0.8rem', fontFamily: 'monospace' }}>
-                <h3>Debug Info (Vercel)</h3>
-                <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
-            </div>
         </div>
     )
 }
