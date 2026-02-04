@@ -8,6 +8,11 @@ import { useAuth } from '../../auth/useAuth'
 // Tipos
 type LeadStatus = string
 
+type LeadHistory = {
+    statusId: string
+    date: string
+}
+
 type Lead = {
     id: string
     name: string
@@ -19,6 +24,7 @@ type Lead = {
     lastContact?: string
     notes?: string
     createdAt?: string
+    history?: LeadHistory[]
 }
 
 type Column = {
@@ -106,10 +112,17 @@ export default function CRM() {
                 }
                 const { data: leadsData } = await supabase.from('crm_leads').select('*').eq('user_id', user.id)
                 if (leadsData && leadsData.length > 0) {
-                    setLeads(leadsData.map(l => ({
-                        id: l.id, name: l.name, phone: l.phone || '', email: l.email || '', source: l.source || 'Manual',
-                        status: l.status_column_id, goal: l.goal, notes: l.notes, createdAt: l.created_at
-                    })))
+                    setLeads(currentLeads => {
+                        return leadsData.map(l => {
+                            // Tenta encontrar a versão local para preservar o histórico se o DB não tiver
+                            const localMatch = currentLeads.find(loc => loc.id === l.id)
+                            return {
+                                id: l.id, name: l.name, phone: l.phone || '', email: l.email || '', source: l.source || 'Manual',
+                                status: l.status_column_id, goal: l.goal, notes: l.notes, createdAt: l.created_at, 
+                                history: l.history || localMatch?.history
+                            }
+                        })
+                    })
                 }
             } catch (error) { console.error('Erro sync Supabase:', error) }
         }
@@ -124,11 +137,33 @@ export default function CRM() {
     }
 
     const moveLead = async (id: string, newStatusId: string) => {
-        const updatedLeads = leads.map(l => l.id === id ? { ...l, status: newStatusId } : l)
+        const updatedLeads = leads.map(l => {
+            if (l.id === id) {
+                const history = l.history || []
+                // Se for o primeiro movimento e não tiver histórico inicial, adiciona o status anterior com data de criação (retroativo)
+                let newHistory = [...history]
+                if (newHistory.length === 0 && l.createdAt) {
+                    newHistory.push({ statusId: l.status, date: l.createdAt })
+                }
+                
+                return { 
+                    ...l, 
+                    status: newStatusId,
+                    history: [...newHistory, { statusId: newStatusId, date: new Date().toISOString() }]
+                }
+            }
+            return l
+        })
         setLeads(updatedLeads)
+        localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads)) // Salva sempre localmente (cache)
 
-        if (!user) localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
-        else await supabase.from('crm_leads').update({ status_column_id: newStatusId }).eq('id', id)
+        if (user) {
+            const lead = updatedLeads.find(l => l.id === id)
+            await supabase.from('crm_leads').update({ 
+                status_column_id: newStatusId,
+                history: lead?.history 
+            }).eq('id', id)
+        }
 
         if (newStatusId === finalizerColumnId) {
             const lead = updatedLeads.find(l => l.id === id)
@@ -152,8 +187,9 @@ export default function CRM() {
         if (editingLeadId) {
             const updatedLeads = leads.map(l => l.id === editingLeadId ? { ...l, ...newLeadData, source: finalSource } : l)
             setLeads(updatedLeads)
-            if (!user) localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
-            else await supabase.from('crm_leads').update({ name: newLeadData.name, email: newLeadData.email, phone: newLeadData.phone, goal: newLeadData.goal, notes: newLeadData.notes, source: finalSource }).eq('id', editingLeadId)
+            localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
+            
+            if (user) await supabase.from('crm_leads').update({ name: newLeadData.name, email: newLeadData.email, phone: newLeadData.phone, goal: newLeadData.goal, notes: newLeadData.notes, source: finalSource }).eq('id', editingLeadId)
         } else {
             const newLead = { 
                 id: Math.random().toString(), 
@@ -161,17 +197,18 @@ export default function CRM() {
                 source: finalSource, 
                 status: columns[0].id, 
                 lastContact: new Date().toISOString(),
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                history: [{ statusId: columns[0].id, date: new Date().toISOString() }]
             }
             const updatedLeads = [...leads, newLead]
             setLeads(updatedLeads)
+            localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
             
-            if (!user) {
-                localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
-            } else {
+            if (user) {
                 await supabase.from('crm_leads').insert({
                     name: newLeadData.name, email: newLeadData.email, phone: newLeadData.phone, goal: newLeadData.goal, notes: newLeadData.notes,
-                    source: finalSource, status_column_id: columns[0].id, user_id: user.id
+                    source: finalSource, status_column_id: columns[0].id, user_id: user.id,
+                    history: newLead.history
                 })
             }
         }
@@ -186,8 +223,8 @@ export default function CRM() {
         if (!leadToDelete) return
         const updatedLeads = leads.filter(l => l.id !== leadToDelete)
         setLeads(updatedLeads)
-        if (!user) localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
-        else await supabase.from('crm_leads').delete().eq('id', leadToDelete)
+        localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
+        if (user) await supabase.from('crm_leads').delete().eq('id', leadToDelete)
         setDeleteModalOpen(false); setLeadToDelete(null)
     }
 
