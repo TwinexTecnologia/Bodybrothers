@@ -308,23 +308,40 @@ export default function CRM() {
     }
 
     const syncData = async () => {
-        if (!confirm('Deseja enviar os dados locais para a nuvem? Isso corrigirá a visualização na Vercel.')) return
-        if (!user) return
+        console.log('🔄 Tentando iniciar Sync...')
+        if (!window.confirm('Deseja enviar os dados locais para a nuvem? Isso corrigirá a visualização na Vercel.')) return
         
         setIsLoading(true)
+        
+        // Tenta obter usuário manualmente se o hook falhou
+        let currentUser = user
+        if (!currentUser) {
+            console.log('⚠️ Usuário não encontrado no contexto. Buscando sessão manualmente...')
+            const { data } = await supabase.auth.getUser()
+            currentUser = data.user
+        }
+
+        if (!currentUser) {
+            setIsLoading(false)
+            alert('Erro Crítico: Você não está logado no Supabase. Por favor, faça logout e login novamente.')
+            return
+        }
+        
+        console.log('🚀 Iniciando processo de Sync para usuário:', currentUser.id)
+        
         try {
             // 1. Sincronizar Colunas (Garante que elas existem no banco)
             const colsMap: Record<string, string> = {} // LocalID -> RealID
             
             for (const col of columns) {
                 // Tenta encontrar pelo título
-                const { data: existing } = await supabase.from('crm_columns').select('id').eq('title', col.title).eq('user_id', user.id).single()
+                const { data: existing } = await supabase.from('crm_columns').select('id').eq('title', col.title).eq('user_id', currentUser.id).single()
                 
                 let realId = existing?.id
                 
                 if (!realId) {
                     const { data: newCol } = await supabase.from('crm_columns').insert({
-                         title: col.title, color: col.color, bg_color: col.bg, order: columns.indexOf(col), user_id: user.id
+                         title: col.title, color: col.color, bg_color: col.bg, order: columns.indexOf(col), user_id: currentUser.id
                     }).select().single()
                     realId = newCol?.id
                 }
@@ -347,7 +364,7 @@ export default function CRM() {
                     goal: lead.goal,
                     notes: lead.notes,
                     status_column_id: realStatusId,
-                    user_id: user.id,
+                    user_id: currentUser.id,
                     history: lead.history
                 }
 
@@ -389,7 +406,7 @@ export default function CRM() {
                 <div style={{ display: 'flex', gap: 12 }}>
                     <button 
                         className="btn" 
-                        onClick={syncData} 
+                        onClick={(e) => { e.preventDefault(); syncData(); }} 
                         title="Sincronizar dados locais com a nuvem"
                         style={{ 
                             background: '#fff', 
