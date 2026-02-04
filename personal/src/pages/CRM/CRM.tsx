@@ -103,26 +103,30 @@ export default function CRM() {
                 if (cols && cols.length > 0) {
                     const mappedCols = cols.map(c => ({ id: c.id, title: c.title, color: c.color, bg: c.bg_color }))
                     setColumns(mappedCols)
+                    localStorage.setItem('crm_columns_offline', JSON.stringify(mappedCols)) // Atualiza cache
                     
                     // Se não tiver finalizador configurado, tenta adivinhar
                     if (!savedSettings) {
                         const winner = mappedCols.find((c: Column) => c.title.includes('Ganho') || c.title.includes('Fechou'))
                         if (winner) setFinalizerColumnId(winner.id)
                     }
+                } else if (cols && cols.length === 0) {
+                     // Se banco vazio, limpa local
+                     // (Opcional: Poderíamos restaurar padrão, mas você quer fidelidade ao banco)
                 }
+
                 const { data: leadsData } = await supabase.from('crm_leads').select('*').eq('user_id', user.id)
-                if (leadsData && leadsData.length > 0) {
-                    setLeads(currentLeads => {
-                        return leadsData.map(l => {
-                            // Tenta encontrar a versão local para preservar o histórico se o DB não tiver
-                            const localMatch = currentLeads.find(loc => loc.id === l.id)
-                            return {
-                                id: l.id, name: l.name, phone: l.phone || '', email: l.email || '', source: l.source || 'Manual',
-                                status: l.status_column_id, goal: l.goal, notes: l.notes, createdAt: l.created_at, 
-                                history: l.history || localMatch?.history
-                            }
-                        })
-                    })
+                
+                // Prioridade Total ao Banco (Online First)
+                if (leadsData) { // Se array existe (mesmo vazio)
+                    const onlineLeads = leadsData.map(l => ({
+                        id: l.id, name: l.name, phone: l.phone || '', email: l.email || '', source: l.source || 'Manual',
+                        status: l.status_column_id, goal: l.goal, notes: l.notes, createdAt: l.created_at, 
+                        history: l.history
+                    }))
+                    
+                    setLeads(onlineLeads)
+                    localStorage.setItem('crm_leads_offline', JSON.stringify(onlineLeads)) // Sobrescreve cache com a verdade
                 }
             } catch (error) { console.error('Erro sync Supabase:', error) }
         }
