@@ -452,7 +452,7 @@ export default function CRM() {
                     notes: lead.notes,
                     status_column_id: realStatusId, // UUID Válido garantido
                     user_id: currentUser.id,
-                    // history: lead.history // REMOVIDO: Coluna não existe no banco. Descomente após criar coluna 'history' (JSONB) no Supabase.
+                    history: lead.history 
                 }
 
                 // IMPORTANTE: Se ID for local (tem ponto), NÃO envia o ID, deixa o banco criar novo UUID.
