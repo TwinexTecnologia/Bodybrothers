@@ -170,7 +170,7 @@ export default function CRM() {
         }
 
         // Auto-Sync após mover
-        syncData(true)
+        syncData(true, updatedLeads)
 
         if (newStatusId === finalizerColumnId) {
             const lead = updatedLeads.find(l => l.id === id)
@@ -191,10 +191,13 @@ export default function CRM() {
             if (!availableSources.includes(finalSource)) setAvailableSources(prev => [...prev, finalSource])
         }
 
+        let currentUpdatedLeads: Lead[] = []
+
         if (editingLeadId) {
             const updatedLeads = leads.map(l => l.id === editingLeadId ? { ...l, ...newLeadData, source: finalSource } : l)
             setLeads(updatedLeads)
             localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
+            currentUpdatedLeads = updatedLeads
             
             if (user) await supabase.from('crm_leads').update({ name: newLeadData.name, email: newLeadData.email, phone: newLeadData.phone, goal: newLeadData.goal, notes: newLeadData.notes, source: finalSource }).eq('id', editingLeadId)
         } else {
@@ -210,6 +213,7 @@ export default function CRM() {
             const updatedLeads = [...leads, newLead]
             setLeads(updatedLeads)
             localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
+            currentUpdatedLeads = updatedLeads
             
             if (user) {
                 await supabase.from('crm_leads').insert({
@@ -221,7 +225,7 @@ export default function CRM() {
         }
         
         // Auto-Sync após criar/editar
-        syncData(true)
+        syncData(true, currentUpdatedLeads)
 
         setNewLeadData({ name: '', phone: '', email: '', goal: '', notes: '', source: 'Instagram', customSource: '' })
         setEditingLeadId(null)
@@ -378,7 +382,7 @@ export default function CRM() {
         setWinModalOpen(false); setLeadToWin(null)
     }
 
-    const syncData = async (silent = false) => {
+    const syncData = async (silent = false, leadsOverride?: Lead[]) => {
         if (!silent) {
             console.log('🔄 Tentando iniciar Sync Manual...')
             if (!window.confirm('Deseja enviar os dados locais para a nuvem? Isso corrigirá a visualização na Vercel.')) return
@@ -439,8 +443,9 @@ export default function CRM() {
             // 2. Sincronizar Leads
             let count = 0
             let errorCount = 0
+            const leadsToSync = leadsOverride || leads
             
-            for (const lead of leads) {
+            for (const lead of leadsToSync) {
                 // Descobre o ID real da coluna
                 let realStatusId = colsMap[lead.status] || colsNameMap[columns.find(c => c.id === lead.status)?.title || '']
                 
