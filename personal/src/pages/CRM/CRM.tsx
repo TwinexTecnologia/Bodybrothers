@@ -496,14 +496,15 @@ export default function CRM() {
         }
     }
 
-    // Auto-Sync ao carregar a página
+    // Auto-Sync APENAS em ações do usuário (Removido do carregamento inicial para evitar ressuscitar dados deletados)
+    /*
     useEffect(() => {
         if (user) {
-            // Aguarda 3 segundos para garantir que tudo carregou e roda sync silencioso
             const timer = setTimeout(() => syncData(true), 3000)
             return () => clearTimeout(timer)
         }
     }, [user])
+    */
 
     return (
         <div style={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
