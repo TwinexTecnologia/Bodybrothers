@@ -240,12 +240,28 @@ export default function CRM() {
     
     const confirmDelete = async () => {
         if (!leadToDelete) return
+        
+        console.log('Tentando inativar lead:', leadToDelete)
+
         const updatedLeads = leads.filter(l => l.id !== leadToDelete)
         setLeads(updatedLeads)
         localStorage.setItem('crm_leads_offline', JSON.stringify(updatedLeads))
         
         // Soft Delete: Apenas marca como inativo
-        if (user) await supabase.from('crm_leads').update({ active: false }).eq('id', leadToDelete)
+        if (user) {
+            const { data, error } = await supabase
+                .from('crm_leads')
+                .update({ active: false })
+                .eq('id', leadToDelete)
+                .select()
+            
+            if (error) {
+                console.error('Erro no Soft Delete:', error)
+                alert('Erro ao inativar no banco. Verifique o console.')
+            } else {
+                console.log('Lead inativado com sucesso:', data)
+            }
+        }
         
         setDeleteModalOpen(false); setLeadToDelete(null)
     }
