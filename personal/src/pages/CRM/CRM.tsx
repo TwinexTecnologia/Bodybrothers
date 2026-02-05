@@ -560,81 +560,138 @@ export default function CRM() {
     */
 
     return (
-        <div style={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', padding: '0 20px 20px 20px' }}>
             <style>{`
                 .crm-card:hover {
                     transform: translateY(-2px);
                     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
                     border-color: #cbd5e1 !important;
                 }
+                /* Scrollbar fina para as colunas */
+                ::-webkit-scrollbar {
+                    width: 6px;
+                    height: 6px;
+                }
+                ::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                ::-webkit-scrollbar-thumb {
+                    background: #cbd5e1;
+                    border-radius: 3px;
+                }
+                ::-webkit-scrollbar-thumb:hover {
+                    background: #94a3b8;
+                }
             `}</style>
-            {/* Header Compacto */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid #f1f5f9' }}>
-                <div>
-                    <h1 style={{ margin: 0, fontSize: '1.4rem', color: '#0f172a' }}>CRM</h1>
+            
+            {/* Toolbar Unificada (Título + Filtros + Ações) */}
+            <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: 16, 
+                padding: '12px 16px', 
+                background: '#fff', 
+                borderRadius: 12, 
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                gap: 16,
+                flexWrap: 'wrap'
+            }}>
+                {/* Esquerda: Título + Filtros */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1 }}>
+                    <h1 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a', fontWeight: 700, whiteSpace: 'nowrap' }}>CRM</h1>
+                    
+                    <div style={{ width: 1, height: 24, background: '#e2e8f0' }}></div> {/* Separador */}
+
+                    <div style={{ position: 'relative', maxWidth: 220, flex: 1 }}>
+                        <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+                        <input 
+                            placeholder="Buscar nome ou telefone..." 
+                            value={searchTerm} 
+                            onChange={e => setSearchTerm(e.target.value)} 
+                            style={{ 
+                                width: '100%', 
+                                padding: '8px 10px 8px 32px', 
+                                borderRadius: 6, 
+                                border: '1px solid #e2e8f0', 
+                                outline: 'none', 
+                                fontSize: '0.85rem',
+                                background: '#f8fafc',
+                                transition: 'all 0.2s'
+                            }} 
+                            onFocus={e => { e.target.style.background = '#fff'; e.target.style.borderColor = '#cbd5e1' }}
+                            onBlur={e => { e.target.style.background = '#f8fafc'; e.target.style.borderColor = '#e2e8f0' }}
+                        />
+                    </div>
+
+                    <select 
+                        value={sourceFilter} 
+                        onChange={e => setSourceFilter(e.target.value)} 
+                        style={{ 
+                            padding: '8px 10px', 
+                            borderRadius: 6, 
+                            border: '1px solid #e2e8f0', 
+                            outline: 'none', 
+                            fontSize: '0.85rem',
+                            background: '#f8fafc',
+                            color: '#475569',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <option value="all">Todas as Origens</option>
+                        {availableSources.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
                 </div>
+
+                {/* Direita: Ações */}
                 <div style={{ display: 'flex', gap: 8 }}>
                     <button 
                         className="btn" 
                         onClick={() => navigate('/crm/dashboard')} 
-                        style={{ 
-                            background: '#fff', 
-                            border: '1px solid #cbd5e1', 
-                            padding: '6px 12px', 
-                            borderRadius: 6, 
-                            display: 'flex', 
-                            gap: 6, 
-                            alignItems: 'center', 
-                            cursor: 'pointer',
-                            color: '#64748b', 
-                            fontWeight: 500,
-                            fontSize: '0.85rem'
-                        }}
+                        title="Ver Relatórios"
+                        style={{ background: '#fff', border: '1px solid #e2e8f0', padding: '8px', borderRadius: 6, cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
-                        <BarChart size={16} /> Relatórios
+                        <BarChart size={18} />
                     </button>
                     <button 
                         className="btn" 
                         onClick={() => setConfigOpen(true)} 
+                        title="Configurar Etapas"
+                        style={{ background: '#fff', border: '1px solid #e2e8f0', padding: '8px', borderRadius: 6, cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        <Settings size={18} />
+                    </button>
+                    <button 
+                        className="btn-primary" 
+                        onClick={() => { setNewLeadOpen(true); setEditingLeadId(null); setNewLeadData({ name: '', phone: '', email: '', goal: '', notes: '', source: 'Instagram', customSource: '' }) }} 
                         style={{ 
-                            background: '#fff', 
-                            border: '1px solid #cbd5e1', 
-                            padding: '6px 12px', 
+                            background: '#2563eb', 
+                            color: '#fff', 
+                            border: 'none', 
+                            padding: '8px 16px', 
                             borderRadius: 6, 
                             display: 'flex', 
-                            gap: 6, 
+                            gap: 8, 
                             alignItems: 'center', 
-                            cursor: 'pointer',
-                            color: '#64748b',
-                            fontWeight: 500,
-                            fontSize: '0.85rem'
+                            cursor: 'pointer', 
+                            fontWeight: 600, 
+                            fontSize: '0.85rem',
+                            boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
                         }}
                     >
-                        <Settings size={16} /> Configurar
+                        <Plus size={16} /> Novo Lead
                     </button>
-                    <button className="btn-primary" onClick={() => { setNewLeadOpen(true); setEditingLeadId(null); setNewLeadData({ name: '', phone: '', email: '', goal: '', notes: '', source: 'Instagram', customSource: '' }) }} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 16px', borderRadius: 6, display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}><Plus size={16} /> Novo Lead</button>
                 </div>
-            </div>
-
-            {/* Filtros Compactos */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12, padding: '8px', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0', alignItems: 'center' }}>
-                <div style={{ position: 'relative', flex: 1, maxWidth: 250 }}>
-                    <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: 8, top: 9 }} />
-                    <input placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '6px 10px 6px 30px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem' }} />
-                </div>
-                <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem' }}>
-                    <option value="all">Todas as Origens</option>
-                    {availableSources.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
             </div>
 
             {/* Kanban Otimizado */}
-            <div style={{ flex: 1, display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 10, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 10, alignItems: 'flex-start' }}>
                 {columns.map(col => (
-                    <div key={col.id} style={{ flex: '1 0 220px', maxWidth: 300, minWidth: 220, display: 'flex', flexDirection: 'column', background: '#f8fafc', borderRadius: 8, maxHeight: '100%', border: '1px solid #e2e8f0' }}>
+                    <div key={col.id} style={{ flex: '1 0 260px', maxWidth: 320, minWidth: 260, display: 'flex', flexDirection: 'column', background: '#f1f5f9', borderRadius: 8, maxHeight: '100%', border: '1px solid #e2e8f0' }}>
                         
                         {/* Header da Coluna */}
-                        <div style={{ padding: '8px 10px', background: '#fff', borderRadius: '7px 7px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
+                        <div style={{ padding: '10px 12px', background: '#fff', borderRadius: '7px 7px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: col.color, boxShadow: `0 0 0 2px ${col.bg}` }}></div>
                                 <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 6 }}>
