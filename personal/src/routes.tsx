@@ -36,6 +36,8 @@ import TestConnection from './pages/TestConnection'
 import Migration from './pages/Migration'
 import CRM from './pages/CRM/CRM'
 import CRMDashboard from './pages/CRM/Dashboard'
+import StudentLogin from './pages/StudentApp/Login'
+import StudentHome from './pages/StudentApp/Home'
 
 function DefaultRedirect() {
   const { isAuthenticated } = useAuth()
@@ -97,6 +99,10 @@ export default function AppRoutes() {
       <Route path="/account/preferences" element={<Protected><Preferences /></Protected>} />
       
       <Route path="/logout" element={<Logout />} />
+      
+      {/* App do Aluno */}
+      <Route path="/app/login" element={<StudentLogin />} />
+      <Route path="/app/home" element={<Protected><StudentHome /></Protected>} />
     </Routes>
   )
 }

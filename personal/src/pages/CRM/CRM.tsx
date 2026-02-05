@@ -568,30 +568,30 @@ export default function CRM() {
                     border-color: #cbd5e1 !important;
                 }
             `}</style>
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            {/* Header Compacto */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid #f1f5f9' }}>
                 <div>
-                    <h1 style={{ margin: 0, fontSize: '1.8rem', color: '#0f172a' }}>CRM • Vendas</h1>
-                    <p style={{ margin: '4px 0 0 0', color: '#64748b' }}>Funil de vendas personalizável</p>
+                    <h1 style={{ margin: 0, fontSize: '1.4rem', color: '#0f172a' }}>CRM</h1>
                 </div>
-                <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
                     <button 
                         className="btn" 
                         onClick={() => navigate('/crm/dashboard')} 
                         style={{ 
                             background: '#fff', 
                             border: '1px solid #cbd5e1', 
-                            padding: '8px 16px', 
-                            borderRadius: 8, 
+                            padding: '6px 12px', 
+                            borderRadius: 6, 
                             display: 'flex', 
-                            gap: 8, 
+                            gap: 6, 
                             alignItems: 'center', 
                             cursor: 'pointer',
                             color: '#64748b', 
-                            fontWeight: 500
+                            fontWeight: 500,
+                            fontSize: '0.85rem'
                         }}
                     >
-                        <BarChart size={18} /> Relatórios
+                        <BarChart size={16} /> Relatórios
                     </button>
                     <button 
                         className="btn" 
@@ -599,41 +599,42 @@ export default function CRM() {
                         style={{ 
                             background: '#fff', 
                             border: '1px solid #cbd5e1', 
-                            padding: '8px 16px', 
-                            borderRadius: 8, 
+                            padding: '6px 12px', 
+                            borderRadius: 6, 
                             display: 'flex', 
-                            gap: 8, 
+                            gap: 6, 
                             alignItems: 'center', 
                             cursor: 'pointer',
-                            color: '#64748b', // Cor forçada para garantir contraste
-                            fontWeight: 500
+                            color: '#64748b',
+                            fontWeight: 500,
+                            fontSize: '0.85rem'
                         }}
                     >
-                        <Settings size={18} /> Configurar
+                        <Settings size={16} /> Configurar
                     </button>
-                    <button className="btn-primary" onClick={() => { setNewLeadOpen(true); setEditingLeadId(null); setNewLeadData({ name: '', phone: '', email: '', goal: '', notes: '', source: 'Instagram', customSource: '' }) }} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontWeight: 600 }}><Plus size={18} /> Novo Lead</button>
+                    <button className="btn-primary" onClick={() => { setNewLeadOpen(true); setEditingLeadId(null); setNewLeadData({ name: '', phone: '', email: '', goal: '', notes: '', source: 'Instagram', customSource: '' }) }} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 16px', borderRadius: 6, display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}><Plus size={16} /> Novo Lead</button>
                 </div>
             </div>
 
-            {/* Filtros */}
-            <div style={{ display: 'flex', gap: 12, marginBottom: 20, padding: '12px', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0', alignItems: 'center' }}>
-                <div style={{ position: 'relative', flex: 1, maxWidth: 300 }}>
-                    <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: 10, top: 10 }} />
-                    <input placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '8px 10px 8px 36px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }} />
+            {/* Filtros Compactos */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, padding: '8px', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1, maxWidth: 250 }}>
+                    <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: 8, top: 9 }} />
+                    <input placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '6px 10px 6px 30px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem' }} />
                 </div>
-                <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}>
+                <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem' }}>
                     <option value="all">Todas as Origens</option>
                     {availableSources.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
             </div>
 
-            {/* Kanban */}
-            <div style={{ flex: 1, display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start' }}>
+            {/* Kanban Otimizado */}
+            <div style={{ flex: 1, display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 10, alignItems: 'flex-start' }}>
                 {columns.map(col => (
-                    <div key={col.id} style={{ flex: '1 0 270px', maxWidth: 350, display: 'flex', flexDirection: 'column', background: '#f1f5f9', borderRadius: 12, maxHeight: '100%', border: '1px solid #cbd5e1' }}>
+                    <div key={col.id} style={{ flex: '1 0 220px', maxWidth: 300, minWidth: 220, display: 'flex', flexDirection: 'column', background: '#f8fafc', borderRadius: 8, maxHeight: '100%', border: '1px solid #e2e8f0' }}>
                         
-                        {/* Header da Coluna Profissional */}
-                        <div style={{ padding: '12px 14px', background: '#fff', borderRadius: '11px 11px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
+                        {/* Header da Coluna */}
+                        <div style={{ padding: '8px 10px', background: '#fff', borderRadius: '7px 7px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: col.color, boxShadow: `0 0 0 2px ${col.bg}` }}></div>
                                 <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 6 }}>
