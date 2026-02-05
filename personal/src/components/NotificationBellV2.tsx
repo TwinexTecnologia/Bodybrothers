@@ -183,7 +183,12 @@ export default function NotificationBellV2() {
                 list.sort((a, b) => b.date.getTime() - a.date.getTime())
 
                 setNotifications(list)
-                setUnreadCount(list.length)
+                
+                // Calcular não lidos baseado no LocalStorage
+                const lastReadStr = localStorage.getItem('notification_last_read')
+                const lastReadDate = lastReadStr ? new Date(lastReadStr) : new Date(0)
+                const unread = list.filter(n => n.date.getTime() > lastReadDate.getTime()).length
+                setUnreadCount(unread)
 
             } catch (error) {
                 console.error('Erro Fatal Notificações:', error)
@@ -232,7 +237,10 @@ export default function NotificationBellV2() {
             <button 
                 onClick={() => {
                     setShowDropdown(!showDropdown)
-                    if (!showDropdown) setUnreadCount(0)
+                    if (!showDropdown) {
+                        setUnreadCount(0)
+                        localStorage.setItem('notification_last_read', new Date().toISOString())
+                    }
                 }}
                 style={{ 
                     background: 'transparent', border: 'none', cursor: 'pointer', 
