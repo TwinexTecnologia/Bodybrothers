@@ -331,11 +331,11 @@ export default function ListStudents() {
       
       {loading ? <div>Carregando...</div> : (
         <div className="table-responsive" style={{ overflowX: 'auto' }}>
-            <div style={{ display: 'grid', gap: 8, minWidth: 1100 }}>
+            <div style={{ display: 'grid', gap: 6, minWidth: 750 }}>
                 <div style={{ 
                     display: 'grid', 
-                    gridTemplateColumns: '1.8fr 2fr 0.6fr 1fr 1fr 0.8fr 160px', 
-                    gap: 12, fontWeight: 600, padding: '10px 16px', fontSize: '0.8rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' 
+                    gridTemplateColumns: '1.4fr 1.5fr 0.5fr 0.9fr 0.9fr 0.7fr 130px', 
+                    gap: 6, fontWeight: 600, padding: '8px 10px', fontSize: '0.7rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' 
                 }}>
                     <div>Aluno</div>
                     <div>Protocolos</div>
@@ -377,31 +377,32 @@ export default function ListStudents() {
                 return (
                     <div key={s.id} style={{ 
                         display: 'grid', 
-                        gridTemplateColumns: '1.8fr 2fr 0.6fr 1fr 1fr 0.8fr 160px', 
-                        gap: 12, alignItems: 'center', 
-                        border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 16px', 
+                        gridTemplateColumns: '1.4fr 1.5fr 0.5fr 0.9fr 0.9fr 0.7fr 130px', 
+                        gap: 6, alignItems: 'center', 
+                        border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px', 
                         opacity: isInactive ? 0.7 : 1, 
                         background: isInactive ? '#f8fafc' : '#fff',
                         transition: 'all 0.2s',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                        fontSize: '0.75rem'
                     }}>
                     
                     {/* 1. Aluno */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#f1f5f9', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0, border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#f1f5f9', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0, border: '1px solid #e2e8f0' }}>
                             {s.avatarUrl ? (
                                 <img src={s.avatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerText = '👤' }} />
                             ) : (
-                                <span style={{ fontSize: '1.2rem' }}>👤</span>
+                                <span style={{ fontSize: '0.9rem' }}>👤</span>
                             )}
                         </div>
                         <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={s.name}>{s.name}</div>
-                            <div style={{ fontSize: '0.8rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={s.email}>{s.email}</div>
-                            <div style={{ marginTop: 2 }}>
+                            <div style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.8rem' }} title={s.name}>{s.name}</div>
+                            <div style={{ fontSize: '0.7rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={s.email}>{s.email}</div>
+                            <div style={{ marginTop: 1 }}>
                                 <span style={{ 
-                                    fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
-                                    padding: '2px 6px', borderRadius: 4,
+                                    fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase',
+                                    padding: '0px 4px', borderRadius: 3,
                                     background: isInactive ? '#e2e8f0' : '#dcfce7',
                                     color: isInactive ? '#64748b' : '#166534'
                                 }}>
@@ -411,88 +412,88 @@ export default function ListStudents() {
                         </div>
                     </div>
 
-                    {/* 2. Protocolos (Quebrando Linha) */}
-                    <div style={{ fontSize: '0.85rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                            <span style={{ fontSize: '1rem', marginTop: -2 }}>💪</span> 
-                            <span style={{ color: workoutsStr === 'Sem treinos' ? '#94a3b8' : 'inherit', lineHeight: 1.3 }}>{workoutsStr}</span>
+                    {/* 2. Protocolos */}
+                    <div style={{ fontSize: '0.75rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                            <span style={{ fontSize: '0.85rem', marginTop: -1 }}>💪</span> 
+                            <span style={{ color: workoutsStr === 'Sem treinos' ? '#94a3b8' : 'inherit', lineHeight: 1.1 }}>{workoutsStr}</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                            <span style={{ fontSize: '1rem', marginTop: -2 }}>🥗</span>
-                            <span style={{ color: dietsStr === 'Sem dietas' ? '#94a3b8' : 'inherit', lineHeight: 1.3 }}>{dietsStr}</span>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                            <span style={{ fontSize: '0.85rem', marginTop: -1 }}>🥗</span>
+                            <span style={{ color: dietsStr === 'Sem dietas' ? '#94a3b8' : 'inherit', lineHeight: 1.1 }}>{dietsStr}</span>
                         </div>
                     </div>
 
-                    {/* 3. Frequência (Destacada) */}
+                    {/* 3. Frequência */}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                         <span style={{ fontSize: '1.1rem', fontWeight: 700, color: freq > 0 ? '#10b981' : '#94a3b8' }}>{freq}x</span>
-                         <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>/semana</span>
+                         <span style={{ fontSize: '0.9rem', fontWeight: 700, color: freq > 0 ? '#10b981' : '#94a3b8' }}>{freq}x</span>
+                         <span style={{ fontSize: '0.6rem', color: '#94a3b8' }}>/sem</span>
                     </div>
 
-                    {/* 4. Anamnese (Separada) */}
+                    {/* 4. Anamnese */}
                     <div>
                          <span style={{ 
-                            color: anamData.color, fontWeight: 600, fontSize: '0.85rem',
-                            display: 'inline-flex', alignItems: 'center', gap: 4
+                            color: anamData.color, fontWeight: 600, fontSize: '0.75rem',
+                            display: 'inline-flex', alignItems: 'center', gap: 4, lineHeight: 1.1
                          }}>
                             {anamData.label}
                          </span>
                     </div>
 
                     {/* 5. Financeiro */}
-                    <div style={{ fontSize: '0.85rem' }}>
+                    <div style={{ fontSize: '0.75rem' }}>
                         <div style={{ fontWeight: 600, color: '#1e293b' }}>{plan ? plan.name : <span style={{color:'#94a3b8'}}>Sem plano</span>}</div>
-                        <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+                        <div style={{ marginTop: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
                             <span style={{ 
                                 background: finStatus.bg, color: finStatus.color, 
-                                padding: '2px 6px', borderRadius: 4, fontSize: '0.75rem', fontWeight: 700 
+                                padding: '0px 4px', borderRadius: 3, fontSize: '0.65rem', fontWeight: 700 
                             }}>
                                 {finStatus.label}
                             </span>
                             {finStatus.daysDiff !== null && (finStatus.status === 'paid' || finStatus.status === 'warning') && (
-                                <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Vence em {finStatus.daysDiff} dias</span>
+                                <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Vence em {finStatus.daysDiff} dias</span>
                             )}
                             {finStatus.daysDiff !== null && finStatus.status === 'overdue' && (
-                                <span style={{ fontSize: '0.7rem', color: '#ef4444' }}>Vencido há {finStatus.daysDiff} dias</span>
+                                <span style={{ fontSize: '0.6rem', color: '#ef4444' }}>Vencido há {finStatus.daysDiff} dias</span>
                             )}
                         </div>
                     </div>
 
                     {/* 6. Acesso */}
-                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
                         {s.lastAccess ? (
                             <div>
                                 <div>{new Date(s.lastAccess).toLocaleDateString('pt-BR')}</div>
-                                <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>{new Date(s.lastAccess).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</div>
+                                <div style={{ fontSize: '0.6rem', opacity: 0.8 }}>{new Date(s.lastAccess).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</div>
                             </div>
                         ) : 'Nunca'}
                     </div>
 
-                    {/* 7. Ações (Coloridas) */}
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    {/* 7. Ações */}
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                         <button 
                             className="btn" 
                             title="Ver Feedbacks"
-                            style={{ padding: '8px', fontSize: '0.9em', background: '#f59e0b', color: '#fff', borderRadius: 6, border: 'none', cursor: 'pointer' }}
+                            style={{ padding: '5px', fontSize: '0.9em', background: '#f59e0b', color: '#fff', borderRadius: 6, border: 'none', cursor: 'pointer' }}
                             onClick={() => setSelectedStudentForFeedback(s)}
                         >
-                            <MessageSquare size={16} />
+                            <MessageSquare size={13} />
                         </button>
                         <button 
                             className="btn" 
                             title="Ver Anamneses"
-                            style={{ padding: '8px', fontSize: '0.9em', background: '#3b82f6', color: '#fff', borderRadius: 6, border: 'none', cursor: 'pointer' }}
+                            style={{ padding: '5px', fontSize: '0.9em', background: '#3b82f6', color: '#fff', borderRadius: 6, border: 'none', cursor: 'pointer' }}
                             onClick={() => setSelectedStudentForAnamnesis(s)}
                         >
-                            <ClipboardList size={16} />
+                            <ClipboardList size={13} />
                         </button>
                         <button 
                             title="Editar / Gerenciar"
                             onClick={() => navigate(`/students/edit?id=${s.id}`)}
                             style={{ 
-                                padding: '6px 12px', borderRadius: 6, 
+                                padding: '5px 8px', borderRadius: 6, 
                                 background: 'var(--personal-accent)', color: '#fff', border: 'none',
-                                fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
+                                fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer',
                                 display: 'flex', alignItems: 'center'
                             }}
                         >
