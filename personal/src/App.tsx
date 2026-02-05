@@ -5,6 +5,7 @@ import AppRoutes from './routes'
 import { AuthProvider } from './auth/AuthContext'
 import { useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
+import NotificationBellV2 from './components/NotificationBellV2'
 
 export default function App() {
   const location = useLocation()
@@ -74,7 +75,7 @@ export default function App() {
                   </button>
                   <strong>Painel do Personal</strong>
               </div>
-              {/* <NotificationBellV2 /> */}
+              <NotificationBellV2 />
             </div>
             <div className="content" style={contentStyle}>
               <AppRoutes />

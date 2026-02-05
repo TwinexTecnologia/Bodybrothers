@@ -64,7 +64,7 @@ export default function NotificationBellV2() {
                         description: `${d.profiles?.full_name || 'Aluno'} pagou R$ ${Number(d.amount).toFixed(2)}`,
                         date: new Date(d.paid_at),
                         studentId: d.payer_id,
-                        link: '/finance/history'
+                        // Sem link conforme solicitado
                     })
                 })
 
@@ -89,9 +89,9 @@ export default function NotificationBellV2() {
                             description: `${d.profiles?.full_name || 'Aluno'} - Venceu há ${Math.abs(diffDays)} dias`,
                             date: localDue,
                             studentId: d.payer_id,
-                            link: '/finance/pendences'
+                            link: '/financial'
                         })
-                    } else if (diffDays <= 5) {
+                    } else if (diffDays <= 3) { // Reduzi para 3 dias
                         list.push({
                             id: `due-${d.id}`,
                             type: 'financial_due_soon',
@@ -99,7 +99,7 @@ export default function NotificationBellV2() {
                             description: `${d.profiles?.full_name || 'Aluno'} - Vence em ${diffDays === 0 ? 'hoje' : diffDays + ' dias'}`,
                             date: localDue,
                             studentId: d.payer_id,
-                            link: '/finance/pendences'
+                            link: '/financial'
                         })
                     }
                 })
@@ -129,7 +129,7 @@ export default function NotificationBellV2() {
                             description: `${stName} não respondeu "${a.title}"`,
                             date: new Date(a.ends_at),
                             studentId: a.student_id,
-                            link: '/protocols/anamnesis-models'
+                            link: '/protocols/anamnesis-pending'
                         })
                     })
                 }
@@ -156,10 +156,10 @@ export default function NotificationBellV2() {
                             id: `anam-ans-${a.id}`,
                             type: 'anamnesis_answered',
                             title: 'Anamnese Respondida',
-                            description: `${stName} enviou respostas`,
+                            description: `${stName} respondeu "${a.title}"`,
                             date: new Date(a.created_at),
                             studentId: a.student_id,
-                            link: `/students/list` 
+                            link: `/protocols/anamnesis/view/${a.id}` 
                         })
                     })
                 }
