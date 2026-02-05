@@ -98,7 +98,9 @@ const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], a
                     daysLeft = Math.ceil((nextDueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
                     return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
                 } else if (daysLeft < 0) {
-                    return { status: 'overdue', label: '🔴 Vencida', color: '#ef4444', fontWeight: 600 }
+                    return { status: 'overdue', label: `🔴 Vencida (${Math.abs(daysLeft)}d)`, color: '#ef4444', fontWeight: 600 }
+                } else if (daysLeft === 0) {
+                    return { status: 'warning', label: `🟡 Vence Hoje`, color: '#f59e0b', fontWeight: 600 }
                 } else if (daysLeft <= 7) {
                     return { status: 'warning', label: `🟡 Vence em ${daysLeft} dias`, color: '#f59e0b', fontWeight: 600 }
                 } else {
