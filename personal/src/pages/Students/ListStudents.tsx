@@ -330,188 +330,180 @@ export default function ListStudents() {
       </div>
       
       {loading ? <div>Carregando...</div> : (
-        <div className="table-responsive">
-            <div style={{ display: 'grid', gap: 8, minWidth: 1200 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.7fr 0.7fr 0.7fr 0.8fr 0.8fr 0.8fr 0.6fr 1.4fr', gap: 8, fontWeight: 600, padding: '6px 10px', fontSize: '0.85em', color: '#6b7280' }}>
-                <div>ALUNO</div>
-                <div>TREINOS</div>
-                <div>FREQ.</div>
-                <div>DIETAS</div>
-                <div>ANAMNESE</div>
-                <div>PLANO</div>
-                <div>FINANCEIRO</div>
-                <div>ÚLT. LOGIN</div>
-                <div>STATUS</div>
-                <div style={{ textAlign: 'right' }}>AÇÕES</div>
+        <div className="table-responsive" style={{ overflowX: 'auto' }}>
+            <div style={{ display: 'grid', gap: 8, minWidth: 1100 }}>
+                <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '1.8fr 2fr 0.6fr 1fr 1fr 0.8fr 160px', 
+                    gap: 12, fontWeight: 600, padding: '10px 16px', fontSize: '0.8rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' 
+                }}>
+                    <div>Aluno</div>
+                    <div>Protocolos</div>
+                    <div style={{textAlign:'center'}}>Freq.</div>
+                    <div>Anamnese</div>
+                    <div>Financeiro</div>
+                    <div>Acesso</div>
+                    <div style={{ textAlign: 'right' }}>Ações</div>
                 </div>
+                
                 {filtered.map((s) => {
                 // Planos
                 const plan = plans.find(p => p.id === s.planId)
-            const finStatus = getFinancialStatus(s, plan, payments)
-            
-            const planStr = plan ? (
-                <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9em' }}>{plan.name}</div>
-                    <div style={{ fontSize: '0.8em', color: '#166534' }}>R$ {plan.price.toFixed(2)}</div>
-                </div>
-            ) : <span style={{ color: '#9ca3af' }}>—</span>
-
-            // Treinos Ativos do Aluno
-            const studentWorkouts = workouts.filter(w => w.studentId === s.id && w.status === 'ativo')
-            const workoutsStr = studentWorkouts.length > 0 
-                ? studentWorkouts.map(w => w.name).join(', ') 
-                : <span style={{ color: '#9ca3af', fontSize: '0.9em' }}>Sem treinos</span>
-
-            // Frequência
-            const freq = frequencies[s.id] || 0
-            
-            // Dietas Ativas do Aluno
-            const studentPersonalDiets = diets.filter(d => d.studentId === s.id && d.status === 'ativa')
-            const linkedDiets = diets.filter(d => (s.dietIds || []).includes(d.id))
-            const allStudentDiets = [...studentPersonalDiets, ...linkedDiets]
-            // Remove duplicatas
-            const uniqueDiets = Array.from(new Set(allStudentDiets.map(d => d.id))).map(id => allStudentDiets.find(d => d.id === id)!)
-            
-            const dietsStr = uniqueDiets.length > 0
-                ? uniqueDiets.map(d => d.name).join(', ')
-                : <span style={{ color: '#9ca3af', fontSize: '0.9em' }}>Sem dietas</span>
-
-            // Anamnese
-            const anamData = getAnamnesisStatus(s.id, anamneses, responses)
-            const anamnesisStatus = <span style={{ color: anamData.color, fontWeight: anamData.fontWeight, fontSize: '0.9em' }}>{anamData.label}</span>
-
-            const isInactive = s.status === 'inativo'
-            return (
-                <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.7fr 0.7fr 0.7fr 0.8fr 0.8fr 0.8fr 0.6fr 1.4fr', gap: 8, alignItems: 'center', border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, opacity: isInactive ? 0.6 : 1, background: isInactive ? '#f9fafb' : '#fff' }}>
+                const finStatus = getFinancialStatus(s, plan, payments)
                 
-                {/* Aluno */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#e5e7eb', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
-                        {s.avatarUrl ? (
-                            <img src={s.avatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerText = '👤' }} />
-                        ) : (
-                            <span style={{ fontSize: '1.2rem' }}>👤</span>
-                        )}
-                    </div>
-                    <div>
-                        <div style={{ fontWeight: 600 }}>{s.name}</div>
-                        <div style={{ fontSize: '0.85em', color: '#6b7280' }}>{s.email}</div>
-                    </div>
-                </div>
+                // Treinos Ativos
+                const studentWorkouts = workouts.filter(w => w.studentId === s.id && w.status === 'ativo')
+                const workoutsStr = studentWorkouts.length > 0 
+                    ? studentWorkouts.map(w => w.name).join(', ') 
+                    : 'Sem treinos'
 
-                {/* Treinos */}
-                <div style={{ fontSize: '0.9em', lineHeight: 1.4 }}>
-                    {workoutsStr}
-                </div>
+                // Frequência
+                const freq = frequencies[s.id] || 0
+                
+                // Dietas
+                const studentPersonalDiets = diets.filter(d => d.studentId === s.id && d.status === 'ativa')
+                const linkedDiets = diets.filter(d => (s.dietIds || []).includes(d.id))
+                const allStudentDiets = [...studentPersonalDiets, ...linkedDiets]
+                const uniqueDiets = Array.from(new Set(allStudentDiets.map(d => d.id))).map(id => allStudentDiets.find(d => d.id === id)!)
+                const dietsStr = uniqueDiets.length > 0
+                    ? uniqueDiets.map(d => d.name).join(', ')
+                    : 'Sem dietas'
 
-                {/* Frequência */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <BarChart2 size={16} color={freq > 0 ? '#10b981' : '#cbd5e1'} />
-                    <span style={{ fontWeight: 700, color: freq > 0 ? '#10b981' : '#94a3b8' }}>{freq}x</span>
-                </div>
+                // Anamnese
+                const anamData = getAnamnesisStatus(s.id, anamneses, responses)
+                
+                const isInactive = s.status === 'inativo'
 
-                {/* Dietas */}
-                <div style={{ fontSize: '0.9em', lineHeight: 1.4 }}>
-                    {dietsStr}
-                </div>
-
-                {/* Anamnese */}
-                <div>
-                    {anamnesisStatus}
-                </div>
-
-                {/* Plano */}
-                <div>
-                    {planStr}
-                </div>
-
-                {/* Financeiro */}
-                <div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                        <span style={{ 
-                            background: finStatus.bg, 
-                            color: finStatus.color, 
-                            padding: '2px 8px', borderRadius: 4, fontSize: '0.85em', fontWeight: 600 
-                        }}>
-                            {finStatus.label}
-                        </span>
-                        {finStatus.status === 'paid' && finStatus.daysDiff !== null && (
-                            <span style={{ fontSize: '0.75em', color: '#15803d', marginTop: 2, fontWeight: 500 }}>
-                                Vence em {finStatus.daysDiff} dias
-                            </span>
-                        )}
-                        {finStatus.status === 'warning' && finStatus.daysDiff !== null && (
-                            <span style={{ fontSize: '0.75em', color: '#b45309', marginTop: 2, fontWeight: 500 }}>
-                                Vence em {finStatus.daysDiff} dias
-                            </span>
-                        )}
-                        {finStatus.status === 'overdue' && finStatus.daysDiff !== null && (
-                            <span style={{ fontSize: '0.75em', color: '#991b1b', marginTop: 2, fontWeight: 500 }}>
-                                Vencido há {finStatus.daysDiff} dias
-                            </span>
-                        )}
-                        {s.dueDay && (
-                            <div style={{ fontSize: '0.75em', color: '#94a3b8', marginTop: 2 }}>
-                                Dia {s.dueDay}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Último Login */}
-                <div style={{ fontSize: '0.85em', color: '#64748b' }}>
-                    {s.lastAccess ? new Date(s.lastAccess).toLocaleDateString('pt-BR') : 'Nunca'}
-                </div>
-
-                {/* Status */}
-                <div>
-                    <span style={{ 
-                        background: isInactive ? '#f3f4f6' : '#dcfce7', 
-                        color: isInactive ? '#6b7280' : '#166534', 
-                        padding: '2px 8px', borderRadius: 4, fontSize: '0.85em', fontWeight: 600 
+                return (
+                    <div key={s.id} style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: '1.8fr 2fr 0.6fr 1fr 1fr 0.8fr 160px', 
+                        gap: 12, alignItems: 'center', 
+                        border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 16px', 
+                        opacity: isInactive ? 0.7 : 1, 
+                        background: isInactive ? '#f8fafc' : '#fff',
+                        transition: 'all 0.2s',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                     }}>
-                        {s.status.toUpperCase()}
-                    </span>
-                </div>
+                    
+                    {/* 1. Aluno */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#f1f5f9', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0, border: '1px solid #e2e8f0' }}>
+                            {s.avatarUrl ? (
+                                <img src={s.avatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerText = '👤' }} />
+                            ) : (
+                                <span style={{ fontSize: '1.2rem' }}>👤</span>
+                            )}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={s.name}>{s.name}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={s.email}>{s.email}</div>
+                            <div style={{ marginTop: 2 }}>
+                                <span style={{ 
+                                    fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
+                                    padding: '2px 6px', borderRadius: 4,
+                                    background: isInactive ? '#e2e8f0' : '#dcfce7',
+                                    color: isInactive ? '#64748b' : '#166534'
+                                }}>
+                                    {s.status}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
 
-                {/* Ações */}
-                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                    <button 
-                        className="btn" 
-                        title="Ver Feedbacks"
-                        style={{ padding: '6px 8px', fontSize: '0.9em', background: '#f59e0b' }}
-                        onClick={() => setSelectedStudentForFeedback(s)}
-                    >
-                        <MessageSquare size={16} />
-                    </button>
-                    <button 
-                        className="btn" 
-                        title="Ver Anamneses"
-                        style={{ padding: '6px 8px', fontSize: '0.9em', background: '#3b82f6' }}
-                        onClick={() => setSelectedStudentForAnamnesis(s)}
-                    >
-                        <ClipboardList size={16} />
-                    </button>
-                    <button 
-                        className="btn" 
-                        style={{ padding: '6px 12px', fontSize: '0.9em', background: 'var(--personal-accent)' }}
-                        onClick={() => navigate(`/students/edit?id=${s.id}`)}
-                    >
-                        Gerenciar
-                    </button>
-                    <button 
-                        className="btn" 
-                        style={{ padding: '6px 12px', fontSize: '0.9em', background: isInactive ? '#10b981' : '#ef4444' }}
-                        onClick={() => handleToggle(s)}
-                    >
-                        {isInactive ? 'Reativar' : 'Inativar'}
-                    </button>
-                </div>
-                </div>
-            )
-            })}
-            {filtered.length === 0 && <div>Nenhum aluno encontrado.</div>}
-        </div>
+                    {/* 2. Protocolos (Quebrando Linha) */}
+                    <div style={{ fontSize: '0.85rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                            <span style={{ fontSize: '1rem', marginTop: -2 }}>💪</span> 
+                            <span style={{ color: workoutsStr === 'Sem treinos' ? '#94a3b8' : 'inherit', lineHeight: 1.3 }}>{workoutsStr}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                            <span style={{ fontSize: '1rem', marginTop: -2 }}>🥗</span>
+                            <span style={{ color: dietsStr === 'Sem dietas' ? '#94a3b8' : 'inherit', lineHeight: 1.3 }}>{dietsStr}</span>
+                        </div>
+                    </div>
+
+                    {/* 3. Frequência (Destacada) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                         <span style={{ fontSize: '1.1rem', fontWeight: 700, color: freq > 0 ? '#10b981' : '#94a3b8' }}>{freq}x</span>
+                         <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>/semana</span>
+                    </div>
+
+                    {/* 4. Anamnese (Separada) */}
+                    <div>
+                         <span style={{ 
+                            color: anamData.color, fontWeight: 600, fontSize: '0.85rem',
+                            display: 'inline-flex', alignItems: 'center', gap: 4
+                         }}>
+                            {anamData.label}
+                         </span>
+                    </div>
+
+                    {/* 5. Financeiro */}
+                    <div style={{ fontSize: '0.85rem' }}>
+                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{plan ? plan.name : <span style={{color:'#94a3b8'}}>Sem plano</span>}</div>
+                        <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+                            <span style={{ 
+                                background: finStatus.bg, color: finStatus.color, 
+                                padding: '2px 6px', borderRadius: 4, fontSize: '0.75rem', fontWeight: 700 
+                            }}>
+                                {finStatus.label}
+                            </span>
+                            {finStatus.daysDiff !== null && (finStatus.status === 'paid' || finStatus.status === 'warning') && (
+                                <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Vence em {finStatus.daysDiff} dias</span>
+                            )}
+                            {finStatus.daysDiff !== null && finStatus.status === 'overdue' && (
+                                <span style={{ fontSize: '0.7rem', color: '#ef4444' }}>Vencido há {finStatus.daysDiff} dias</span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 6. Acesso */}
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                        {s.lastAccess ? (
+                            <div>
+                                <div>{new Date(s.lastAccess).toLocaleDateString('pt-BR')}</div>
+                                <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>{new Date(s.lastAccess).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</div>
+                            </div>
+                        ) : 'Nunca'}
+                    </div>
+
+                    {/* 7. Ações (Coloridas) */}
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <button 
+                            className="btn" 
+                            title="Ver Feedbacks"
+                            style={{ padding: '8px', fontSize: '0.9em', background: '#f59e0b', color: '#fff', borderRadius: 6, border: 'none', cursor: 'pointer' }}
+                            onClick={() => setSelectedStudentForFeedback(s)}
+                        >
+                            <MessageSquare size={16} />
+                        </button>
+                        <button 
+                            className="btn" 
+                            title="Ver Anamneses"
+                            style={{ padding: '8px', fontSize: '0.9em', background: '#3b82f6', color: '#fff', borderRadius: 6, border: 'none', cursor: 'pointer' }}
+                            onClick={() => setSelectedStudentForAnamnesis(s)}
+                        >
+                            <ClipboardList size={16} />
+                        </button>
+                        <button 
+                            title="Editar / Gerenciar"
+                            onClick={() => navigate(`/students/edit?id=${s.id}`)}
+                            style={{ 
+                                padding: '6px 12px', borderRadius: 6, 
+                                background: 'var(--personal-accent)', color: '#fff', border: 'none',
+                                fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center'
+                            }}
+                        >
+                            Gerenciar
+                        </button>
+                    </div>
+                    </div>
+                )
+                })}
+                {filtered.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>Nenhum aluno encontrado.</div>}
+            </div>
       </div>
       )}
 
