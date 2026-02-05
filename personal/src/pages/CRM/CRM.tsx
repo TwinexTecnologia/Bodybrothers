@@ -294,111 +294,60 @@ export default function CRM() {
 
     // Config Colunas
     const [newColName, setNewColName] = useState('')
+    
+    // Ao alterar título, apenas atualiza estado local (React + LocalStorage)
+    const updateColumnTitle = (id: string, newTitle: string) => {
+        const updatedCols = columns.map(c => c.id === id ? { ...c, title: newTitle } : c)
+        setColumns(updatedCols)
+        // Se estiver offline, já salva no cache
+        if (!user) localStorage.setItem('crm_columns_offline', JSON.stringify(updatedCols))
+    }
+
+    // Salvar Tudo no Banco (Chamado pelo botão Salvar)
+    const saveColumnsConfig = async () => {
+        if (user) {
+            // Salva todos os títulos alterados de uma vez
+            for (const col of columns) {
+                // Só faz update se o ID for real (UUID)
+                if (!col.id.startsWith('col-') && !col.id.startsWith('local-')) {
+                     await supabase.from('crm_columns').update({ title: col.title }).eq('id', col.id)
+                }
+            }
+        }
+        setConfigOpen(false)
+    }
+
     const addColumn = async () => {
         if (!newColName.trim()) return
+        
+        // Adiciona imediatamente (UX melhor), depois sincroniza se precisar
         const newCol = { id: `col-${Date.now()}`, title: newColName, color: '#64748b', bg: '#f8fafc' }
         const updatedCols = [...columns, newCol]
         setColumns(updatedCols)
         
-        if (!user) {
-            localStorage.setItem('crm_columns_offline', JSON.stringify(updatedCols))
+        if (user) {
+             const { data } = await supabase.from('crm_columns').insert({ 
+                 title: newColName, color: '#64748b', bg_color: '#f8fafc', order: columns.length, user_id: user.id 
+             }).select().single()
+             
+             // Atualiza ID local pelo ID real do banco
+             if (data) {
+                 const colsWithRealId = updatedCols.map(c => c.id === newCol.id ? { ...c, id: data.id } : c)
+                 setColumns(colsWithRealId)
+             }
         } else {
-            const { data } = await supabase.from('crm_columns').insert({ title: newColName, color: '#64748b', bg_color: '#f8fafc', order: columns.length, user_id: user.id }).select().single()
-            if (data) setColumns([...columns, { id: data.id, title: data.title, color: data.color, bg: data.bg_color }])
+             localStorage.setItem('crm_columns_offline', JSON.stringify(updatedCols))
         }
         setNewColName('')
     }
 
     const removeColumn = async (id: string) => {
-        if (!confirm('Tem certeza?')) return
+        if (!confirm('Tem certeza? Os leads dessa coluna ficarão órfãos (invisíveis) até serem movidos.')) return
         const updatedCols = columns.filter(c => c.id !== id)
         setColumns(updatedCols)
-        if (!user) localStorage.setItem('crm_columns_offline', JSON.stringify(updatedCols))
-        else await supabase.from('crm_columns').delete().eq('id', id)
-    }
-
-    const updateColumnTitle = (id: string, newTitle: string) => {
-        const updatedCols = columns.map(c => c.id === id ? { ...c, title: newTitle } : c)
-        setColumns(updatedCols)
         
-        // Salva Offline instantaneamente
-        if (!user) {
-            localStorage.setItem('crm_columns_offline', JSON.stringify(updatedCols))
-        }
-    }
-
-    const persistColumnTitle = async (id: string, newTitle: string) => {
-        // Salva no Banco apenas ao sair do campo (onBlur) para economizar requisições
-        if (user && newTitle.trim()) {
-            await supabase.from('crm_columns').update({ title: newTitle }).eq('id', id)
-        }
-    }
-
-    const resetCRM = async () => {
-        if (!confirm('Resetar tudo?')) return
-        localStorage.removeItem('crm_columns_offline')
-        if (user) await supabase.from('crm_columns').delete().eq('user_id', user.id)
-        window.location.reload()
-    }
-
-    const optimizeColumns = async () => {
-        if (!confirm('Isso vai remover colunas com nomes duplicados e unificar os leads na primeira coluna encontrada. Continuar?')) return
-        
-        let currentUser = user
-        if (!currentUser) {
-            const { data } = await supabase.auth.getUser()
-            currentUser = data.user
-        }
-
-        if (!currentUser) return alert('Precisa estar online.')
-        
-        try {
-            // 1. Pega todas as colunas
-            const { data: cols } = await supabase.from('crm_columns').select('*').eq('user_id', currentUser.id)
-            if (!cols) return
-
-            // 2. Agrupa por nome
-            const groups: Record<string, string[]> = {}
-            cols.forEach(c => {
-                if (!groups[c.title]) groups[c.title] = []
-                groups[c.title].push(c.id)
-            })
-
-            // 3. Processa
-            let moved = 0
-            let deleted = 0
-
-            for (const title in groups) {
-                const ids = groups[title]
-                if (ids.length > 1) {
-                    const keeper = ids[0] // Mantém o primeiro
-                    const toDelete = ids.slice(1) // Apaga o resto
-
-                    console.log(`Otimizando "${title}": Mantendo ${keeper}, apagando ${toDelete.length} duplicatas.`)
-
-                    // Move leads para o keeper
-                    await supabase.from('crm_leads')
-                        .update({ status_column_id: keeper })
-                        .in('status_column_id', toDelete)
-                    
-                    moved++
-
-                    // Apaga colunas duplicadas
-                    await supabase.from('crm_columns')
-                        .delete()
-                        .in('id', toDelete)
-                    
-                    deleted += toDelete.length
-                }
-            }
-
-            alert(`Otimização concluída!\nColunas duplicadas removidas: ${deleted}\nGrupos unificados: ${moved}`)
-            window.location.reload()
-
-        } catch (e) {
-            console.error(e)
-            alert('Erro ao otimizar: ' + e)
-        }
+        if (user) await supabase.from('crm_columns').delete().eq('id', id)
+        else localStorage.setItem('crm_columns_offline', JSON.stringify(updatedCols))
     }
 
     const filteredLeads = leads.filter(l => {
@@ -778,7 +727,7 @@ export default function CRM() {
                                 <input 
                                     value={col.title}
                                     onChange={(e) => updateColumnTitle(col.id, e.target.value)}
-                                    onBlur={(e) => persistColumnTitle(col.id, e.target.value)}
+                                    // Removido onBlur (agora salva no botão Salvar)
                                     style={{ 
                                         fontWeight: 500, 
                                         color: '#334155', 
@@ -814,9 +763,38 @@ export default function CRM() {
                             </div>
                         ))}
                     </div>
-                    <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between' }}>
-                        <button onClick={resetCRM} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Resetar Padrões</button>
-                        <button onClick={optimizeColumns} style={{ color: '#f59e0b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>🧹 Otimizar Banco (Remover Duplicatas)</button>
+                    <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                         <button 
+                            onClick={() => setConfigOpen(false)} 
+                            style={{ 
+                                padding: '10px 16px', 
+                                background: '#f1f5f9', 
+                                color: '#64748b', 
+                                border: 'none', 
+                                borderRadius: 6, 
+                                cursor: 'pointer',
+                                fontWeight: 500 
+                            }}
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            onClick={saveColumnsConfig} 
+                            style={{ 
+                                padding: '10px 24px', 
+                                background: '#2563eb', 
+                                color: '#fff', 
+                                border: 'none', 
+                                borderRadius: 6, 
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8
+                            }}
+                        >
+                            <Check size={18} /> Salvar e Fechar
+                        </button>
                     </div>
                 </div>
             </Modal>
