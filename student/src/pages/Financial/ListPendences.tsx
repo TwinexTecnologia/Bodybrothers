@@ -1,5 +1,7 @@
-import { Wallet, Calendar, CheckCircle, AlertCircle, CreditCard, Clock } from 'lucide-react'
+import { Wallet, Calendar, CheckCircle, AlertCircle, CreditCard, Clock, Download } from 'lucide-react'
 import { useFinancialStatus } from '../../hooks/useFinancialStatus'
+import { generateFinancePdf } from '../../lib/finance_pdf'
+import { useAuth } from '../../auth/AuthContext'
 
 const frequencyMap: Record<string, string> = {
     weekly: 'Semanal',
@@ -11,6 +13,7 @@ const frequencyMap: Record<string, string> = {
 }
 
 export default function ListPendences() {
+  const { user } = useAuth()
   const { loading, plan, financialInfo, chargesList, overdueCount } = useFinancialStatus()
 
   // Filtra lista para exibição limpa (Pendentes + Proximos)
@@ -27,6 +30,28 @@ export default function ListPendences() {
       return false
   }).slice(0, 2) // Limita a 2 itens (Atual/Pendente + Próxima)
 
+  const handleDownload = async () => {
+      if (!plan || !user) return
+      
+      // Prepara dados para o PDF (Histórico Completo + Futuro Próximo)
+      // Vamos pegar TUDO que está no chargesList, ordenado por data
+      const allCharges = [...chargesList].sort((a, b) => b.date.getTime() - a.date.getTime())
+      
+      const pdfData = allCharges.map(c => ({
+          description: `Mensalidade (${c.date.toLocaleDateString('pt-BR', { month: 'long' })})`,
+          dueDate: c.date,
+          paidAt: c.status === 'paid' ? c.payment.paidAt : null,
+          status: c.status,
+          amount: c.amount
+      }))
+
+      await generateFinancePdf(
+          user.user_metadata.full_name || user.email || 'Aluno',
+          plan.title,
+          pdfData
+      )
+  }
+
   const nextCharge = chargesList.find(c => c.date >= new Date(new Date().setHours(0,0,0,0)))
   const freqLabel = plan?.frequency ? frequencyMap[plan.frequency] : 'Mensal'
   const suffix = plan?.frequency === 'weekly' ? '/sem' : plan?.frequency === 'annual' ? '/ano' : '/mês'
@@ -36,9 +61,27 @@ export default function ListPendences() {
   return (
     <>
       <div style={{ padding: 24, paddingBottom: 100 }}>
-        <header style={{ marginBottom: 32 }}>
-            <h1 style={{ fontSize: '1.8rem', color: '#0f172a', marginBottom: 8 }}>Financeiro</h1>
-            <p style={{ color: '#64748b' }}>Detalhes do seu plano e pagamentos.</p>
+        <header style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+                <h1 style={{ fontSize: '1.8rem', color: '#0f172a', marginBottom: 8 }}>Financeiro</h1>
+                <p style={{ color: '#64748b' }}>Detalhes do seu plano e pagamentos.</p>
+            </div>
+            {plan && (
+                <button 
+                    onClick={handleDownload}
+                    className="btn-icon"
+                    title="Baixar Extrato Completo"
+                    style={{ 
+                        background: '#f1f5f9', border: '1px solid #e2e8f0', 
+                        padding: 10, borderRadius: 8, color: '#0f172a',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        cursor: 'pointer'
+                    }}
+                >
+                    <Download size={20} />
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, display: 'none' }} className="desktop-only">Extrato</span>
+                </button>
+            )}
         </header>
 
         {plan ? (
