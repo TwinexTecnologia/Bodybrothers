@@ -1,7 +1,7 @@
 import { Wallet, Calendar, CheckCircle, AlertCircle, CreditCard, Clock, Download } from 'lucide-react'
 import { useFinancialStatus } from '../../hooks/useFinancialStatus'
 import { generateFinancePdf } from '../../lib/finance_pdf'
-import { useAuth } from '../../auth/AuthContext'
+import { useAuth } from '../../auth/useAuth'
 
 const frequencyMap: Record<string, string> = {
     weekly: 'Semanal',
