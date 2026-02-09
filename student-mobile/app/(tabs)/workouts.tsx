@@ -4,7 +4,7 @@ import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { Dumbbell, ChevronRight, X, Clock, Play, CheckCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { startSession } from '../../lib/history';
+import { startSession, getWeeklyActivity } from '../../lib/history';
 import { router } from 'expo-router';
 
 // Tipos simplificados
@@ -38,6 +38,7 @@ export default function Workouts() {
   const { user } = useAuth();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [schedule, setSchedule] = useState<Record<string, string[]>>({});
+  const [activeDays, setActiveDays] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
@@ -57,6 +58,10 @@ export default function Workouts() {
       const linkedIds = profile?.data?.workoutIds || [];
       const sched = profile?.data?.workoutSchedule || {};
       setSchedule(sched);
+
+      // Carrega dias ativos
+      const days = await getWeeklyActivity(user.id);
+      setActiveDays(days);
 
       let query = supabase.from('protocols').select('*').eq('type', 'workout').eq('status', 'active');
       
@@ -89,13 +94,19 @@ export default function Workouts() {
   const handleStartSession = async (w: Workout) => {
       try {
           if (!user) return;
+
+          const todayIndex = new Date().getDay();
+          if (activeDays.includes(todayIndex)) {
+              Alert.alert('Descanso', 'Você já treinou hoje! Volte amanhã. 💪');
+              return;
+          }
+
           // Iniciar sessão
           const session = await startSession(w.id, w.title, user.id);
           // Fechar modal
           setSelectedWorkout(null);
-          // Navegar para tela de sessão (que vamos criar)
-          // router.push({ pathname: '/session', params: { sessionId: session.id } });
-          Alert.alert('Sucesso', 'Treino iniciado! (Funcionalidade de sessão em desenvolvimento)');
+          // Navegar para tela de sessão
+          router.push({ pathname: '/session', params: { sessionId: session.id } });
       } catch (error) {
           Alert.alert('Erro', 'Não foi possível iniciar o treino.');
       }
