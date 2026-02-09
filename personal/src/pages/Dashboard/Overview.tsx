@@ -1,12 +1,56 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
-import { isStudentOverdue, generateExpectedCharges } from '../../lib/finance_utils'
+import { listAllAnamnesis, listResponsesByPersonal, type AnamnesisResponse, type AnamnesisModel } from '../../store/anamnesis'
 import type { StudentRecord } from '../../store/students'
 import type { PlanRecord } from '../../store/plans'
 import type { DebitRecord } from '../../store/financial'
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts'
+
+// Função IDÊNTICA ao ListStudents.tsx para garantir consistência
+const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], allResponses: AnamnesisResponse[]) => {
+    const studentAnamneses = allAnamneses.filter(a => a.studentId === studentId)
+    
+    if (studentAnamneses.length === 0) return { status: 'none', label: '—', color: '#9ca3af', fontWeight: 400 }
+
+    try {
+        const sorted = studentAnamneses.sort((a, b) => {
+            const da = a.validUntil ? new Date(a.validUntil).getTime() : Infinity
+            const db = b.validUntil ? new Date(b.validUntil).getTime() : Infinity
+            return da - db
+        })
+        const nearest = sorted[0]
+        
+        if (nearest.validUntil) {
+            const modelResponses = allResponses.filter(r => r.modelId === nearest.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            const lastResponse = modelResponses[0]
+
+            const validDate = new Date(nearest.validUntil)
+            if (!isNaN(validDate.getTime())) {
+                let daysLeft = Math.ceil((validDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                
+                if (lastResponse) {
+                    let nextDueDate = new Date(nearest.validUntil!)
+                    const now = new Date()
+                    while (nextDueDate < now) {
+                        nextDueDate.setMonth(nextDueDate.getMonth() + 1) // Lógica de recorrência do ListStudents
+                    }
+                    daysLeft = Math.ceil((nextDueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                    
+                    if (daysLeft < 0) return { status: 'overdue', label: `🔴 Vencida`, color: '#ef4444' }
+                    return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981' }
+                } else {
+                    // Sem resposta
+                    return { status: 'pending', label: 'Pendente', color: '#f59e0b' }
+                }
+            }
+        }
+        return { status: 'none', label: '—', color: '#9ca3af' }
+    } catch (err) {
+        return { status: 'error', label: 'Erro', color: '#ef4444' }
+    }
+}
 
 export default function Overview() {
   const navigate = useNavigate()
@@ -114,12 +158,12 @@ export default function Overview() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
-        const [
+            const [
             studentsRes,
             plansRes,
             paymentsRes,
-            anamnesisRes,
-            modelsRes,
+            anamnesisModels, // Mudado de anamnesisRes para clareza (Models)
+            anamnesisResponses, // NOVO: Respostas reais
             dietsActiveRes,
             dietsInactiveRes,
             workoutsActiveRes,
@@ -128,8 +172,8 @@ export default function Overview() {
             supabase.from('profiles').select('*').eq('personal_id', user.id).eq('role', 'aluno'),
             supabase.from('plans').select('*').eq('personal_id', user.id),
             supabase.from('debits').select('*').eq('receiver_id', user.id).eq('status', 'paid'),
-            supabase.from('protocols').select('*').eq('personal_id', user.id).eq('type', 'anamnesis'),
-            supabase.from('protocols').select('*').eq('personal_id', user.id).eq('type', 'anamnesis_model'),
+            listAllAnamnesis(user.id), // Helper direto (Models)
+            listResponsesByPersonal(user.id), // Helper direto (Responses)
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active'),
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active'),
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').eq('status', 'active'),
@@ -290,26 +334,27 @@ export default function Overview() {
 
         // CALCULO ANAMNESES
         let pendingAnamnesisCount = 0
-        const allAnamnesis = anamnesisRes.data || []
-        const allModels = modelsRes.data || []
+        
+        // Helpers já retornam camelCase e tipados corretamente
+        const mappedModels = anamnesisModels || []
+        const mappedResponses = anamnesisResponses || []
 
+        // Usa a MESMA lógica da listagem
         activeStudentsList.forEach(student => {
-            const hasLinkedModel = allModels.some(m => m.student_id === student.id)
-            if (!hasLinkedModel) return
-            const studentResponses = allAnamnesis.filter(a => a.student_id === student.id)
-            if (studentResponses.length > 0) {
-                studentResponses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                const last = studentResponses[0]
-                const renewDays = last.renew_in_days || 90
-                if (renewDays) {
-                    const created = new Date(last.created_at)
-                    const expireDate = new Date(created.getTime() + (renewDays * 24 * 60 * 60 * 1000))
-                    expireDate.setHours(0, 0, 0, 0)
-                    const nowZero = new Date(now)
-                    nowZero.setHours(0,0,0,0)
-                    if (expireDate <= nowZero) {
-                        pendingAnamnesisCount++
-                    }
+            const status = getAnamnesisStatus(student.id, mappedModels as any, mappedResponses as any)
+            
+            // Conta como pendência se for Vencida (overdue) ou Pendente Antiga (pending > 7 dias)
+            if (status.status === 'overdue') {
+                pendingAnamnesisCount++
+            } else if (status.status === 'pending') {
+                const createdDate = new Date(student.createdAt)
+                const nowTime = new Date()
+                const diffTime = Math.abs(nowTime.getTime() - createdDate.getTime())
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                
+                // Se tem mais de 7 dias e nunca respondeu, conta como pendência
+                if (diffDays > 7) {
+                    pendingAnamnesisCount++
                 }
             }
         })

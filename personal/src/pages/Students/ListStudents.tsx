@@ -229,6 +229,8 @@ export default function ListStudents() {
             if (anamStatus !== 'ok' && anamStatus !== 'warning') return false
         } else if (anamnesisFilter === 'pending') {
             if (anamStatus !== 'pending' && anamStatus !== 'overdue' && anamStatus !== 'error' && anamStatus !== 'none') return false
+        } else if (anamnesisFilter === 'overdue') {
+            if (anamStatus !== 'overdue') return false
         }
     }
     
@@ -303,6 +305,7 @@ export default function ListStudents() {
             <option value="all">Todas Anamneses</option>
             <option value="ok">Em Dia</option>
             <option value="pending">Pendentes/Vencidas</option>
+            <option value="overdue">Vencidas (Apenas)</option>
         </select>
 
         <select 
