@@ -63,7 +63,7 @@ export default function Login() {
         {/* Logo Centralizada */}
         <div style={{ textAlign: 'center', marginBottom: 0, zIndex: 1 }}>
             <img 
-               src="https://cdtouwfxwuhnlzqhcagy.supabase.co/storage/v1/object/public/system-assets/logo%20twinex.png" 
+               src="https://cdtouwfxwuhnlzqhcagy.supabase.co/storage/v1/object/public/Imagens/ChatGPT%20Image%209%20de%20fev.%20de%202026%2C%2022_23_47.png" 
                alt="Logo" 
                style={{ 
                    maxWidth: 350, // Voltando para 350px

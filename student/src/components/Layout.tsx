@@ -67,7 +67,7 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
                   <Menu size={24} color="#111827" />
               </button>
               <span style={{ fontWeight: 600, fontSize: '1.1rem', color: '#111827' }}>
-                  BodyBrothers
+                  FitBody Pro
               </span>
           </div>
           <NotificationBell />

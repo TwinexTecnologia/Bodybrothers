@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "student-mobile",
-    "slug": "student-mobile",
-    "scheme": "student-mobile",
+    "name": "FitBody Pro",
+    "slug": "fitbody-pro",
+    "scheme": "fitbody-pro",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -26,6 +26,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O aplicativo precisa acessar suas fotos para enviar imagens na anamnese e evolução.",
+          "cameraPermission": "O aplicativo precisa acessar sua câmera para tirar fotos na anamnese e evolução."
+        }
+      ]
+    ]
   }
 }

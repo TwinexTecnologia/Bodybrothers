@@ -41,26 +41,25 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
 
   if (error) throw error;
 
-  // Notificação para o Personal (Simplificada para mobile, sem log excessivo)
-  try {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('personal_id, full_name')
-      .eq('id', data.student_id)
-      .single();
-
-    if (profile?.personal_id) {
-      await supabase.from('notifications').insert({
-        user_id: profile.personal_id,
-        title: 'Treino Concluído',
-        message: `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}"`,
-        type: 'feedback',
-        link: `/students/details/${data.student_id}`,
-      });
-    }
-  } catch (err) {
-    console.warn('Erro ao notificar personal', err);
-  }
+  // Notificação para o Personal (Sem await para não travar a UI)
+  supabase
+    .from('profiles')
+    .select('personal_id, full_name')
+    .eq('id', data.student_id)
+    .single()
+    .then(({ data: profile }) => {
+        if (profile?.personal_id) {
+            supabase.from('notifications').insert({
+                user_id: profile.personal_id,
+                title: 'Treino Concluído',
+                message: `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}"`,
+                type: 'feedback',
+                link: `/students/details/${data.student_id}`,
+            }).then(() => console.log('Notificação enviada'))
+              .catch(err => console.warn('Erro notificação:', err));
+        }
+    })
+    .catch(err => console.warn('Erro profile notificação:', err));
 
   return mapFromDb(data);
 }

@@ -117,7 +117,7 @@ export async function generateDietPdf(d: DietRecord, logoUrl: string) {
 
     html += `
         <div style="margin-top: 40px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-            Gerado por BodyBrothers App • ${new Date().toLocaleDateString()}
+            Gerado por FitBody Pro App • ${new Date().toLocaleDateString()}
         </div>
     `
 

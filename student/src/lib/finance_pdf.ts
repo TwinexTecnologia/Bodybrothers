@@ -18,7 +18,7 @@ export async function generateFinancePdf(studentName: string, planTitle: string,
     let html = `
         <div style="text-align: center; margin-bottom: 30px;">
             <h1 style="margin: 0; color: #1e3a8a; font-size: 24px;">Extrato Financeiro</h1>
-            <p style="color: #64748b; margin-top: 5px;">BodyBrothers Consultoria</p>
+            <p style="color: #64748b; margin-top: 5px;">FitBody Pro</p>
         </div>
 
         <div style="margin-bottom: 30px; background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0;">
@@ -111,7 +111,26 @@ export async function generateFinancePdf(studentName: string, planTitle: string,
           heightLeft -= pdfHeight
         }
         
-        pdf.save(`Extrato_${studentName.replace(/\s+/g, '_')}.pdf`)
+        const pdfBlob = pdf.output('blob')
+        const pdfUrl = URL.createObjectURL(pdfBlob)
+        
+        // Tenta forçar download via link
+        const link = document.createElement('a')
+        link.href = pdfUrl
+        link.download = `Extrato_${studentName.replace(/\s+/g, '_')}.pdf`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+
+        // Fallback para abrir em nova aba se o download não iniciar (comum em iOS)
+        setTimeout(() => {
+            // Verifica se é dispositivo móvel
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+            if (isMobile) {
+                window.open(pdfUrl, '_blank')
+            }
+        }, 100)
+
     } catch (err) {
         console.error('Erro ao gerar PDF:', err)
         alert('Erro ao gerar PDF do extrato.')

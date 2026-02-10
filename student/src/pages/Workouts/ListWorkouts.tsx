@@ -401,6 +401,23 @@ export default function ListWorkouts() {
               </header>
 
               <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 24 }}>
+                  {/* Observações Gerais */}
+                  {session.workout.data.notes && (
+                      <div style={{ 
+                          marginBottom: 24, padding: 20, borderRadius: 16, 
+                          background: '#fff7ed', border: '1px solid #ffedd5',
+                          display: 'flex', flexDirection: 'column', gap: 8 
+                      }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <MessageSquare size={18} color="#f97316" />
+                              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ea580c', letterSpacing: '0.5px' }}>OBSERVAÇÕES GERAIS</span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: '0.95rem', color: '#c2410c', lineHeight: 1.5 }}>
+                              {session.workout.data.notes}
+                          </p>
+                      </div>
+                  )}
+
                   {session.workout.data.exercises.map((ex, i) => (
                       <div key={i} style={{ marginBottom: 16, borderRadius: 20, padding: 20, background: '#fff', border: '1px solid #f1f5f9', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'flex-start' }}>

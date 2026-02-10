@@ -159,7 +159,7 @@ export default function StudentLogin() {
       </form>
       
       <div style={{ marginTop: 40, fontSize: '0.85rem', color: '#475569' }}>
-        BodyBrothers App v1.0
+        FitBody Pro App v1.0
       </div>
     </div>
   )

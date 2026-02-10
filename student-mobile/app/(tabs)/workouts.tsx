@@ -1,21 +1,42 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal, ActivityIndicator, Alert, Image, Dimensions, Platform } from 'react-native';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
-import { Dumbbell, ChevronRight, X, Clock, Play, CheckCircle } from 'lucide-react-native';
+import { Dumbbell, ChevronRight, X, Clock, Play, CheckCircle, ArrowRight, MessageSquare, ChevronLeft } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { startSession, getWeeklyActivity } from '../../lib/history';
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { WebView } from 'react-native-webview';
 
-// Tipos simplificados
+// Tipos
+type ExerciseSet = {
+    type: 'warmup' | 'feeder' | 'working' | 'custom' | 'topset'
+    customLabel?: string
+    series: string
+    reps: string
+    load: string
+    rest: string
+}
+
 type Exercise = {
   name: string;
+  sets?: ExerciseSet[];
   series: string;
   reps: string;
   load: string;
   rest: string;
   videoUrl?: string;
+  video_url?: string;
   notes?: string;
+  warmupSeries?: string
+  warmupReps?: string
+  warmupLoad?: string
+  warmupRest?: string
+  feederSeries?: string
+  feederReps?: string
+  feederLoad?: string
+  feederRest?: string
 };
 
 type Workout = {
@@ -42,6 +63,7 @@ export default function Workouts() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
+  const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -59,7 +81,6 @@ export default function Workouts() {
       const sched = profile?.data?.workoutSchedule || {};
       setSchedule(sched);
 
-      // Carrega dias ativos
       const days = await getWeeklyActivity(user.id);
       setActiveDays(days);
 
@@ -101,11 +122,8 @@ export default function Workouts() {
               return;
           }
 
-          // Iniciar sessão
           const session = await startSession(w.id, w.title, user.id);
-          // Fechar modal
           setSelectedWorkout(null);
-          // Navegar para tela de sessão
           router.push({ pathname: '/session', params: { sessionId: session.id } });
       } catch (error) {
           Alert.alert('Erro', 'Não foi possível iniciar o treino.');
@@ -130,13 +148,22 @@ export default function Workouts() {
       return !days || !Array.isArray(days) || days.length === 0;
   });
 
+  const getYoutubeThumbnail = (url?: string) => {
+      if (!url) return null;
+      const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+      return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Text style={styles.headerTitle}>Meus Treinos</Text>
+        <View style={styles.headerRow}>
+            <Text style={styles.headerTitle}>Seus Treinos</Text>
+            <Text style={styles.dateText}>{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric' })}</Text>
+        </View>
 
         {loading && <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 20 }} />}
 
@@ -148,262 +175,358 @@ export default function Workouts() {
         )}
 
         {workoutsByDay.map(group => (
-            <View key={group.dayKey} style={styles.section}>
-                <Text style={styles.sectionTitle}>{group.label}</Text>
+            <View key={group.dayKey} style={styles.sectionCard}>
+                <View style={styles.sectionHeader}>
+                    <View>
+                        <Text style={styles.sectionTitle}>{group.label}</Text>
+                        {group.workouts[0]?.data.goal && (
+                            <Text style={styles.sectionSubtitle}>Foco: <Text style={{color: '#3b82f6', fontWeight: 'bold'}}>{group.workouts[0].data.goal}</Text></Text>
+                        )}
+                    </View>
+                    <View style={styles.countBadge}>
+                        <Text style={styles.countText}>{group.workouts.length} {group.workouts.length === 1 ? 'treino' : 'treinos'}</Text>
+                    </View>
+                </View>
+
                 {group.workouts.map(w => (
-                    <TouchableOpacity key={w.id} style={styles.card} onPress={() => setSelectedWorkout(w)}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.cardTitle}>{w.title}</Text>
-                            <Text style={styles.cardSubtitle}>{w.data.exercises.length} exercícios • {w.data.goal || 'Geral'}</Text>
-                        </View>
-                        <ChevronRight color="#cbd5e1" />
-                    </TouchableOpacity>
+                    <View key={w.id} style={styles.workoutItem}>
+                        <Text style={styles.workoutTitleItem}>{w.title}</Text>
+                        <TouchableOpacity 
+                            onPress={() => setSelectedWorkout(w)}
+                        >
+                            <LinearGradient
+                                colors={['#0ea5e9', '#0284c7']}
+                                start={{x: 0, y: 0}} end={{x: 1, y: 1}}
+                                style={styles.viewButton}
+                            >
+                                <Text style={styles.viewButtonText}>VER TREINO</Text>
+                                <View style={styles.arrowBox}>
+                                    <ArrowRight size={14} color="#0ea5e9" />
+                                </View>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
                 ))}
             </View>
         ))}
 
         {unscheduledWorkouts.length > 0 && (
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Outros Treinos</Text>
+            <View style={{ marginTop: 24 }}>
+                <Text style={styles.otherTitle}>Outros Treinos Disponíveis</Text>
                 {unscheduledWorkouts.map(w => (
-                    <TouchableOpacity key={w.id} style={styles.card} onPress={() => setSelectedWorkout(w)}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.cardTitle}>{w.title}</Text>
-                            <Text style={styles.cardSubtitle}>{w.data.exercises.length} exercícios</Text>
+                    <View key={w.id} style={styles.otherCard}>
+                        <View>
+                            <Text style={styles.otherCardTitle}>{w.title}</Text>
+                            <Text style={styles.otherCardSub}>{w.data.exercises.length} exercícios</Text>
                         </View>
-                        <ChevronRight color="#cbd5e1" />
-                    </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={styles.otherButton}
+                            onPress={() => setSelectedWorkout(w)}
+                        >
+                            <Text style={styles.otherButtonText}>Ver</Text>
+                        </TouchableOpacity>
+                    </View>
                 ))}
             </View>
         )}
       </ScrollView>
 
-      {/* Modal de Detalhes */}
+      {/* Modal de Detalhes Moderno */}
       <Modal visible={!!selectedWorkout} animationType="slide" presentationStyle="pageSheet">
           {selectedWorkout && (
-              <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-                  <View style={styles.modalHeader}>
-                      <TouchableOpacity onPress={() => setSelectedWorkout(null)} style={styles.closeButton}>
-                          <X color="#0f172a" size={24} />
+              <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+                  {/* Header Azul Escuro */}
+                  <LinearGradient
+                      colors={['#1e3a8a', '#172554']}
+                      style={styles.modalHeader}
+                  >
+                      <TouchableOpacity onPress={() => setSelectedWorkout(null)} style={styles.backButton}>
+                          <ChevronLeft size={16} color="#fff" />
+                          <Text style={{color: '#fff', fontWeight: 'bold'}}>Voltar</Text>
                       </TouchableOpacity>
+
                       <Text style={styles.modalTitle}>{selectedWorkout.title}</Text>
-                      <View style={{ width: 40 }} />
-                  </View>
-                  
+                      
+                      <View style={styles.modalTags}>
+                        {selectedWorkout.data.goal && (
+                            <View style={styles.tag}>
+                                <Text style={styles.tagText}>{selectedWorkout.data.goal}</Text>
+                            </View>
+                        )}
+                        <View style={styles.tag}>
+                            <Text style={styles.tagText}>{selectedWorkout.data.exercises.length} exercícios</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.modalHero}>
+                          <View style={styles.heroIcon}>
+                              <Dumbbell size={32} color="#fff" />
+                          </View>
+                          
+                          {activeDays.includes(new Date().getDay()) ? (
+                              <View style={styles.doneBadge}>
+                                  <CheckCircle size={20} color="#16a34a" />
+                                  <Text style={styles.doneText}>TREINO REALIZADO</Text>
+                              </View>
+                          ) : (
+                              <TouchableOpacity onPress={() => handleStartSession(selectedWorkout)}>
+                                  <LinearGradient
+                                      colors={['#10b981', '#059669']}
+                                      style={styles.startButton}
+                                  >
+                                      <Play size={20} fill="#fff" color="#fff" />
+                                      <Text style={styles.startButtonText}>INICIAR TREINO</Text>
+                                  </LinearGradient>
+                              </TouchableOpacity>
+                          )}
+                      </View>
+                  </LinearGradient>
+
                   <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
                       {selectedWorkout.data.notes && (
                           <View style={styles.notesBox}>
-                              <Text style={styles.notesText}>{selectedWorkout.data.notes}</Text>
+                              <MessageSquare size={18} color="#ea580c" style={{marginTop: 2}} />
+                              <View>
+                                  <Text style={styles.notesTitle}>Observações Gerais</Text>
+                                  <Text style={styles.notesText}>{selectedWorkout.data.notes}</Text>
+                              </View>
                           </View>
                       )}
 
                       {selectedWorkout.data.exercises.map((ex, i) => (
                           <View key={i} style={styles.exerciseCard}>
-                              <View style={styles.exerciseHeader}>
-                                  <View style={styles.exerciseIndex}>
-                                      <Text style={styles.indexText}>{i + 1}</Text>
+                              <View style={{ flex: 1 }}>
+                                  <View style={styles.exerciseHeader}>
+                                      <View style={styles.exerciseIndex}>
+                                          <Text style={styles.indexText}>{i + 1}</Text>
+                                      </View>
+                                      <Text style={styles.exerciseName}>{ex.name}</Text>
                                   </View>
-                                  <Text style={styles.exerciseName}>{ex.name}</Text>
-                              </View>
-                              <View style={styles.exerciseDetails}>
-                                  <View style={styles.detailItem}>
-                                      <Text style={styles.detailLabel}>SÉRIES</Text>
-                                      <Text style={styles.detailValue}>{ex.series} x {ex.reps}</Text>
+
+                                  {/* Sets Logic */}
+                                  <View style={styles.setsContainer}>
+                                      {(() => {
+                                          let setsToRender: ExerciseSet[] = ex.sets || [];
+                                          if (setsToRender.length === 0) {
+                                              if (ex.warmupSeries) setsToRender.push({ type: 'warmup', series: ex.warmupSeries, reps: ex.warmupReps || '', load: ex.warmupLoad || '', rest: ex.warmupRest || '' });
+                                              if (ex.feederSeries) setsToRender.push({ type: 'feeder', series: ex.feederSeries, reps: ex.feederReps || '', load: ex.feederLoad || '', rest: ex.feederRest || '' });
+                                              if (ex.series) setsToRender.push({ type: 'working', series: ex.series, reps: ex.reps, load: ex.load, rest: ex.rest });
+                                          }
+
+                                          return setsToRender.map((set, idx) => {
+                                              let color = '#334155';
+                                              let bg = 'transparent';
+                                              let borderColor = 'transparent';
+                                              let label = '';
+
+                                              if (set.type === 'warmup') { 
+                                                  color = '#ea580c'; 
+                                                  bg = '#fff7ed'; 
+                                                  borderColor = '#ffedd5';
+                                                  label = 'AQUECIMENTO'; 
+                                              }
+                                              else if (set.type === 'working') { 
+                                                  color = '#16a34a'; 
+                                                  bg = '#f0fdf4'; 
+                                                  borderColor = '#dcfce7';
+                                                  label = 'TRABALHO'; 
+                                              }
+                                              else if (set.type === 'feeder') { 
+                                                  color = '#0284c7'; 
+                                                  bg = '#f0f9ff'; 
+                                                  borderColor = '#e0f2fe';
+                                                  label = 'PREPARAÇÃO'; 
+                                              }
+                                              else if (set.type === 'topset') { 
+                                                  color = '#4f46e5'; // Indigo
+                                                  bg = '#eef2ff'; 
+                                                  borderColor = '#e0e7ff';
+                                                  label = 'TOP SET'; 
+                                              }
+                                              else { 
+                                                  color = '#475569'; 
+                                                  bg = '#f8fafc'; 
+                                                  borderColor = '#e2e8f0';
+                                                  label = set.customLabel || 'OUTRO'; 
+                                              }
+
+                                              return (
+                                                  <View key={idx} style={{ 
+                                                      backgroundColor: bg, 
+                                                      borderRadius: 12, 
+                                                      padding: 12, 
+                                                      borderWidth: 1, 
+                                                      borderColor: borderColor,
+                                                      marginBottom: 4
+                                                  }}>
+                                                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                              <View style={{ backgroundColor: '#fff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, shadowColor: color, shadowOpacity: 0.1, shadowOffset: {width: 0, height: 1}, elevation: 1 }}>
+                                                                  <Text style={{ color: color, fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>{label}</Text>
+                                                              </View>
+                                                              <Text style={{ fontWeight: '700', color: '#1e293b', fontSize: 15 }}>{set.series} x {set.reps}</Text>
+                                                          </View>
+                                                          {set.load && <Text style={{ fontSize: 13, color: '#475569', fontWeight: '700', textTransform: 'uppercase' }}>{set.load}</Text>}
+                                                      </View>
+                                                      
+                                                      {set.rest && (
+                                                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                               <Clock size={14} color="#94a3b8" />
+                                                               <Text style={{ fontSize: 13, color: '#64748b', fontWeight: '500' }}>{set.rest}</Text>
+                                                           </View>
+                                                      )}
+                                                  </View>
+                                              );
+                                          });
+                                      })()}
                                   </View>
-                                  {ex.load && (
-                                    <View style={styles.detailItem}>
-                                        <Text style={styles.detailLabel}>CARGA</Text>
-                                        <Text style={styles.detailValue}>{ex.load}</Text>
-                                    </View>
+
+                                  {ex.notes && (
+                                      <View style={styles.exNote}>
+                                          <MessageSquare size={12} color="#f97316" />
+                                          <Text style={styles.exNoteText}>{ex.notes}</Text>
+                                      </View>
                                   )}
-                                  <View style={styles.detailItem}>
-                                      <Text style={styles.detailLabel}>DESC.</Text>
-                                      <Text style={styles.detailValue}>{ex.rest}</Text>
-                                  </View>
                               </View>
-                              {ex.notes && <Text style={styles.exerciseNotes}>{ex.notes}</Text>}
+
+                              {/* Video Player Embutido */}
+                              {(ex.videoUrl || ex.video_url) ? (
+                                  <View style={styles.thumbBox}>
+                                      {Platform.OS === 'web' ? (
+                                          <iframe
+                                              src={(ex.videoUrl || ex.video_url)?.includes('youtube') 
+                                                  ? (ex.videoUrl || ex.video_url)?.replace('watch?v=', 'embed/') 
+                                                  : (ex.videoUrl || ex.video_url)}
+                                              style={{ width: '100%', height: '100%', border: 'none' }}
+                                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                              allowFullScreen
+                                          />
+                                      ) : (
+                                          <WebView
+                                              source={{ uri: (ex.videoUrl || ex.video_url)?.includes('youtube') ? (ex.videoUrl || ex.video_url) : (ex.videoUrl || ex.video_url) }}
+                                              style={{ flex: 1 }}
+                                              javaScriptEnabled={true}
+                                              domStorageEnabled={true}
+                                              allowsFullscreenVideo={true}
+                                          />
+                                      )}
+                                  </View>
+                              ) : (
+                                  <View style={styles.noThumbBox}>
+                                      <Dumbbell size={20} color="#cbd5e1" />
+                                  </View>
+                              )}
                           </View>
                       ))}
                   </ScrollView>
-
-                  <View style={styles.footer}>
-                      <TouchableOpacity style={styles.startButton} onPress={() => handleStartSession(selectedWorkout)}>
-                          <Play fill="#fff" color="#fff" size={20} />
-                          <Text style={styles.startButtonText}>INICIAR TREINO</Text>
-                      </TouchableOpacity>
-                  </View>
-              </SafeAreaView>
+              </View>
           )}
       </Modal>
+
+      {/* Modal Video */}
+      <Modal visible={!!videoModalUrl} animationType="slide" presentationStyle="pageSheet">
+          <View style={{ flex: 1, backgroundColor: '#000' }}>
+              <View style={styles.videoHeader}>
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Vídeo</Text>
+                  <TouchableOpacity onPress={() => setVideoModalUrl(null)} style={{ padding: 8 }}>
+                      <X color="#fff" size={24} />
+                  </TouchableOpacity>
+              </View>
+              {videoModalUrl && (
+                  Platform.OS === 'web' ? (
+                    <iframe 
+                        src={videoModalUrl.includes('youtube') ? videoModalUrl.replace('watch?v=', 'embed/') : videoModalUrl}
+                        style={{ width: '100%', height: '100%', border: 'none' }}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                    />
+                  ) : (
+                    <WebView 
+                        source={{ uri: videoModalUrl.includes('youtube') ? videoModalUrl : videoModalUrl }} 
+                        style={{ flex: 1 }}
+                        javaScriptEnabled={true}
+                        domStorageEnabled={true}
+                    />
+                  )
+              )}
+          </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  scrollContent: { padding: 16 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: '#0f172a' },
+  dateText: { fontSize: 12, color: '#64748b', textTransform: 'capitalize' },
+  emptyState: { padding: 40, alignItems: 'center', backgroundColor: '#fff', borderRadius: 20 },
+  emptyText: { color: '#94a3b8', marginTop: 16 },
+
+  // Cards da Lista
+  sectionCard: {
+      backgroundColor: '#fff', borderRadius: 24, marginBottom: 24,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2,
+      borderWidth: 1, borderColor: '#f1f5f9'
   },
-  scrollContent: {
-    padding: 20,
+  sectionHeader: {
+      padding: 20, borderBottomWidth: 1, borderBottomColor: '#f8fafc',
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start'
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#0f172a',
-    marginBottom: 24,
+  sectionTitle: { fontSize: 20, fontWeight: '700', color: '#0f172a' },
+  sectionSubtitle: { fontSize: 14, color: '#64748b', marginTop: 4 },
+  countBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
+  countText: { fontSize: 12, fontWeight: '600', color: '#475569' },
+  workoutItem: { padding: 20 },
+  workoutTitleItem: { fontSize: 16, color: '#334155', marginBottom: 12, fontWeight: '500' },
+  viewButton: {
+      padding: 16, borderRadius: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
   },
-  section: {
-    marginBottom: 24,
+  viewButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  arrowBox: { backgroundColor: 'rgba(255,255,255,0.2)', padding: 6, borderRadius: 8 },
+
+  // Outros
+  otherTitle: { fontSize: 16, fontWeight: '600', color: '#64748b', marginBottom: 16 },
+  otherCard: { 
+      backgroundColor: '#fff', padding: 20, borderRadius: 20, marginBottom: 12,
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      borderWidth: 1, borderColor: '#f1f5f9'
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 12,
-  },
-  card: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 4,
-  },
-  emptyState: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 40,
-  },
-  emptyText: {
-      color: '#94a3b8',
-      marginTop: 16,
-  },
+  otherCardTitle: { fontSize: 16, fontWeight: '600', color: '#0f172a' },
+  otherCardSub: { fontSize: 12, color: '#64748b' },
+  otherButton: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' },
+  otherButtonText: { fontWeight: '700', color: '#0f172a', fontSize: 12 },
+
   // Modal
-  modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: '#f1f5f9',
-  },
-  closeButton: {
-      padding: 8,
-  },
-  modalTitle: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: '#0f172a',
-  },
-  notesBox: {
-      backgroundColor: '#fff7ed',
-      padding: 16,
-      borderRadius: 12,
-      marginBottom: 20,
-      borderWidth: 1,
-      borderColor: '#ffedd5',
-  },
-  notesText: {
-      color: '#c2410c',
-  },
+  modalHeader: { padding: 20, paddingBottom: 30 },
+  backButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 24 },
+  modalTitle: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 12 },
+  modalTags: { flexDirection: 'row', gap: 8 },
+  tag: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  tagText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  modalHero: { marginTop: 20, alignItems: 'center', gap: 16 },
+  heroIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  startButton: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 32, paddingVertical: 16, borderRadius: 16, shadowColor: '#10b981', shadowOpacity: 0.4, shadowOffset: {width: 0, height: 10}, shadowRadius: 20, elevation: 10 },
+  startButtonText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  doneBadge: { backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
+  doneText: { color: '#16a34a', fontWeight: '700', fontSize: 14 },
+
+  // Exercises
+  notesBox: { backgroundColor: '#fff7ed', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#ffedd5', flexDirection: 'row', gap: 12, marginBottom: 24 },
+  notesTitle: { color: '#ea580c', fontWeight: '800', fontSize: 12, textTransform: 'uppercase', marginBottom: 4 },
+  notesText: { color: '#9a3412', fontSize: 14, lineHeight: 20 },
+  
   exerciseCard: {
-      backgroundColor: '#fff',
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 16,
-      borderWidth: 1,
-      borderColor: '#e2e8f0',
+      backgroundColor: '#fff', borderRadius: 16, padding: 12, marginBottom: 12,
+      flexDirection: 'column', gap: 16, borderWidth: 1, borderColor: '#f1f5f9', // Coluna
+      shadowColor: '#000', shadowOpacity: 0.02, shadowOffset: {width: 0, height: 2}, elevation: 1
   },
-  exerciseHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 12,
-  },
-  exerciseIndex: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: '#f1f5f9',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 10,
-  },
-  indexText: {
-      fontSize: 12,
-      fontWeight: 'bold',
-      color: '#64748b',
-  },
-  exerciseName: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      color: '#0f172a',
-      flex: 1,
-  },
-  exerciseDetails: {
-      flexDirection: 'row',
-      gap: 16,
-  },
-  detailItem: {
-      flex: 1,
-      backgroundColor: '#f8fafc',
-      padding: 8,
-      borderRadius: 8,
-  },
-  detailLabel: {
-      fontSize: 10,
-      fontWeight: 'bold',
-      color: '#94a3b8',
-      marginBottom: 2,
-  },
-  detailValue: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: '#334155',
-  },
-  exerciseNotes: {
-      marginTop: 8,
-      fontSize: 12,
-      color: '#64748b',
-      fontStyle: 'italic',
-  },
-  footer: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      padding: 20,
-      backgroundColor: '#fff',
-      borderTopWidth: 1,
-      borderTopColor: '#f1f5f9',
-  },
-  startButton: {
-      backgroundColor: '#2563eb',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 16,
-      borderRadius: 16,
-      gap: 8,
-  },
-  startButtonText: {
-      color: '#fff',
-      fontWeight: 'bold',
-      fontSize: 16,
-  },
+  // Thumb
+  thumbBox: { width: '100%', height: 200, borderRadius: 12, overflow: 'hidden', position: 'relative', marginTop: 8 },
+  playOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' },
+  noThumbBox: { display: 'none' }, // Esconde se não tiver vídeo para economizar espaço
+  
+  videoHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, alignItems: 'center' }
 });

@@ -62,8 +62,8 @@ export default function Login() {
         {/* Logo Centralizada */}
         <div style={{ textAlign: 'center', marginBottom: 0, zIndex: 1 }}>
             <img 
-               src="https://cdtouwfxwuhnlzqhcagy.supabase.co/storage/v1/object/public/system-assets/logo%20twinex.png" 
-               alt="BodyBrothers" 
+               src="https://cdtouwfxwuhnlzqhcagy.supabase.co/storage/v1/object/public/Imagens/ChatGPT%20Image%209%20de%20fev.%20de%202026%2C%2022_23_47.png" 
+               alt="FitBody Pro" 
                style={{ 
                    maxWidth: 400,
                    height: 'auto', 
@@ -75,7 +75,7 @@ export default function Login() {
                }} 
             />
             <h1 hidden style={{ color: '#fff', margin: 0, fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-1px' }}>
-                <span style={{ color: '#38bdf8' }}>Body</span>Brothers
+                <span style={{ color: '#38bdf8' }}>FitBody</span> Pro
             </h1>
         </div>
 
