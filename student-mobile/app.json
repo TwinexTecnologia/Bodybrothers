@@ -24,7 +24,10 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -37,6 +40,11 @@
           "cameraPermission": "O aplicativo precisa acessar sua câmera para tirar fotos na anamnese e evolução."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4b43fac9-1a1e-44f2-af06-2713a3e3e1b0"
+      }
+    }
   }
 }

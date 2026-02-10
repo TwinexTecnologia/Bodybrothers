@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { addWorkout, updateWorkout, getWorkoutById, deleteWorkoutIfPersonalized } from '../../store/workouts'
 import { listExercises, type Exercise as LibraryExercise } from '../../store/exercises'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { X, BookOpen, Search, Video } from 'lucide-react'
 
@@ -55,8 +55,10 @@ function getYouTubeId(url: string) {
 
 export default function WorkoutCreate() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const workoutId = id
+  // Pega o ID da rota (useParams) ou da query string (searchParams)
+  const workoutId = id || searchParams.get('id')
   
   const [personalId, setPersonalId] = useState('')
   const [editId, setEditId] = useState<string | null>(null)
