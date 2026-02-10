@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capa Google Play</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #333;
+        }
+        .canvas {
+            width: 1024px;
+            height: 500px;
+            background-color: #0f172a; /* Azul BodyBrothers */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: sans-serif;
+            position: relative;
+            overflow: hidden;
+        }
+        .logo-text {
+            color: white;
+            font-size: 100px;
+            font-weight: 900;
+            letter-spacing: -2px;
+            z-index: 2;
+        }
+        .subtitle {
+            color: #10b981; /* Verde do app */
+            font-size: 30px;
+            font-weight: 600;
+            margin-top: 20px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            z-index: 2;
+        }
+        .bg-circle {
+            position: absolute;
+            width: 800px;
+            height: 800px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, rgba(15, 23, 42, 0) 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="canvas">
+        <div class="bg-circle"></div>
+        <div class="logo-text">FitBody Pro</div>
+        <div class="subtitle">Student App</div>
+    </div>
+</body>
+</html>
