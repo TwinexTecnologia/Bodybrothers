@@ -119,15 +119,23 @@ export default function Session() {
             await finishSession(sessionId as string, elapsedSeconds, sessionNotes);
             
             setShowFinishModal(false);
-            Alert.alert('🎉 Treino Concluído!', 'Parabéns! Mais um passo em direção ao seu objetivo.', [
-                { text: 'Fechar', onPress: () => router.replace('/(tabs)/dashboard') }
-            ]);
+            setIsFinishing(false);
+
+            // Pequeno delay para garantir que o modal fechou antes do alerta
+            setTimeout(() => {
+                Alert.alert(
+                    '🎉 Treino Concluído!', 
+                    'Parabéns! Mais um passo em direção ao seu objetivo.', 
+                    [{ text: 'Fechar', onPress: () => router.replace('/(tabs)/dashboard') }]
+                );
+            }, 300);
+
         } catch (error: any) {
             console.error('Erro ao finalizar:', error);
             setShowFinishModal(false);
-            router.replace('/(tabs)/dashboard');
-        } finally {
             setIsFinishing(false);
+            Alert.alert('Erro', 'Não foi possível finalizar o treino, mas tentamos salvar.');
+            router.replace('/(tabs)/dashboard');
         }
     }
 

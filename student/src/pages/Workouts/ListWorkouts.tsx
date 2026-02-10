@@ -93,6 +93,7 @@ export default function ListWorkouts() {
   const [showSummaryModal, setShowSummaryModal] = useState(false)
   const [sessionNotes, setSessionNotes] = useState('')
   const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null)
+  const [isFinishing, setIsFinishing] = useState(false)
   const timerRef = useRef<any>(null)
 
   useEffect(() => {
@@ -287,16 +288,25 @@ export default function ListWorkouts() {
 
   const handleConfirmFinish = async () => {
       if (!session.sessionId) return
+      
+      setIsFinishing(true)
       try {
           await finishSession(session.sessionId, session.elapsedSeconds, sessionNotes)
-          setSession({ active: false, elapsedSeconds: 0 })
+          
+          // Ordem importante: fecha modal, reseta notas, mostra sucesso, encerra sessão
           setShowFinishModal(false)
           setSessionNotes('')
-          loadFrequency()
           setShowSuccessModal(true)
+          setSession({ active: false, elapsedSeconds: 0 })
+          
+          // Recarrega dados
+          loadFrequency()
+          loadData()
       } catch (err) {
           console.error(err)
           alert('Erro ao salvar treino.')
+      } finally {
+          setIsFinishing(false)
       }
   }
 
@@ -638,8 +648,10 @@ export default function ListWorkouts() {
                               }} 
                           />
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                              <button onClick={() => setShowFinishModal(false)} style={{ padding: '16px', borderRadius: 16, border: 'none', background: '#f1f5f9', fontWeight: 700, cursor: 'pointer', color: '#64748b' }}>Cancelar</button>
-                              <button onClick={handleConfirmFinish} style={{ padding: '16px', borderRadius: 16, border: 'none', background: '#10b981', color: '#fff', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}>Salvar e Finalizar</button>
+                              <button onClick={() => setShowFinishModal(false)} disabled={isFinishing} style={{ padding: '16px', borderRadius: 16, border: 'none', background: '#f1f5f9', fontWeight: 700, cursor: isFinishing ? 'not-allowed' : 'pointer', color: '#64748b', opacity: isFinishing ? 0.5 : 1 }}>Cancelar</button>
+                              <button onClick={handleConfirmFinish} disabled={isFinishing} style={{ padding: '16px', borderRadius: 16, border: 'none', background: '#10b981', color: '#fff', fontWeight: 700, cursor: isFinishing ? 'not-allowed' : 'pointer', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)', opacity: isFinishing ? 0.7 : 1 }}>
+                                  {isFinishing ? 'Salvando...' : 'Salvar e Finalizar'}
+                              </button>
                           </div>
                       </div>
                   </div>
