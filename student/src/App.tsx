@@ -9,6 +9,8 @@ import ListPendences from './pages/Financial/ListPendences'
 import Profile from './pages/Account/Profile'
 import Layout from './components/Layout'
 import { AuthProvider } from './auth/AuthContext'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+
 import { useAuth } from './auth/useAuth'
 
 function ProtectedLayout() {
@@ -28,6 +30,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
       
       {/* Rotas Protegidas com Layout Persistente */}
       <Route element={<ProtectedLayout />}>
