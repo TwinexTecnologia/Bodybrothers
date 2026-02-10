@@ -51,6 +51,7 @@ export default function Session() {
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [loading, setLoading] = useState(true);
     const [showFinishModal, setShowFinishModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [isFinishing, setIsFinishing] = useState(false);
     const [sessionNotes, setSessionNotes] = useState('');
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -121,13 +122,9 @@ export default function Session() {
             setShowFinishModal(false);
             setIsFinishing(false);
 
-            // Pequeno delay para garantir que o modal fechou antes do alerta
+            // Mostra modal customizado de sucesso (mais robusto que Alert)
             setTimeout(() => {
-                Alert.alert(
-                    '🎉 Treino Concluído!', 
-                    'Parabéns! Mais um passo em direção ao seu objetivo.', 
-                    [{ text: 'Fechar', onPress: () => router.replace('/(tabs)/dashboard') }]
-                );
+                setShowSuccessModal(true);
             }, 300);
 
         } catch (error: any) {
@@ -368,6 +365,33 @@ export default function Session() {
                                 <Text style={styles.cancelButtonText}>Cancelar</Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal de Sucesso */}
+            <Modal visible={showSuccessModal} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#dcfce7', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                                <Text style={{ fontSize: 32 }}>🎉</Text>
+                            </View>
+                            <Text style={[styles.modalTitle, { textAlign: 'center' }]}>Treino Concluído!</Text>
+                            <Text style={[styles.modalSubtitle, { textAlign: 'center' }]}>
+                                Parabéns! Mais um passo em direção ao seu objetivo. Continue assim! 💪
+                            </Text>
+                        </View>
+                        
+                        <TouchableOpacity 
+                            style={[styles.modalButton, styles.confirmButton]}
+                            onPress={() => {
+                                setShowSuccessModal(false);
+                                router.replace('/(tabs)/dashboard');
+                            }}
+                        >
+                            <Text style={styles.confirmButtonText}>Fechar</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
