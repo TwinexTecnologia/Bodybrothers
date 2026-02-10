@@ -4,7 +4,7 @@ export default function PrivacyPolicy() {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px', fontFamily: 'sans-serif', lineHeight: '1.6', color: '#333' }}>
       <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '20px', color: '#0f172a' }}>Política de Privacidade</h1>
-      <p style={{ color: '#64748b', marginBottom: '40px' }}>Última atualização: {new Date().toLocaleDateString()}</p>
+      <p style={{ color: '#64748b', marginBottom: '40px' }}>Última atualização: {new Date().toLocaleDateString('pt-BR')}</p>
 
       <section style={{ marginBottom: '30px' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '15px', color: '#1e293b' }}>1. Introdução</h2>
