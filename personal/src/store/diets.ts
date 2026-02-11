@@ -25,6 +25,7 @@ export type DietFood = {
   base_fat_100g?: string
   base_sodium_100g?: string
   base_unit_weight?: number // Peso em gramas de 1 unidade (se aplicável)
+  dndId?: string // ID temporário para Drag and Drop
 }
 
 export type DietMeal = {

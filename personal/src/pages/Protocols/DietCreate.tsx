@@ -6,7 +6,8 @@ import { supabase } from '../../lib/supabase'
 import FoodAutocomplete from '../../components/FoodAutocomplete'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
-import { Copy } from 'lucide-react'
+import { Copy, GripVertical } from 'lucide-react'
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 
 const safeUUID = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -97,11 +98,15 @@ export default function DietCreate() {
                 setSupplements(d.supplements || [])
                 
                 if (d.variants && d.variants.length > 0) {
+                    // Garante dndId
+                    d.variants.forEach(v => v.meals.forEach(m => m.foods.forEach(f => { if(!f.dndId) f.dndId = safeUUID() })))
                     setVariants(d.variants)
                     setActiveVariantId(d.variants[0].id)
                     setMeals(d.variants[0].meals)
                 } else {
                     const def = { id: 'default', name: 'Padrão', meals: d.meals || [] }
+                    // Garante dndId
+                    def.meals.forEach(m => m.foods.forEach(f => { if(!f.dndId) f.dndId = safeUUID() }))
                     setVariants([def])
                     setActiveVariantId('default')
                     setMeals(def.meals)
@@ -284,10 +289,38 @@ export default function DietCreate() {
     setMeals(arr)
   }
 
+  const onDragEndFood = (result: DropResult) => {
+    if (!result.destination) return
+
+    // droppableId é "meal-{index}"
+    const sourceMealIdx = parseInt(result.source.droppableId.split('-')[1])
+    const destMealIdx = parseInt(result.destination.droppableId.split('-')[1])
+
+    const nextMeals = [...meals]
+    const sourceFoods = [...nextMeals[sourceMealIdx].foods]
+    
+    // Remove do original
+    const [movedFood] = sourceFoods.splice(result.source.index, 1)
+
+    if (sourceMealIdx === destMealIdx) {
+        // Mesma refeição
+        sourceFoods.splice(result.destination.index, 0, movedFood)
+        nextMeals[sourceMealIdx] = { ...nextMeals[sourceMealIdx], foods: sourceFoods }
+    } else {
+        // Moveu para outra refeição
+        const destFoods = [...nextMeals[destMealIdx].foods]
+        destFoods.splice(result.destination.index, 0, movedFood)
+        nextMeals[sourceMealIdx] = { ...nextMeals[sourceMealIdx], foods: sourceFoods }
+        nextMeals[destMealIdx] = { ...nextMeals[destMealIdx], foods: destFoods }
+    }
+
+    setMeals(nextMeals)
+  }
+
   const addFood = (mi: number) => {
     const next = meals.slice()
     const foods = next[mi].foods.slice()
-    foods.push({ name: '', quantity: '', unit: 'g' })
+    foods.push({ name: '', quantity: '', unit: 'g', dndId: safeUUID() })
     next[mi] = { ...next[mi], foods }
     setMeals(next)
   }
@@ -633,6 +666,7 @@ export default function DietCreate() {
       </div>
 
       {/* Refeições */}
+      <DragDropContext onDragEnd={onDragEndFood}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           {meals.map((m, mi) => (
             <div
@@ -687,7 +721,8 @@ export default function DietCreate() {
 
               <div style={{ padding: 20 }}>
                 {/* Tabela de Alimentos */}
-                <div style={{ display: 'grid', gridTemplateColumns: '3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 0.5fr 40px', gap: 8, marginBottom: 8, padding: '0 8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '30px 3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 0.5fr 40px', gap: 8, marginBottom: 8, padding: '0 8px' }}>
+                    <div></div>
                     <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>ALIMENTO</div>
                     <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>QTD</div>
                     <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>UNID</div>
@@ -699,83 +734,104 @@ export default function DietCreate() {
                     <div></div>
                 </div>
 
-                {m.foods.map((f, fi) => (
-                    <div key={fi} style={{ marginBottom: 12, padding: '8px', background: '#fff', borderRadius: 8, border: '1px solid #f1f5f9' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 0.5fr 40px', gap: 8, alignItems: 'center' }}>
-                            <FoodAutocomplete 
-                                className="input" 
-                                style={{ width: '100%', minWidth: 0 }} 
-                                placeholder="Ex: Arroz Branco" 
-                                value={f.name} 
-                                onChange={(val) => updateFood(mi, fi, { name: val })}
-                                onSelect={(details) => updateFood(mi, fi, {
-                                    name: details.name,
-                                    food_id: details.food_id,
-                                    base_calories_100g: String(details.calories_100g || 0),
-                                    base_protein_100g: String(details.protein_100g || 0),
-                                    base_carbs_100g: String(details.carbs_100g || 0),
-                                    base_fat_100g: String(details.fat_100g || 0),
-                                    base_sodium_100g: String(details.sodium_100g || 0),
-                                    base_unit_weight: details.unit_weight,
-                                    unit: details.unit_weight ? 'unid' : 'g',
-                                    quantity: details.unit_weight ? '1' : '100'
-                                })}
-                            />
-                            <input className="input" style={{ width: '100%', minWidth: 0 }} placeholder="100" value={f.quantity} onChange={(e) => updateFood(mi, fi, { quantity: e.target.value })} />
-                            
-                            <select 
-                                className="input" 
-                                style={{ width: '100%', minWidth: 0, padding: '8px 4px', background: '#fff' }} 
-                                value={f.unit || 'g'} 
-                                onChange={(e) => updateFood(mi, fi, { unit: e.target.value })}
-                            >
-                                <option value="g">g</option>
-                                <option value="ml">ml</option>
-                                <option value="unid">unid</option>
-                                <option value="fatia">fatia</option>
-                                <option value="colher">colher</option>
-                                <option value="scoop">scoop</option>
-                            </select>
-                            
-                            {/* Macros Readonly */}
-                            <input className="input" style={{ background: '#f8fafc', color: '#64748b', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.calories || '-'} />
-                            <input className="input" style={{ background: '#f0fdf4', color: '#166534', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.protein || '-'} />
-                            <input className="input" style={{ background: '#eff6ff', color: '#1e40af', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.carbs || '-'} />
-                            <input className="input" style={{ background: '#fff7ed', color: '#9a3412', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.fat || '-'} />
-                            <input className="input" style={{ background: '#f5f5f5', color: '#555', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.sodium || '-'} />
+                <Droppable droppableId={`meal-${mi}`}>
+                    {(provided) => (
+                        <div ref={provided.innerRef} {...provided.droppableProps}>
+                            {m.foods.map((f, fi) => (
+                                <Draggable key={f.dndId || `temp-${mi}-${fi}`} draggableId={f.dndId || `temp-${mi}-${fi}`} index={fi}>
+                                    {(provided) => (
+                                        <div 
+                                            ref={provided.innerRef}
+                                            {...provided.draggableProps}
+                                            style={{ 
+                                                ...provided.draggableProps.style,
+                                                marginBottom: 12, padding: '8px', background: '#fff', borderRadius: 8, border: '1px solid #f1f5f9' 
+                                            }}
+                                        >
+                                            <div style={{ display: 'grid', gridTemplateColumns: '30px 3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 0.5fr 40px', gap: 8, alignItems: 'center' }}>
+                                                <div {...provided.dragHandleProps} style={{ cursor: 'grab', color: '#cbd5e1', display: 'flex', justifyContent: 'center' }}>
+                                                    <GripVertical size={18} />
+                                                </div>
+                                                <FoodAutocomplete 
+                                                    className="input" 
+                                                    style={{ width: '100%', minWidth: 0 }} 
+                                                    placeholder="Ex: Arroz Branco" 
+                                                    value={f.name} 
+                                                    onChange={(val) => updateFood(mi, fi, { name: val })}
+                                                    onSelect={(details) => updateFood(mi, fi, {
+                                                        name: details.name,
+                                                        food_id: details.food_id,
+                                                        base_calories_100g: String(details.calories_100g || 0),
+                                                        base_protein_100g: String(details.protein_100g || 0),
+                                                        base_carbs_100g: String(details.carbs_100g || 0),
+                                                        base_fat_100g: String(details.fat_100g || 0),
+                                                        base_sodium_100g: String(details.sodium_100g || 0),
+                                                        base_unit_weight: details.unit_weight,
+                                                        unit: details.unit_weight ? 'unid' : 'g',
+                                                        quantity: details.unit_weight ? '1' : '100'
+                                                    })}
+                                                />
+                                                <input className="input" style={{ width: '100%', minWidth: 0 }} placeholder="100" value={f.quantity} onChange={(e) => updateFood(mi, fi, { quantity: e.target.value })} />
+                                                
+                                                <select 
+                                                    className="input" 
+                                                    style={{ width: '100%', minWidth: 0, padding: '8px 4px', background: '#fff' }} 
+                                                    value={f.unit || 'g'} 
+                                                    onChange={(e) => updateFood(mi, fi, { unit: e.target.value })}
+                                                >
+                                                    <option value="g">g</option>
+                                                    <option value="ml">ml</option>
+                                                    <option value="unid">unid</option>
+                                                    <option value="fatia">fatia</option>
+                                                    <option value="colher">colher</option>
+                                                    <option value="scoop">scoop</option>
+                                                </select>
+                                                
+                                                {/* Macros Readonly */}
+                                                <input className="input" style={{ background: '#f8fafc', color: '#64748b', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.calories || '-'} />
+                                                <input className="input" style={{ background: '#f0fdf4', color: '#166534', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.protein || '-'} />
+                                                <input className="input" style={{ background: '#eff6ff', color: '#1e40af', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.carbs || '-'} />
+                                                <input className="input" style={{ background: '#fff7ed', color: '#9a3412', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.fat || '-'} />
+                                                <input className="input" style={{ background: '#f5f5f5', color: '#555', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.sodium || '-'} />
 
-                            <button onClick={() => removeFood(mi, fi)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+                                                <button onClick={() => removeFood(mi, fi)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+                                            </div>
+                                            
+                                            {/* Substitutos */}
+                                            {(f.substitutes || []).map((s, si) => (
+                                                <div key={si} style={{ display: 'flex', gap: 10, marginTop: 8, alignItems: 'center', paddingLeft: 50 }}>
+                                                    <div style={{ color: '#cbd5e1' }}>↳</div>
+                                                    <div style={{ flex: 3 }}>
+                                                        <FoodAutocomplete 
+                                                            className="input" 
+                                                            style={{ width: '100%', minWidth: 0, fontSize: '0.9em', background: '#f8fafc' }} 
+                                                            placeholder="Buscar Substituto..." 
+                                                            value={s.name} 
+                                                            onChange={(val) => updateSubstitute(mi, fi, si, { name: val })}
+                                                            onSelect={(details) => updateSubstitute(mi, fi, si, {
+                                                                name: details.name,
+                                                                unit: details.unit_weight ? 'unid' : 'g',
+                                                                quantity: details.unit_weight ? '1' : '100'
+                                                            })}
+                                                        />
+                                                    </div>
+                                                    <input className="input" style={{ flex: 1, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Qtd" value={s.quantity} onChange={(e) => updateSubstitute(mi, fi, si, { quantity: e.target.value })} />
+                                                    <input className="input" style={{ flex: 1, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Unid" value={s.unit} onChange={(e) => updateSubstitute(mi, fi, si, { unit: e.target.value })} />
+                                                    <button onClick={() => removeSubstitute(mi, fi, si)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8em', padding: '0 8px' }}>✕</button>
+                                                </div>
+                                            ))}
+                                            
+                                            <div style={{ marginTop: 6, display: 'flex', gap: 12, paddingLeft: 30 }}>
+                                                <button onClick={() => addSubstitute(mi, fi)} style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '0.8em', cursor: 'pointer', textDecoration: 'underline' }}>+ Adicionar Substituto</button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </Draggable>
+                            ))}
+                            {provided.placeholder}
                         </div>
-                        
-                        {/* Substitutos */}
-                        {(f.substitutes || []).map((s, si) => (
-                            <div key={si} style={{ display: 'flex', gap: 10, marginTop: 8, alignItems: 'center', paddingLeft: 20 }}>
-                                <div style={{ color: '#cbd5e1' }}>↳</div>
-                                <div style={{ flex: 3 }}>
-                                    <FoodAutocomplete 
-                                        className="input" 
-                                        style={{ width: '100%', minWidth: 0, fontSize: '0.9em', background: '#f8fafc' }} 
-                                        placeholder="Buscar Substituto..." 
-                                        value={s.name} 
-                                        onChange={(val) => updateSubstitute(mi, fi, si, { name: val })}
-                                        onSelect={(details) => updateSubstitute(mi, fi, si, {
-                                            name: details.name,
-                                            unit: details.unit_weight ? 'unid' : 'g',
-                                            quantity: details.unit_weight ? '1' : '100'
-                                        })}
-                                    />
-                                </div>
-                                <input className="input" style={{ flex: 1, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Qtd" value={s.quantity} onChange={(e) => updateSubstitute(mi, fi, si, { quantity: e.target.value })} />
-                                <input className="input" style={{ flex: 1, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Unid" value={s.unit} onChange={(e) => updateSubstitute(mi, fi, si, { unit: e.target.value })} />
-                                <button onClick={() => removeSubstitute(mi, fi, si)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8em', padding: '0 8px' }}>✕</button>
-                            </div>
-                        ))}
-                        
-                        <div style={{ marginTop: 6, display: 'flex', gap: 12 }}>
-                            <button onClick={() => addSubstitute(mi, fi)} style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '0.8em', cursor: 'pointer', textDecoration: 'underline' }}>+ Adicionar Substituto</button>
-                        </div>
-                    </div>
-                ))}
+                    )}
+                </Droppable>
                 
                 <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <button className="btn" onClick={() => addFood(mi)} style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1' }}>+ Adicionar Alimento</button>
