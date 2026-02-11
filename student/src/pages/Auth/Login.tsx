@@ -66,8 +66,8 @@ export default function Login() {
                src="https://cdtouwfxwuhnlzqhcagy.supabase.co/storage/v1/object/public/Imagens/ChatGPT%20Image%209%20de%20fev.%20de%202026%2C%2022_23_47.png" 
                alt="Logo" 
                style={{ 
-                   maxWidth: 350, 
-                   width: '80%', 
+                   maxWidth: 480, // Aumentado para ficar maior
+                   width: '90%', 
                    height: 'auto', 
                    filter: 'drop-shadow(0 0 25px rgba(56, 189, 248, 0.5))',
                }} 
@@ -85,7 +85,7 @@ export default function Login() {
             borderRadius: 16, 
             background: '#fff', 
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', 
-            marginTop: -100, 
+            marginTop: -130, // Mais grudado no queixo do gorila
             zIndex: 10, 
             position: 'relative',
             boxSizing: 'border-box'
