@@ -130,6 +130,17 @@ export async function listArchivedStudentWorkouts(personalId: string, studentId:
   return (data || []).map(mapFromDb)
 }
 
+export async function listAllWorkouts(personalId: string): Promise<WorkoutRecord[]> {
+  const { data, error } = await supabase
+    .from('protocols')
+    .select('*')
+    .eq('personal_id', personalId)
+    .eq('type', 'workout')
+  
+  if (error) return []
+  return (data || []).map(mapFromDb)
+}
+
 export async function addWorkout(w: Omit<WorkoutRecord, 'id' | 'status' | 'updatedAt'>): Promise<WorkoutRecord | null> {
   const { data, error } = await supabase
     .from('protocols')
