@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     width: '100%',
-    height: 250,
+    height: 400, // Aumentado para ficar maior
     marginBottom: 0,
     zIndex: 1,
   },
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 10,
     marginBottom: 8,
-    marginTop: -50, // Sobe o card para perto do logo
+    marginTop: -80, // Mais grudado ainda
     zIndex: 2,
   },
   title: {
