@@ -86,6 +86,14 @@ body {
   align-items: flex-end;
 }
 
+/* LOGIN STYLES (Desktop Padrão) */
+.login-logo-img {
+    max-width: 480px;
+}
+.login-card {
+    margin-top: -130px;
+}
+
 /* Responsivo Mobile */
 @media (max-width: 768px) {
   .app-shell {
@@ -173,6 +181,15 @@ body {
   
   .mobile-stack > div:last-child {
       text-align: left !important;
+  }
+
+  /* LOGIN MOBILE ADJUSTMENTS */
+  .login-logo-img {
+      max-width: 320px !important; /* Logo menor no mobile */
+  }
+  .login-card {
+      margin-top: -60px !important; /* Menos negativo no mobile para não cobrir */
+      padding: 24px !important;
   }
 }
 
