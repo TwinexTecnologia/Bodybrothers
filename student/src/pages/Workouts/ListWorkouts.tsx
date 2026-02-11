@@ -92,7 +92,8 @@ export default function ListWorkouts() {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [showSummaryModal, setShowSummaryModal] = useState(false)
   const [sessionNotes, setSessionNotes] = useState('')
-  const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null)
+  // const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null) // REMOVIDO: Não usa mais modal
+  const [playingVideoIndex, setPlayingVideoIndex] = useState<number | null>(null) // NOVO: Controla qual vídeo está tocando inline
   const [isFinishing, setIsFinishing] = useState(false)
   const timerRef = useRef<any>(null)
 
@@ -1025,44 +1026,76 @@ export default function ListWorkouts() {
                                     </div>
                                 </div>
                                 
-                                {/* Video Thumbnail (Vertical-ish) */}
+                                {/* Video Thumbnail (Vertical-ish) ou Player Inline */}
                                 {ex.videoUrl ? (
                                     <div 
-                                        onClick={() => setVideoModalUrl(ex.videoUrl || null)}
                                         style={{ 
                                             width: isMobile ? '100%' : 180,
-                                            height: isMobile ? 200 : 270,
+                                            height: isMobile ? (playingVideoIndex === i ? 'auto' : 200) : 270,
+                                            aspectRatio: isMobile && playingVideoIndex === i ? '16/9' : undefined,
                                             alignSelf: 'center',
                                             borderRadius: 12, 
                                             overflow: 'hidden', 
                                             background: '#000', 
                                             flexShrink: 0, 
                                             position: 'relative', 
-                                            cursor: 'pointer',
+                                            cursor: playingVideoIndex === i ? 'default' : 'pointer',
                                             boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                                         }}
                                     >
-                                        {(() => {
-                                            const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
-                                            let thumbUrl = '';
-                                            if (isYoutube) {
-                                                const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
-                                                thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-                                            }
-                                            
-                                            return (
-                                                <>
-                                                    {thumbUrl ? (
-                                                        <img src={thumbUrl} alt={ex.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                    ) : (
-                                                        <video src={ex.videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                    )}
-                                                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.4)', borderRadius: '50%', padding: 8, backdropFilter: 'blur(2px)', pointerEvents: 'none' }}>
-                                                        <Play size={20} fill="#fff" color="#fff" />
-                                                    </div>
-                                                </>
-                                            );
-                                        })()}
+                                        {playingVideoIndex === i ? (
+                                            /* PLAYER INLINE */
+                                            (() => {
+                                                const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
+                                                if (isYoutube) {
+                                                    const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
+                                                    return (
+                                                        <iframe 
+                                                            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1&playsinline=1`} 
+                                                            title={ex.name}
+                                                            style={{ width: '100%', height: '100%', border: 'none' }}
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                                            allowFullScreen
+                                                        />
+                                                    );
+                                                } else {
+                                                    return (
+                                                        <video 
+                                                            src={ex.videoUrl} 
+                                                            controls 
+                                                            autoPlay
+                                                            playsInline
+                                                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                        />
+                                                    );
+                                                }
+                                            })()
+                                        ) : (
+                                            /* THUMBNAIL (Clique para Tocar) */
+                                            <div onClick={() => setPlayingVideoIndex(i)} style={{ width: '100%', height: '100%', position: 'relative' }}>
+                                                {(() => {
+                                                    const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
+                                                    let thumbUrl = '';
+                                                    if (isYoutube) {
+                                                        const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
+                                                        thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+                                                    }
+                                                    
+                                                    return (
+                                                        <>
+                                                            {thumbUrl ? (
+                                                                <img src={thumbUrl} alt={ex.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                                                            ) : (
+                                                                <video src={ex.videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                                                            )}
+                                                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 12, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                <Play size={24} fill="#fff" color="#fff" style={{ marginLeft: 2 }} />
+                                                            </div>
+                                                        </>
+                                                    );
+                                                })()}
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     <div style={{ 
@@ -1094,42 +1127,6 @@ export default function ListWorkouts() {
                     <button onClick={() => setShowSuccessModal(false)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '14px 32px', borderRadius: 16, fontSize: '1rem', fontWeight: 700, cursor: 'pointer', width: '100%', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.4)' }}>Fechar</button>
                 </div>
                 <style>{`@keyframes popIn { from { opacity: 0; transform: scale(0.8) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }`}</style>
-            </div>
-        )}
-
-        {videoModalUrl && (
-            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(10px)' }} onClick={() => setVideoModalUrl(null)}>
-                <div style={{ width: '100%', maxWidth: 800, aspectRatio: '16/9', background: '#000', borderRadius: 16, overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-                    {(() => {
-                        const isYoutube = videoModalUrl.includes('youtube.com') || videoModalUrl.includes('youtu.be');
-                        if (isYoutube) {
-                            const videoId = videoModalUrl.split('v=')[1]?.split('&')[0] || videoModalUrl.split('/').pop();
-                            return (
-                                <iframe 
-                                    src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&rel=0&modestbranding=1`} 
-                                    title="Video"
-                                    style={{ width: '100%', height: '100%', border: 'none' }}
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                    allowFullScreen
-                                />
-                            );
-                        } else {
-                            return (
-                                <video 
-                                    src={videoModalUrl} 
-                                    controls 
-                                    autoPlay
-                                    muted
-                                    playsInline
-                                    style={{ width: '100%', height: '100%' }}
-                                />
-                            );
-                        }
-                    })()}
-                </div>
-                <button onClick={(e) => { e.stopPropagation(); setVideoModalUrl(null); }} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-                    <X size={24} />
-                </button>
             </div>
         )}
       </div>
