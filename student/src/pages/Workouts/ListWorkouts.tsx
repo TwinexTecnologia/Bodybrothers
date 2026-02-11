@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/useAuth'
 import { Dumbbell, ChevronRight, PlayCircle, Clock, X, StopCircle, CheckCircle, Calendar, MessageSquare, History, TrendingUp, ChevronLeft, Play, ArrowRight, Flame, BarChart2 } from 'lucide-react'
 import { startSession, finishSession, getWeeklyFrequency, getWeeklyActivity } from '../../store/history'
+import { ErrorBoundary } from '../../components/ErrorBoundary'
 
 // Atualizado para suportar múltiplos sets
 type ExerciseSet = {
@@ -72,8 +73,17 @@ const DAYS_MAP: Record<string, string> = {
 
 const DAYS_ORDER = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom']
 
-export default function ListWorkouts() {
+export default function ListWorkoutsWrapper() {
+    return (
+        <ErrorBoundary>
+            <ListWorkouts />
+        </ErrorBoundary>
+    )
+}
+
+function ListWorkouts() {
   const { user } = useAuth()
+  const [workouts, setWorkouts] = useState<Workout[]>([])
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [schedule, setSchedule] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
@@ -353,10 +363,10 @@ export default function ListWorkouts() {
   // Agrupamento
   const workoutsByDay = DAYS_ORDER.map(dayKey => {
       const workoutIdsForDay: string[] = []
-      if (schedule) {
+      if (schedule && typeof schedule === 'object') {
         Object.entries(schedule).forEach(([wId, days]) => {
             if (Array.isArray(days)) {
-                const normalizedDays = days.map(d => d.toLowerCase())
+                const normalizedDays = days.map(d => String(d).toLowerCase()) // Garante string
                 if (normalizedDays.includes(dayKey)) workoutIdsForDay.push(wId)
             }
         })
@@ -366,7 +376,7 @@ export default function ListWorkouts() {
   }).filter(group => group.workouts.length > 0)
 
   const unscheduledWorkouts = workouts.filter(w => {
-      const days = schedule ? schedule[w.id] : undefined
+      const days = (schedule && typeof schedule === 'object') ? schedule[w.id] : undefined
       return !days || !Array.isArray(days) || days.length === 0
   })
 
@@ -441,8 +451,8 @@ export default function ListWorkouts() {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 0 }}>
                               
                               {(() => {
-                                  // Normaliza sets: usa o do banco se existir, ou constrói a partir dos campos antigos
-                                  let setsToRender: ExerciseSet[] = ex.sets || []
+                                  // Normaliza sets: usa o do banco se existir e for array, ou constrói a partir dos campos antigos
+                                  let setsToRender: ExerciseSet[] = Array.isArray(ex.sets) ? ex.sets : []
                                   
                                   if (setsToRender.length === 0) {
                                       if (ex.warmupSeries || ex.warmupReps) {
@@ -945,8 +955,8 @@ export default function ListWorkouts() {
                                     
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 0 }}>
                                         {(() => {
-                                            // Normaliza sets: usa o do banco se existir, ou constrói a partir dos campos antigos
-                                            let setsToRender: ExerciseSet[] = ex.sets || []
+                                            // Normaliza sets: usa o do banco se existir e for array, ou constrói a partir dos campos antigos
+                                            let setsToRender: ExerciseSet[] = Array.isArray(ex.sets) ? ex.sets : []
                                             
                                             if (setsToRender.length === 0) {
                                                 if (ex.warmupSeries || ex.warmupReps) {
