@@ -652,40 +652,6 @@ function ListWorkouts() {
                   </div>
               )}
 
-              {videoModalUrl && (
-                  <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 3100, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(10px)' }} onClick={() => setVideoModalUrl(null)}>
-                      <div style={{ width: '100%', maxWidth: 800, aspectRatio: '16/9', background: '#000', borderRadius: 16, overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-                          {(() => {
-                              const isYoutube = videoModalUrl.includes('youtube.com') || videoModalUrl.includes('youtu.be');
-                              if (isYoutube) {
-                                  const videoId = videoModalUrl.split('v=')[1]?.split('&')[0] || videoModalUrl.split('/').pop();
-                                  return (
-                                      <iframe 
-                                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} 
-                                          title="Video"
-                                          style={{ width: '100%', height: '100%', border: 'none' }}
-                                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                          allowFullScreen
-                                      />
-                                  );
-                              } else {
-                                  return (
-                                      <video 
-                                          src={videoModalUrl} 
-                                          controls 
-                                          autoPlay
-                                          style={{ width: '100%', height: '100%' }}
-                                      />
-                                  );
-                              }
-                          })()}
-                      </div>
-                      <button onClick={(e) => { e.stopPropagation(); setVideoModalUrl(null); }} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-                          <X size={24} />
-                      </button>
-                  </div>
-              )}
-
               {showFinishModal && (
                   <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(8px)' }}>
                       <div style={{ background: '#fff', width: '100%', maxWidth: 400, borderRadius: 24, padding: 32, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
