@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Plus, Search, Edit2, Trash2, Video, Dumbbell, Copy } from 'lucide-react'
 import { listExercises, createExercise, updateExercise, deleteExercise, type Exercise } from '../../store/exercises'
+import { listAllWorkouts } from '../../store/workouts'
 import Modal from '../../components/Modal'
 
 function getYouTubeId(url: string) {
@@ -32,11 +33,50 @@ export default function ExercisesLibrary() {
             if (user) {
                 const list = await listExercises(user.id)
                 setExercises(list)
+
+                // Sincronização Automática de Background (importa exercícios faltantes dos treinos)
+                syncFromWorkouts(user.id, list)
             }
         } catch (error) {
             console.error(error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    // Função auxiliar para sincronizar sem bloquear a UI
+    const syncFromWorkouts = async (userId: string, currentLibrary: Exercise[]) => {
+        try {
+            const libraryNames = new Set(currentLibrary.map(e => e.name.toLowerCase().trim()))
+            const allWorkouts = await listAllWorkouts(userId)
+            let newCount = 0
+
+            for (const workout of allWorkouts) {
+                for (const ex of workout.exercises) {
+                    if (ex.videoUrl && ex.name) {
+                        const nameKey = ex.name.toLowerCase().trim()
+                        if (!libraryNames.has(nameKey)) {
+                            // Encontrou um exercício novo nos treinos!
+                            await createExercise(userId, {
+                                name: ex.name.trim(),
+                                muscle_group: ex.group || '',
+                                video_url: ex.videoUrl
+                            })
+                            libraryNames.add(nameKey) // Evita duplicar no loop
+                            newCount++
+                        }
+                    }
+                }
+            }
+
+            if (newCount > 0) {
+                console.log(`Sincronização automática: ${newCount} exercícios importados.`)
+                // Recarrega a lista para mostrar os novos
+                const updatedList = await listExercises(userId)
+                setExercises(updatedList)
+            }
+        } catch (err) {
+            console.error('Erro na sincronização automática:', err)
         }
     }
 
