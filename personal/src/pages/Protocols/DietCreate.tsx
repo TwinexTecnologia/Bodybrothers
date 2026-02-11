@@ -883,6 +883,7 @@ export default function DietCreate() {
             + Adicionar Nova Refeição
           </button>
       </div>
+      </DragDropContext>
 
       {/* Suplementos */}
       <div className="form-card" style={{ padding: 20, marginTop: 24 }}>
