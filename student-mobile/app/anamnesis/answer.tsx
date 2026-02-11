@@ -134,12 +134,15 @@ export default function AnamnesisAnswer() {
 
       const missing = model.questions.filter(q => q.required && (
           answers[q.id] === undefined || 
-          answers[q.id] === '' || 
+          answers[q.id] === null ||
+          (typeof answers[q.id] === 'string' && answers[q.id].trim() === '') || 
           (Array.isArray(answers[q.id]) && answers[q.id].length === 0)
       ));
 
       if (missing.length > 0) {
-          Alert.alert('Campos Obrigatórios', `Por favor responda: ${missing.map(q => q.text).join(', ')}`);
+          console.log('Missing fields:', missing.map(q => q.text));
+          console.log('Current answers:', answers);
+          Alert.alert('Campos Obrigatórios', `Faltam responder: \n\n${missing.map(q => q.text).join('\n')}`);
           return;
       }
 
