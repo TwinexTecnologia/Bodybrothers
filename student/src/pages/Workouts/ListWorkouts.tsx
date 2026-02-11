@@ -533,36 +533,74 @@ function ListWorkouts() {
                                   </div>
                               )}
 
-                              {/* Video Player OTIMIZADO - Com tamanho máximo */}
+                              {/* Video Player OTIMIZADO - Thumbnail com Play Inline */}
                               {ex.videoUrl && (
-                                  <div style={{ width: '100%', maxWidth: '600px', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', background: '#000', marginTop: 16, position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', alignSelf: 'center' }}>
-                                      {(() => {
-                                          const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
-                                          
-                                          if (isYoutube) {
-                                              const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
-                                              return (
-                                                  <>
+                                  <div style={{ 
+                                      width: '100%', 
+                                      maxWidth: '600px', 
+                                      aspectRatio: '16/9', // Fixo para evitar layout shift
+                                      borderRadius: 12, 
+                                      overflow: 'hidden', 
+                                      background: '#000', 
+                                      marginTop: 16, 
+                                      position: 'relative', 
+                                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)', 
+                                      alignSelf: 'center',
+                                      cursor: playingVideoIndex === i ? 'default' : 'pointer'
+                                  }}>
+                                      {playingVideoIndex === i ? (
+                                          /* PLAYER INLINE */
+                                          (() => {
+                                              const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
+                                              if (isYoutube) {
+                                                  const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
+                                                  return (
                                                       <iframe 
-                                                          src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&controls=1`} 
+                                                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1&playsinline=1`} 
                                                           title={ex.name}
-                                                          style={{ width: '100%', height: '100%', border: 'none', objectFit: 'cover' }}
+                                                          style={{ width: '100%', height: '100%', border: 'none' }}
                                                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                                                           allowFullScreen
                                                       />
-                                                  </>
-                                              );
-                                          } else {
-                                              return (
-                                                  <video 
-                                                      src={ex.videoUrl} 
-                                                      controls 
-                                                      playsInline
-                                                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                                  />
-                                              );
-                                          }
-                                      })()}
+                                                  );
+                                              } else {
+                                                  return (
+                                                      <video 
+                                                          src={ex.videoUrl} 
+                                                          controls 
+                                                          autoPlay
+                                                          playsInline
+                                                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                      />
+                                                  );
+                                              }
+                                          })()
+                                      ) : (
+                                          /* THUMBNAIL */
+                                          <div onClick={() => setPlayingVideoIndex(i)} style={{ width: '100%', height: '100%', position: 'relative' }}>
+                                              {(() => {
+                                                  const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
+                                                  let thumbUrl = '';
+                                                  if (isYoutube) {
+                                                      const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
+                                                      thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+                                                  }
+                                                  
+                                                  return (
+                                                      <>
+                                                          {thumbUrl ? (
+                                                              <img src={thumbUrl} alt={ex.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                                                          ) : (
+                                                              <video src={ex.videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                                                          )}
+                                                          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 16, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                              <Play size={32} fill="#fff" color="#fff" style={{ marginLeft: 4 }} />
+                                                          </div>
+                                                      </>
+                                                  );
+                                              })()}
+                                          </div>
+                                      )}
                                   </div>
                               )}
                           </div>
