@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Plus, Search, Edit2, Trash2, Video, Dumbbell } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Video, Dumbbell, Copy } from 'lucide-react'
 import { listExercises, createExercise, updateExercise, deleteExercise, type Exercise } from '../../store/exercises'
 import Modal from '../../components/Modal'
 
@@ -120,6 +120,16 @@ export default function ExercisesLibrary() {
         setIsModalOpen(true)
     }
 
+    const handleDuplicate = (exercise: Exercise) => {
+        setEditingId(null) // Modo criação
+        setFormData({
+            name: `${exercise.name} (Cópia)`,
+            muscle_group: exercise.muscle_group || '',
+            video_url: exercise.video_url || ''
+        })
+        setIsModalOpen(true)
+    }
+
     const closeModal = () => {
         setIsModalOpen(false)
         setEditingId(null)
@@ -202,6 +212,9 @@ export default function ExercisesLibrary() {
                                 )}
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16, borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
+                                <button onClick={() => handleDuplicate(ex)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3b82f6' }} title="Duplicar">
+                                    <Copy size={18} />
+                                </button>
                                 <button onClick={() => openModal(ex)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }} title="Editar">
                                     <Edit2 size={18} />
                                 </button>
