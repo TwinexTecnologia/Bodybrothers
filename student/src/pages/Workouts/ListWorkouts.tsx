@@ -152,7 +152,15 @@ function ListWorkouts() {
                 .eq('id', activeSession.workout_id)
                 .single()
             
-            if (workoutError || !workoutData) return
+            if (workoutError || !workoutData) {
+                // Sessão existe mas treino foi apagado ou erro ao buscar. Finaliza sessão para destravar.
+                console.warn('Sessão ativa encontrada mas treino não existe. Finalizando sessão órfã...', activeSession.id)
+                await supabase.from('workout_history').update({ 
+                    finished_at: new Date().toISOString(), 
+                    notes: 'Sessão encerrada automaticamente (treino não encontrado)' 
+                }).eq('id', activeSession.id)
+                return
+            }
 
             setSession({
                 active: true,
@@ -391,7 +399,7 @@ function ListWorkouts() {
       return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  if (session.active && session.workout) {
+  if (session.active && session.workout && session.workout.data) {
       // Modo Sessão (Mantido com melhorias sutis)
       return (
           <div style={{ padding: 24, minHeight: '80vh', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -438,8 +446,8 @@ function ListWorkouts() {
                           </p>
                       </div>
                   )}
-
-                  {session.workout.data.exercises.map((ex, i) => (
+                  
+                  {session.workout.data.exercises && Array.isArray(session.workout.data.exercises) && session.workout.data.exercises.map((ex, i) => (
                       <div key={i} style={{ marginBottom: 16, borderRadius: 20, padding: 20, background: '#fff', border: '1px solid #f1f5f9', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'flex-start' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
