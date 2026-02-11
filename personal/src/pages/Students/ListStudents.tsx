@@ -87,15 +87,26 @@ const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], a
 
             const validDate = new Date(nearest.validUntil)
             if (!isNaN(validDate.getTime())) {
-                let daysLeft = Math.ceil((validDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                // Normaliza para comparar apenas DATAS (ignora horas/fuso)
+                const now = new Date()
+                now.setHours(0, 0, 0, 0)
+                
+                // Ajusta validDate para considerar o dia localmente correto
+                // Se validDate for UTC 00:00, ajustamos para não voltar um dia no fuso BR
+                const validLocal = new Date(validDate.getUTCFullYear(), validDate.getUTCMonth(), validDate.getUTCDate())
+                validLocal.setHours(0, 0, 0, 0)
+
+                let daysLeft = Math.ceil((validLocal.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
                 
                 if (lastResponse) {
-                    let nextDueDate = new Date(nearest.validUntil!)
-                    const now = new Date()
-                    while (nextDueDate < now) {
+                    let nextDueDate = new Date(validLocal)
+                    const today = new Date()
+                    today.setHours(0,0,0,0)
+                    
+                    while (nextDueDate < today) {
                         nextDueDate.setMonth(nextDueDate.getMonth() + 1)
                     }
-                    daysLeft = Math.ceil((nextDueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                    daysLeft = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
                     return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
                 } else if (daysLeft < 0) {
                     return { status: 'overdue', label: `🔴 Vencida (${Math.abs(daysLeft)}d)`, color: '#ef4444', fontWeight: 600 }
