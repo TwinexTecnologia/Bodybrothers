@@ -9,6 +9,7 @@ import { X, BookOpen, Search, Video, GripVertical, Copy } from 'lucide-react'
 type ExerciseSetType = 'warmup' | 'feeder' | 'working' | 'custom';
 
 type ExerciseSet = {
+    dndId: string; // ID único para drag and drop
     type: ExerciseSetType;
     customLabel?: string; // Para quando for 'custom'
     series: string;
@@ -110,13 +111,16 @@ export default function WorkoutCreate() {
                     if (sets.length === 0) {
                         // Tenta reconstruir sets a partir dos campos antigos
                         if (e.warmupSeries || e.warmupReps) {
-                            sets.push({ type: 'warmup', series: e.warmupSeries || '', reps: e.warmupReps || '', load: e.warmupLoad || '', rest: e.warmupRest || '' })
+                            sets.push({ dndId: Math.random().toString(36).substr(2, 9), type: 'warmup', series: e.warmupSeries || '', reps: e.warmupReps || '', load: e.warmupLoad || '', rest: e.warmupRest || '' })
                         }
                         if (e.feederSeries || e.feederReps) {
-                            sets.push({ type: 'feeder', series: e.feederSeries || '', reps: e.feederReps || '', load: e.feederLoad || '', rest: e.feederRest || '' })
+                            sets.push({ dndId: Math.random().toString(36).substr(2, 9), type: 'feeder', series: e.feederSeries || '', reps: e.feederReps || '', load: e.feederLoad || '', rest: e.feederRest || '' })
                         }
                         // Set de trabalho padrão
-                        sets.push({ type: 'working', series: e.series || '', reps: e.reps || '', load: e.load || '', rest: e.rest || '' })
+                        sets.push({ dndId: Math.random().toString(36).substr(2, 9), type: 'working', series: e.series || '', reps: e.reps || '', load: e.load || '', rest: e.rest || '' })
+                    } else {
+                        // Garante que sets existentes tenham dndId
+                        sets = sets.map(s => ({ ...s, dndId: s.dndId || Math.random().toString(36).substr(2, 9) }))
                     }
 
                     return {
@@ -143,7 +147,7 @@ export default function WorkoutCreate() {
       load: '', 
       rest: '', 
       sets: [
-          { type: 'working', series: '', reps: '', load: '', rest: '' }
+          { dndId: Math.random().toString(36).substr(2, 9), type: 'working', series: '', reps: '', load: '', rest: '' }
       ],
       showAdvanced: false 
   }])
@@ -151,11 +155,40 @@ export default function WorkoutCreate() {
   const onDragEnd = (result: DropResult) => {
     if (!result.destination) return
 
-    const items = Array.from(exercises)
-    const [reorderedItem] = items.splice(result.source.index, 1)
-    items.splice(result.destination.index, 0, reorderedItem)
+    // Reordenar Exercícios
+    if (result.type === 'EXERCISE') {
+        const items = Array.from(exercises)
+        const [reorderedItem] = items.splice(result.source.index, 1)
+        items.splice(result.destination.index, 0, reorderedItem)
+        setExercises(items)
+        return
+    }
 
-    setExercises(items)
+    // Reordenar Sets
+    if (result.type === 'SET') {
+        // droppableId é do formato "sets-list-{exerciseIndex}"
+        const exIdx = parseInt(result.source.droppableId.split('-').pop() || '0')
+        
+        const nextExercises = [...exercises]
+        const targetExercise = nextExercises[exIdx]
+        const sets = Array.from(targetExercise.sets)
+        
+        const [reorderedSet] = sets.splice(result.source.index, 1)
+        sets.splice(result.destination.index, 0, reorderedSet)
+        
+        targetExercise.sets = sets
+        
+        // Atualiza campos legados do primeiro working set se necessário
+        const firstWorking = sets.find(s => s.type === 'working')
+        if (firstWorking) {
+            targetExercise.series = firstWorking.series
+            targetExercise.reps = firstWorking.reps
+            targetExercise.load = firstWorking.load
+            targetExercise.rest = firstWorking.rest
+        }
+
+        setExercises(nextExercises)
+    }
   }
 
   const updateExercise = (idx: number, patch: Partial<Exercise>) => {
@@ -184,7 +217,7 @@ export default function WorkoutCreate() {
 
   const addSet = (exIdx: number, type: ExerciseSetType = 'working') => {
       const next = exercises.slice()
-      next[exIdx].sets.push({ type, series: '', reps: '', load: '', rest: '' })
+      next[exIdx].sets.push({ dndId: Math.random().toString(36).substr(2, 9), type, series: '', reps: '', load: '', rest: '' })
       setExercises(next)
   }
 
@@ -203,8 +236,8 @@ export default function WorkoutCreate() {
       const copy: Exercise = {
           ...original,
           dndId: Math.random().toString(36).substr(2, 9),
-          // Deep copy dos sets para não referenciar o mesmo array
-          sets: original.sets.map(s => ({ ...s }))
+          // Deep copy dos sets para não referenciar o mesmo array e gerar novos IDs
+          sets: original.sets.map(s => ({ ...s, dndId: Math.random().toString(36).substr(2, 9) }))
       }
       
       items.splice(idx + 1, 0, copy)
@@ -398,7 +431,7 @@ export default function WorkoutCreate() {
 
       {/* Lista de Exercícios */}
       <DragDropContext onDragEnd={onDragEnd}>
-        <Droppable droppableId="exercises-list">
+        <Droppable droppableId="exercises-list" type="EXERCISE">
             {(provided) => (
                 <div 
                     {...provided.droppableProps} 
@@ -491,7 +524,8 @@ export default function WorkoutCreate() {
 
                                 <div style={{ padding: 20 }}>
                                     {/* Cabeçalho da Tabela de Sets */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 1.2fr) 0.6fr 0.8fr 0.8fr 0.6fr 40px', gap: 10, alignItems: 'center', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #f1f5f9' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '30px minmax(100px, 1.2fr) 0.6fr 0.8fr 0.8fr 0.6fr 40px', gap: 10, alignItems: 'center', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #f1f5f9' }}>
+                                        <div></div> {/* Espaço para o drag handle */}
                                         <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>TIPO</div>
                                         <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>SÉRIES</div>
                                         <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>REPS</div>
@@ -501,67 +535,97 @@ export default function WorkoutCreate() {
                                     </div>
 
                                     {/* Lista de Sets Dinâmicos */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                        {ex.sets.map((set, setIdx) => (
-                                            <div key={setIdx} style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 1.2fr) 0.6fr 0.8fr 0.8fr 0.6fr 40px', gap: 10, alignItems: 'center' }}>
-                                                {/* Seletor de Tipo ou Input Customizado */}
-                                                {set.type === 'custom' ? (
-                                                    <input 
-                                                        className="input"
-                                                        value={set.customLabel || ''}
-                                                        onChange={(e) => updateSet(idx, setIdx, 'customLabel', e.target.value)}
-                                                        placeholder="Nome do Tipo"
-                                                        autoFocus
-                                                        style={{ 
-                                                            padding: '6px 8px', fontSize: '0.85em', fontWeight: 600,
-                                                            color: '#7c3aed', borderColor: '#ddd6fe', background: '#f5f3ff',
-                                                            width: '100%'
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <select 
-                                                        className="input"
-                                                        value={set.type}
-                                                        onChange={(e) => updateSet(idx, setIdx, 'type', e.target.value)}
-                                                        style={{ 
-                                                            padding: '6px 8px', fontSize: '0.85em', fontWeight: 600,
-                                                            color: set.type === 'warmup' ? '#ea580c' : set.type === 'feeder' ? '#0284c7' : '#16a34a',
-                                                            borderColor: set.type === 'warmup' ? '#fed7aa' : set.type === 'feeder' ? '#bae6fd' : '#bbf7d0',
-                                                            background: set.type === 'warmup' ? '#fff7ed' : set.type === 'feeder' ? '#f0f9ff' : '#f0fdf4',
-                                                            width: '100%'
-                                                        }}
-                                                    >
-                                                        <option value="warmup">Aquecimento</option>
-                                                        <option value="feeder">Preparação</option>
-                                                        <option value="working">Trabalho</option>
-                                                        <option value="custom">Outro...</option>
-                                                    </select>
-                                                )}
+                                    <Droppable droppableId={`sets-list-${idx}`} type="SET">
+                                        {(provided) => (
+                                            <div 
+                                                ref={provided.innerRef} 
+                                                {...provided.droppableProps} 
+                                                style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+                                            >
+                                                {ex.sets.map((set, setIdx) => (
+                                                    <Draggable key={set.dndId} draggableId={set.dndId} index={setIdx}>
+                                                        {(provided) => (
+                                                            <div 
+                                                                ref={provided.innerRef}
+                                                                {...provided.draggableProps}
+                                                                style={{ 
+                                                                    ...provided.draggableProps.style,
+                                                                    display: 'grid', 
+                                                                    gridTemplateColumns: '30px minmax(100px, 1.2fr) 0.6fr 0.8fr 0.8fr 0.6fr 40px', 
+                                                                    gap: 10, 
+                                                                    alignItems: 'center',
+                                                                    background: '#fff',
+                                                                    borderRadius: 6
+                                                                }}
+                                                            >
+                                                                {/* Handle para arrastar set */}
+                                                                <div {...provided.dragHandleProps} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
+                                                                    <GripVertical size={16} />
+                                                                </div>
 
-                                                <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.series} onChange={(e) => updateSet(idx, setIdx, 'series', e.target.value)} placeholder="-" />
-                                                <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.reps} onChange={(e) => updateSet(idx, setIdx, 'reps', e.target.value)} placeholder="-" />
-                                                <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.load} onChange={(e) => updateSet(idx, setIdx, 'load', e.target.value)} placeholder="kg" />
-                                                <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.rest} onChange={(e) => updateSet(idx, setIdx, 'rest', e.target.value)} placeholder="s" />
-                                                
-                                                <button 
-                                                    onClick={() => removeSet(idx, setIdx)}
-                                                    style={{ background: '#fee2e2', border: 'none', color: '#ef4444', width: 24, height: 24, borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                                    title="Remover série"
-                                                >
-                                                    <X size={14} />
-                                                </button>
-                                                {set.type === 'custom' && (
-                                                    <button 
-                                                        onClick={() => updateSet(idx, setIdx, 'type', 'working')}
-                                                        style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', marginLeft: -30, marginRight: 10 }}
-                                                        title="Cancelar"
-                                                    >
-                                                        <X size={14} />
-                                                    </button>
-                                                )}
+                                                                {/* Seletor de Tipo ou Input Customizado */}
+                                                                {set.type === 'custom' ? (
+                                                                    <input 
+                                                                        className="input"
+                                                                        value={set.customLabel || ''}
+                                                                        onChange={(e) => updateSet(idx, setIdx, 'customLabel', e.target.value)}
+                                                                        placeholder="Nome do Tipo"
+                                                                        autoFocus
+                                                                        style={{ 
+                                                                            padding: '6px 8px', fontSize: '0.85em', fontWeight: 600,
+                                                                            color: '#7c3aed', borderColor: '#ddd6fe', background: '#f5f3ff',
+                                                                            width: '100%'
+                                                                        }}
+                                                                    />
+                                                                ) : (
+                                                                    <select 
+                                                                        className="input"
+                                                                        value={set.type}
+                                                                        onChange={(e) => updateSet(idx, setIdx, 'type', e.target.value)}
+                                                                        style={{ 
+                                                                            padding: '6px 8px', fontSize: '0.85em', fontWeight: 600,
+                                                                            color: set.type === 'warmup' ? '#ea580c' : set.type === 'feeder' ? '#0284c7' : '#16a34a',
+                                                                            borderColor: set.type === 'warmup' ? '#fed7aa' : set.type === 'feeder' ? '#bae6fd' : '#bbf7d0',
+                                                                            background: set.type === 'warmup' ? '#fff7ed' : set.type === 'feeder' ? '#f0f9ff' : '#f0fdf4',
+                                                                            width: '100%'
+                                                                        }}
+                                                                    >
+                                                                        <option value="warmup">Aquecimento</option>
+                                                                        <option value="feeder">Preparação</option>
+                                                                        <option value="working">Trabalho</option>
+                                                                        <option value="custom">Outro...</option>
+                                                                    </select>
+                                                                )}
+
+                                                                <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.series} onChange={(e) => updateSet(idx, setIdx, 'series', e.target.value)} placeholder="-" />
+                                                                <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.reps} onChange={(e) => updateSet(idx, setIdx, 'reps', e.target.value)} placeholder="-" />
+                                                                <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.load} onChange={(e) => updateSet(idx, setIdx, 'load', e.target.value)} placeholder="kg" />
+                                                                <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.rest} onChange={(e) => updateSet(idx, setIdx, 'rest', e.target.value)} placeholder="s" />
+                                                                
+                                                                <button 
+                                                                    onClick={() => removeSet(idx, setIdx)}
+                                                                    style={{ background: '#fee2e2', border: 'none', color: '#ef4444', width: 24, height: 24, borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                                    title="Remover série"
+                                                                >
+                                                                    <X size={14} />
+                                                                </button>
+                                                                {set.type === 'custom' && (
+                                                                    <button 
+                                                                        onClick={() => updateSet(idx, setIdx, 'type', 'working')}
+                                                                        style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', marginLeft: -30, marginRight: 10 }}
+                                                                        title="Cancelar"
+                                                                    >
+                                                                        <X size={14} />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </Draggable>
+                                                ))}
+                                                {provided.placeholder}
                                             </div>
-                                        ))}
-                                    </div>
+                                        )}
+                                    </Droppable>
 
                                     {/* Botões para Adicionar Sets */}
                                     <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
