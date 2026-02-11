@@ -84,7 +84,6 @@ export default function ListWorkoutsWrapper() {
 function ListWorkouts() {
   const { user } = useAuth()
   const [workouts, setWorkouts] = useState<Workout[]>([])
-  const [workouts, setWorkouts] = useState<Workout[]>([])
   const [schedule, setSchedule] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null)
