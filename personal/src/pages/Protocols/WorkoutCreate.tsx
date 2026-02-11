@@ -4,7 +4,7 @@ import { listExercises, type Exercise as LibraryExercise } from '../../store/exe
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
-import { X, BookOpen, Search, Video, GripVertical } from 'lucide-react'
+import { X, BookOpen, Search, Video, GripVertical, Copy } from 'lucide-react'
 
 type ExerciseSetType = 'warmup' | 'feeder' | 'working' | 'custom';
 
@@ -196,6 +196,21 @@ export default function WorkoutCreate() {
   
   const removeExercise = (idx: number) => setExercises(exercises.filter((_, i) => i !== idx))
   
+  const duplicateExercise = (idx: number) => {
+      const items = Array.from(exercises)
+      const original = items[idx]
+      
+      const copy: Exercise = {
+          ...original,
+          dndId: Math.random().toString(36).substr(2, 9),
+          // Deep copy dos sets para não referenciar o mesmo array
+          sets: original.sets.map(s => ({ ...s }))
+      }
+      
+      items.splice(idx + 1, 0, copy)
+      setExercises(items)
+  }
+
   const toggleAdvanced = (idx: number) => {
       const next = exercises.slice()
       next[idx].showAdvanced = !next[idx].showAdvanced
@@ -425,13 +440,22 @@ export default function WorkoutCreate() {
                                             onBlur={(e) => e.target.style.background = 'transparent'}
                                         />
                                     </div>
-                                    <button 
-                                        onClick={() => removeExercise(idx)}
-                                        style={{ marginLeft: 16, background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.2em', cursor: 'pointer', padding: 4 }}
-                                        title="Remover exercício"
-                                    >
-                                        ✕
-                                    </button>
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                        <button 
+                                            onClick={() => duplicateExercise(idx)}
+                                            style={{ marginLeft: 8, background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer', padding: 4 }}
+                                            title="Duplicar exercício"
+                                        >
+                                            <Copy size={20} />
+                                        </button>
+                                        <button 
+                                            onClick={() => removeExercise(idx)}
+                                            style={{ marginLeft: 8, background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.2em', cursor: 'pointer', padding: 4 }}
+                                            title="Remover exercício"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div style={{ padding: 20 }}>
