@@ -129,15 +129,17 @@ export default function DietsActive() {
     // 0. Converte logo para Base64 para evitar problemas de CORS no html2canvas
     let base64Logo = ''
     if (logoUrl && !logoUrl.includes('placehold.co')) {
-        try {
-            const response = await fetch(logoUrl)
-            const blob = await response.blob()
-            base64Logo = await new Promise((resolve) => {
-                const reader = new FileReader()
-                reader.onloadend = () => resolve(reader.result as string)
-                reader.readAsDataURL(blob)
-            })
-        } catch (e) {
+         try {
+             // Adiciona timestamp para evitar cache do navegador (CORS)
+             const cacheBuster = logoUrl.includes('?') ? '&t=' : '?t='
+             const response = await fetch(logoUrl + cacheBuster + new Date().getTime())
+             const blob = await response.blob()
+             base64Logo = await new Promise((resolve) => {
+                 const reader = new FileReader()
+                 reader.onloadend = () => resolve(reader.result as string)
+                 reader.readAsDataURL(blob)
+             })
+         } catch (e) {
             console.error('Erro ao converter logo para base64:', e)
             base64Logo = logoUrl // Tenta usar URL normal como fallback
         }

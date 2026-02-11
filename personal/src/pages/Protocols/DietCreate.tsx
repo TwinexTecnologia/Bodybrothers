@@ -81,7 +81,9 @@ export default function DietCreate() {
             if (config?.logo_url) {
                 // Converte para Base64 para garantir que saia no PDF
                 try {
-                    const response = await fetch(config.logo_url)
+                    // Adiciona timestamp para evitar cache do navegador (CORS)
+                    const cacheBuster = config.logo_url.includes('?') ? '&t=' : '?t='
+                    const response = await fetch(config.logo_url + cacheBuster + new Date().getTime())
                     const blob = await response.blob()
                     const reader = new FileReader()
                     reader.onloadend = () => {
