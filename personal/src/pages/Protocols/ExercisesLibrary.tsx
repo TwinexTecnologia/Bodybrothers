@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Plus, Search, Edit2, Trash2, Video, Dumbbell, Copy, RefreshCw } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Video, Dumbbell, Copy } from 'lucide-react'
 import { listExercises, createExercise, updateExercise, deleteExercise, type Exercise } from '../../store/exercises'
-import { listAllWorkouts } from '../../store/workouts'
 import Modal from '../../components/Modal'
 
 function getYouTubeId(url: string) {
@@ -22,7 +21,6 @@ export default function ExercisesLibrary() {
     const [formData, setFormData] = useState({ name: '', muscle_group: '', video_url: '' })
     const [saving, setSaving] = useState(false)
     const [uploading, setUploading] = useState(false)
-    const [syncing, setSyncing] = useState(false)
 
     useEffect(() => {
         load()
@@ -107,68 +105,6 @@ export default function ExercisesLibrary() {
         }
     }
 
-    const handleSync = async () => {
-        if (!confirm('Isso irá varrer todos os seus treinos existentes e importar exercícios com vídeos para a biblioteca. Deseja continuar?')) return
-
-        setSyncing(true)
-        try {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
-
-            // 1. Busca tudo que já existe na biblioteca para não duplicar
-            const currentLibrary = await listExercises(user.id)
-            const libraryNames = new Set(currentLibrary.map(e => e.name.toLowerCase().trim()))
-
-            // 2. Busca todos os treinos
-            const allWorkouts = await listAllWorkouts(user.id)
-            
-            // 3. Coleta exercícios novos
-            const newExercises = new Map<string, { name: string, group: string, videoUrl: string }>()
-
-            for (const workout of allWorkouts) {
-                for (const ex of workout.exercises) {
-                    if (ex.videoUrl && ex.name) {
-                        const nameKey = ex.name.toLowerCase().trim()
-                        if (!libraryNames.has(nameKey)) {
-                            // Se ainda não está na lib, adiciona para importar
-                            // Usa Map para evitar duplicatas dentro da própria importação
-                            if (!newExercises.has(nameKey)) {
-                                newExercises.set(nameKey, {
-                                    name: ex.name.trim(), // Mantém case original
-                                    group: ex.group || '',
-                                    videoUrl: ex.videoUrl
-                                })
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 4. Salva no banco
-            if (newExercises.size === 0) {
-                alert('Nenhum exercício novo com vídeo encontrado nos treinos.')
-            } else {
-                let count = 0
-                for (const ex of newExercises.values()) {
-                    await createExercise(user.id, {
-                        name: ex.name,
-                        muscle_group: ex.group,
-                        video_url: ex.videoUrl
-                    })
-                    count++
-                }
-                alert(`${count} exercícios importados com sucesso!`)
-                await load()
-            }
-
-        } catch (error) {
-            console.error('Erro na sincronização:', error)
-            alert('Erro ao sincronizar exercícios.')
-        } finally {
-            setSyncing(false)
-        }
-    }
-
     const openModal = (exercise?: Exercise) => {
         if (exercise) {
             setEditingId(exercise.id)
@@ -214,21 +150,9 @@ export default function ExercisesLibrary() {
                     <h1 style={{ margin: 0, fontSize: '1.8rem', color: '#0f172a' }}>Biblioteca de Exercícios</h1>
                     <p style={{ margin: '4px 0 0 0', color: '#64748b' }}>Gerencie seus exercícios para usar nos treinos</p>
                 </div>
-                <div style={{ display: 'flex', gap: 10 }}>
-                    <button 
-                        className="btn" 
-                        onClick={handleSync} 
-                        disabled={syncing}
-                        style={{ display: 'flex', gap: 8, alignItems: 'center', background: '#fff', color: '#64748b', border: '1px solid #cbd5e1' }}
-                        title="Importar exercícios com vídeo dos seus treinos existentes"
-                    >
-                        <RefreshCw size={20} className={syncing ? 'spin' : ''} /> 
-                        {syncing ? 'Sincronizando...' : 'Importar dos Treinos'}
-                    </button>
-                    <button className="btn-primary" onClick={() => openModal()} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <Plus size={20} /> Novo Exercício
-                    </button>
-                </div>
+                <button className="btn-primary" onClick={() => openModal()} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <Plus size={20} /> Novo Exercício
+                </button>
             </div>
 
             {/* Busca */}
