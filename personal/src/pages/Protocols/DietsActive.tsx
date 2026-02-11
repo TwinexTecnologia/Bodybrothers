@@ -130,14 +130,28 @@ export default function DietsActive() {
     let base64Logo = ''
     if (logoUrl && !logoUrl.includes('placehold.co')) {
          try {
-             // Adiciona timestamp para evitar cache do navegador (CORS)
-             const cacheBuster = logoUrl.includes('?') ? '&t=' : '?t='
-             const response = await fetch(logoUrl + cacheBuster + new Date().getTime())
-             const blob = await response.blob()
+             // Tenta converter via Image + Canvas (mais robusto para CORS se configurado)
              base64Logo = await new Promise((resolve) => {
-                 const reader = new FileReader()
-                 reader.onloadend = () => resolve(reader.result as string)
-                 reader.readAsDataURL(blob)
+                 const img = new Image()
+                 img.crossOrigin = 'Anonymous'
+                 img.onload = () => {
+                     const canvas = document.createElement('canvas')
+                     canvas.width = img.width
+                     canvas.height = img.height
+                     const ctx = canvas.getContext('2d')
+                     if (ctx) {
+                         ctx.drawImage(img, 0, 0)
+                         resolve(canvas.toDataURL('image/png'))
+                     } else {
+                         resolve(logoUrl) // Fallback
+                     }
+                 }
+                 img.onerror = (err) => {
+                     console.error('Erro ao carregar imagem para base64:', err)
+                     resolve(logoUrl)
+                 }
+                 // Cache buster
+                 img.src = logoUrl + (logoUrl.includes('?') ? '&' : '?') + 't=' + new Date().getTime()
              })
          } catch (e) {
             console.error('Erro ao converter logo para base64:', e)

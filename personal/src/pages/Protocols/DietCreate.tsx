@@ -79,17 +79,25 @@ export default function DietCreate() {
                 .eq('personal_id', user.id)
                 .single()
             if (config?.logo_url) {
-                // Converte para Base64 para garantir que saia no PDF
+                // Converte para Base64 usando Image + Canvas
                 try {
-                    // Adiciona timestamp para evitar cache do navegador (CORS)
-                    const cacheBuster = config.logo_url.includes('?') ? '&t=' : '?t='
-                    const response = await fetch(config.logo_url + cacheBuster + new Date().getTime())
-                    const blob = await response.blob()
-                    const reader = new FileReader()
-                    reader.onloadend = () => {
-                        setLogoUrl(reader.result as string)
+                    const img = new Image()
+                    img.crossOrigin = 'Anonymous'
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas')
+                        canvas.width = img.width
+                        canvas.height = img.height
+                        const ctx = canvas.getContext('2d')
+                        if (ctx) {
+                            ctx.drawImage(img, 0, 0)
+                            setLogoUrl(canvas.toDataURL('image/png'))
+                        } else {
+                            setLogoUrl(config.logo_url)
+                        }
                     }
-                    reader.readAsDataURL(blob)
+                    img.onerror = () => setLogoUrl(config.logo_url)
+                    // Cache buster
+                    img.src = config.logo_url + (config.logo_url.includes('?') ? '&' : '?') + 't=' + new Date().getTime()
                 } catch (e) {
                     console.error('Erro ao converter logo:', e)
                     setLogoUrl(config.logo_url)
