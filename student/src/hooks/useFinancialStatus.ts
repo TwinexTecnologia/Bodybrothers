@@ -99,6 +99,9 @@ export function useFinancialStatus() {
 
     function generateCharges(info: any, planData: Plan, payList: DebitRecord[]) {
         if (!info.planStartDate || !planData) return []
+        
+        // SE O PREÇO FOR ZERO, NÃO GERA COBRANÇAS (GRATUITO)
+        if (planData.price <= 0) return []
 
         let dateStr = info.planStartDate
         if (dateStr.includes('T')) dateStr = dateStr.split('T')[0]

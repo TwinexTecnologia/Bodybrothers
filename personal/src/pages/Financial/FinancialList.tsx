@@ -323,6 +323,9 @@ function FinancialListContent() {
       const plan = plans.find(p => p.id === s.planId)
       if (!plan) return []
       
+      // Se o plano for gratuito (preço <= 0), não gera cobrança
+      if (plan.price <= 0) return []
+
       const charges = generateCharges(s, plan, currentDate)
       
       return charges.map(c => {

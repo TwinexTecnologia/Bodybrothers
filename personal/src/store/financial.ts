@@ -68,6 +68,9 @@ export async function registerPayment(data: {
     refDate: Date
     description?: string
 }): Promise<boolean> {
+    // Se valor for zero ou negativo, não registra (plano gratuito)
+    if (data.amount <= 0) return true
+
     const refMonth = new Date(data.refDate.getFullYear(), data.refDate.getMonth(), 1).toISOString().split('T')[0]
     
     const { error } = await supabase
