@@ -3,7 +3,8 @@ import { addWorkout, updateWorkout, getWorkoutById, deleteWorkoutIfPersonalized 
 import { listExercises, type Exercise as LibraryExercise } from '../../store/exercises'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { X, BookOpen, Search, Video } from 'lucide-react'
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
+import { X, BookOpen, Search, Video, GripVertical } from 'lucide-react'
 
 type ExerciseSetType = 'warmup' | 'feeder' | 'working' | 'custom';
 
@@ -16,7 +17,10 @@ type ExerciseSet = {
     rest: string;
 }
 
-type Exercise = { 
+type Exercise = {
+    // ID único para Drag and Drop (pode ser temp)
+    dndId: string; 
+    
     name: string; 
     group: string; 
     
@@ -117,6 +121,7 @@ export default function WorkoutCreate() {
 
                     return {
                         ...e,
+                        dndId: Math.random().toString(36).substr(2, 9),
                         sets,
                         showAdvanced: !!(e.warmupSeries || e.warmupReps || e.feederSeries || e.feederReps || sets.length > 1)
                     }
@@ -129,7 +134,8 @@ export default function WorkoutCreate() {
     load()
   }, [workoutId])
 
-  const addExercise = () => setExercises([...exercises, { 
+  const addExercise = () => setExercises([...exercises, {
+      dndId: Math.random().toString(36).substr(2, 9),
       name: '', 
       group: '', 
       series: '', 
@@ -142,6 +148,16 @@ export default function WorkoutCreate() {
       showAdvanced: false 
   }])
   
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return
+
+    const items = Array.from(exercises)
+    const [reorderedItem] = items.splice(result.source.index, 1)
+    items.splice(result.destination.index, 0, reorderedItem)
+
+    setExercises(items)
+  }
+
   const updateExercise = (idx: number, patch: Partial<Exercise>) => {
     const next = exercises.slice()
     next[idx] = { ...next[idx], ...patch }
@@ -239,8 +255,8 @@ export default function WorkoutCreate() {
       }
 
       setLoading(true)
-      // Limpa campos internos antes de salvar (remove showAdvanced)
-      const cleanExercises = exercises.map(({ showAdvanced, ...rest }) => rest)
+      // Limpa campos internos antes de salvar (remove showAdvanced e dndId)
+      const cleanExercises = exercises.map(({ showAdvanced, dndId, ...rest }) => rest)
 
       try {
         if (editId) {
@@ -335,255 +351,280 @@ export default function WorkoutCreate() {
       </div>
 
       {/* Lista de Exercícios */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {exercises.map((ex, idx) => (
-          <div key={idx} className="form-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
-            
-            {/* Header do Exercício */}
-            <div style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flex: 1 }}>
-                    <div style={{ width: 28, height: 28, background: '#cbd5e1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#475569', fontSize: '0.9em' }}>
-                        {idx + 1}
-                    </div>
-                    
-                    {/* Nome e Biblioteca */}
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input 
-                            className="input" 
-                            value={ex.name} 
-                            onChange={(e) => updateExercise(idx, { name: e.target.value })} 
-                            placeholder="Nome do Exercício"
-                            style={{ flex: 1, fontWeight: 600, fontSize: '1.05em', border: '1px solid transparent', background: 'transparent' }}
-                            onFocus={(e) => e.target.style.background = '#fff'}
-                            onBlur={(e) => e.target.style.background = 'transparent'}
-                        />
-                        {library.length > 0 && (
-                            <button 
-                                onClick={() => {
-                                    setSelectorOpen(idx)
-                                    setSelectorSearch('')
-                                }}
-                                style={{ 
-                                    background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: 6, 
-                                    padding: '6px 10px', cursor: 'pointer', color: '#0369a1', 
-                                    display: 'flex', alignItems: 'center', gap: 6, 
-                                    fontSize: '0.85em', fontWeight: 600, whiteSpace: 'nowrap'
-                                }}
-                                title="Selecionar da Biblioteca"
-                            >
-                                <BookOpen size={16} /> Biblioteca
-                            </button>
-                        )}
-                    </div>
-
-                    <input 
-                        className="input" 
-                        value={ex.group} 
-                        onChange={(e) => updateExercise(idx, { group: e.target.value })} 
-                        placeholder="Grupo Muscular"
-                        style={{ width: 150, fontSize: '0.9em', border: '1px solid transparent', background: 'transparent', textAlign: 'right', color: '#64748b' }}
-                        onFocus={(e) => e.target.style.background = '#fff'}
-                        onBlur={(e) => e.target.style.background = 'transparent'}
-                    />
-                </div>
-                <button 
-                    onClick={() => removeExercise(idx)}
-                    style={{ marginLeft: 16, background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.2em', cursor: 'pointer', padding: 4 }}
-                    title="Remover exercício"
+      <DragDropContext onDragEnd={onDragEnd}>
+        <Droppable droppableId="exercises-list">
+            {(provided) => (
+                <div 
+                    {...provided.droppableProps} 
+                    ref={provided.innerRef} 
+                    style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
                 >
-                    ✕
-                </button>
-            </div>
-
-            <div style={{ padding: 20 }}>
-                {/* Cabeçalho da Tabela de Sets */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 1.2fr) 0.6fr 0.8fr 0.8fr 0.6fr 40px', gap: 10, alignItems: 'center', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>TIPO</div>
-                    <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>SÉRIES</div>
-                    <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>REPS</div>
-                    <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>CARGA</div>
-                    <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>DESC.</div>
-                    <div></div>
-                </div>
-
-                {/* Lista de Sets Dinâmicos */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {ex.sets.map((set, setIdx) => (
-                        <div key={setIdx} style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 1.2fr) 0.6fr 0.8fr 0.8fr 0.6fr 40px', gap: 10, alignItems: 'center' }}>
-                            {/* Seletor de Tipo ou Input Customizado */}
-                            {set.type === 'custom' ? (
-                                <input 
-                                    className="input"
-                                    value={set.customLabel || ''}
-                                    onChange={(e) => updateSet(idx, setIdx, 'customLabel', e.target.value)}
-                                    placeholder="Nome do Tipo"
-                                    autoFocus
-                                    style={{ 
-                                        padding: '6px 8px', fontSize: '0.85em', fontWeight: 600,
-                                        color: '#7c3aed', borderColor: '#ddd6fe', background: '#f5f3ff',
-                                        width: '100%'
-                                    }}
-                                />
-                            ) : (
-                                <select 
-                                    className="input"
-                                    value={set.type}
-                                    onChange={(e) => updateSet(idx, setIdx, 'type', e.target.value)}
-                                    style={{ 
-                                        padding: '6px 8px', fontSize: '0.85em', fontWeight: 600,
-                                        color: set.type === 'warmup' ? '#ea580c' : set.type === 'feeder' ? '#0284c7' : '#16a34a',
-                                        borderColor: set.type === 'warmup' ? '#fed7aa' : set.type === 'feeder' ? '#bae6fd' : '#bbf7d0',
-                                        background: set.type === 'warmup' ? '#fff7ed' : set.type === 'feeder' ? '#f0f9ff' : '#f0fdf4',
-                                        width: '100%'
-                                    }}
-                                >
-                                    <option value="warmup">Aquecimento</option>
-                                    <option value="feeder">Preparação</option>
-                                    <option value="working">Trabalho</option>
-                                    <option value="custom">Outro...</option>
-                                </select>
-                            )}
-
-                            <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.series} onChange={(e) => updateSet(idx, setIdx, 'series', e.target.value)} placeholder="-" />
-                            <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.reps} onChange={(e) => updateSet(idx, setIdx, 'reps', e.target.value)} placeholder="-" />
-                            <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.load} onChange={(e) => updateSet(idx, setIdx, 'load', e.target.value)} placeholder="kg" />
-                            <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.rest} onChange={(e) => updateSet(idx, setIdx, 'rest', e.target.value)} placeholder="s" />
-                            
-                            <button 
-                                onClick={() => removeSet(idx, setIdx)}
-                                style={{ background: '#fee2e2', border: 'none', color: '#ef4444', width: 24, height: 24, borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                title="Remover série"
-                            >
-                                <X size={14} />
-                            </button>
-                            {set.type === 'custom' && (
-                                <button 
-                                    onClick={() => updateSet(idx, setIdx, 'type', 'working')}
-                                    style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', marginLeft: -30, marginRight: 10 }}
-                                    title="Cancelar"
-                                >
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
-                    ))}
-                </div>
-
-                {/* Botões para Adicionar Sets */}
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                    <button onClick={() => addSet(idx, 'warmup')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#fff7ed', color: '#ea580c', border: '1px solid #fed7aa', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Aquecimento</button>
-                    <button onClick={() => addSet(idx, 'feeder')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#f0f9ff', color: '#0284c7', border: '1px solid #bae6fd', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Preparação</button>
-                    <button onClick={() => addSet(idx, 'working')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Trabalho</button>
-                    <button onClick={() => addSet(idx, 'custom')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Outro</button>
-                </div>
-
-                {/* Footer do Card: Toggle Avançado, Obs e Vídeo */}
-                <div style={{ display: 'flex', gap: 20, paddingTop: 16, marginTop: 16, borderTop: '1px solid #f1f5f9' }}>
-                    
-                    {/* Botão Toggle Avançado */}
-                    {/* (Removido pois agora é sempre visível/dinâmico) */}
-
-                    {/* Obs e Video Inputs */}
-                    <div style={{ flex: 1, display: 'grid', gap: 10 }}>
-                        <input 
-                            className="input" 
-                            style={{ fontSize: '0.9em' }} 
-                            value={ex.notes || ''} 
-                            onChange={(e) => updateExercise(idx, { notes: e.target.value })} 
-                            placeholder="Observações do exercício..." 
-                        />
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <input 
-                                className="input" 
-                                style={{ fontSize: '0.9em', flex: 1 }} 
-                                value={ex.videoUrl || ''} 
-                                onChange={(e) => updateExercise(idx, { videoUrl: e.target.value })} 
-                                placeholder="Link ou Upload..." 
-                            />
-                            <label 
+                    {exercises.map((ex, idx) => (
+                    <Draggable key={ex.dndId} draggableId={ex.dndId} index={idx}>
+                        {(provided) => (
+                            <div 
+                                key={idx} 
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className="form-card" 
                                 style={{ 
-                                    cursor: 'pointer', 
-                                    background: '#f1f5f9', 
-                                    padding: '8px 12px', 
-                                    borderRadius: '6px', 
-                                    border: '1px solid #cbd5e1',
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: 6,
-                                    fontSize: '0.9em',
-                                    color: '#475569',
-                                    whiteSpace: 'nowrap'
+                                    ...provided.draggableProps.style, // Estilos essenciais para o DND
+                                    padding: 0, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' 
                                 }}
-                                title="Fazer upload de vídeo"
                             >
-                                {uploadingIdx === idx ? '⏳...' : '📁 Upload'}
-                                <input 
-                                    type="file" 
-                                    accept="video/*" 
-                                    style={{ display: 'none' }} 
-                                    onChange={(e) => handleUpload(idx, e.target.files?.[0])}
-                                    disabled={uploadingIdx !== null}
-                                />
-                            </label>
-                        </div>
-                        
-                        {/* Preview do Vídeo (Expansível) */}
-                        {ex.videoUrl && (
-                            <div style={{ marginTop: 8, position: 'relative', width: 'fit-content' }}>
-                                <button 
-                                    onClick={() => updateExercise(idx, { videoUrl: '' })}
-                                    style={{
-                                        position: 'absolute', top: -10, right: -10, zIndex: 10,
-                                        background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%',
-                                        width: 24, height: 24, cursor: 'pointer', fontWeight: 'bold',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                                    }}
-                                    title="Remover vídeo"
-                                >
-                                    ✕
-                                </button>
+                                
+                                {/* Header do Exercício */}
+                                <div style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flex: 1 }}>
+                                        {/* Handle para arrastar */}
+                                        <div {...provided.dragHandleProps} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', color: '#94a3b8', marginRight: -4 }}>
+                                            <GripVertical size={20} />
+                                        </div>
 
-                                {getYouTubeId(ex.videoUrl) ? (
-                                    <div style={{ background: '#000', borderRadius: 8, overflow: 'hidden' }}>
-                                        <iframe
-                                            width="320"
-                                            height="180"
-                                            src={`https://www.youtube.com/embed/${getYouTubeId(ex.videoUrl)}`}
-                                            frameBorder="0"
-                                            allowFullScreen
-                                        ></iframe>
+                                        <div style={{ width: 28, height: 28, background: '#cbd5e1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#475569', fontSize: '0.9em' }}>
+                                            {idx + 1}
+                                        </div>
+                                        
+                                        {/* Nome e Biblioteca */}
+                                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <input 
+                                                className="input" 
+                                                value={ex.name} 
+                                                onChange={(e) => updateExercise(idx, { name: e.target.value })} 
+                                                placeholder="Nome do Exercício"
+                                                style={{ flex: 1, fontWeight: 600, fontSize: '1.05em', border: '1px solid transparent', background: 'transparent' }}
+                                                onFocus={(e) => e.target.style.background = '#fff'}
+                                                onBlur={(e) => e.target.style.background = 'transparent'}
+                                            />
+                                            {library.length > 0 && (
+                                                <button 
+                                                    onClick={() => {
+                                                        setSelectorOpen(idx)
+                                                        setSelectorSearch('')
+                                                    }}
+                                                    style={{ 
+                                                        background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: 6, 
+                                                        padding: '6px 10px', cursor: 'pointer', color: '#0369a1', 
+                                                        display: 'flex', alignItems: 'center', gap: 6, 
+                                                        fontSize: '0.85em', fontWeight: 600, whiteSpace: 'nowrap'
+                                                    }}
+                                                    title="Selecionar da Biblioteca"
+                                                >
+                                                    <BookOpen size={16} /> Biblioteca
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <input 
+                                            className="input" 
+                                            value={ex.group} 
+                                            onChange={(e) => updateExercise(idx, { group: e.target.value })} 
+                                            placeholder="Grupo Muscular"
+                                            style={{ width: 150, fontSize: '0.9em', border: '1px solid transparent', background: 'transparent', textAlign: 'right', color: '#64748b' }}
+                                            onFocus={(e) => e.target.style.background = '#fff'}
+                                            onBlur={(e) => e.target.style.background = 'transparent'}
+                                        />
                                     </div>
-                                ) : ex.videoUrl.match(/\.(mp4|mov|webm)$/i) || ex.videoUrl.includes('supabase.co') ? (
-                                    <video 
-                                        src={ex.videoUrl} 
-                                        controls 
-                                        style={{ width: 320, borderRadius: 8, background: '#000' }}
-                                    />
-                                ) : (
-                                    <div style={{ width: 320, padding: 10, background: '#000', borderRadius: 8, color: 'white', textAlign: 'center' }}>
-                                        <a href={ex.videoUrl} target="_blank" rel="noreferrer" style={{ color: '#60a5fa' }}>Abrir Vídeo Externo ↗</a>
+                                    <button 
+                                        onClick={() => removeExercise(idx)}
+                                        style={{ marginLeft: 16, background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.2em', cursor: 'pointer', padding: 4 }}
+                                        title="Remover exercício"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+
+                                <div style={{ padding: 20 }}>
+                                    {/* Cabeçalho da Tabela de Sets */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 1.2fr) 0.6fr 0.8fr 0.8fr 0.6fr 40px', gap: 10, alignItems: 'center', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #f1f5f9' }}>
+                                        <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>TIPO</div>
+                                        <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>SÉRIES</div>
+                                        <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>REPS</div>
+                                        <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>CARGA</div>
+                                        <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>DESC.</div>
+                                        <div></div>
                                     </div>
-                                )}
+
+                                    {/* Lista de Sets Dinâmicos */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        {ex.sets.map((set, setIdx) => (
+                                            <div key={setIdx} style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 1.2fr) 0.6fr 0.8fr 0.8fr 0.6fr 40px', gap: 10, alignItems: 'center' }}>
+                                                {/* Seletor de Tipo ou Input Customizado */}
+                                                {set.type === 'custom' ? (
+                                                    <input 
+                                                        className="input"
+                                                        value={set.customLabel || ''}
+                                                        onChange={(e) => updateSet(idx, setIdx, 'customLabel', e.target.value)}
+                                                        placeholder="Nome do Tipo"
+                                                        autoFocus
+                                                        style={{ 
+                                                            padding: '6px 8px', fontSize: '0.85em', fontWeight: 600,
+                                                            color: '#7c3aed', borderColor: '#ddd6fe', background: '#f5f3ff',
+                                                            width: '100%'
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <select 
+                                                        className="input"
+                                                        value={set.type}
+                                                        onChange={(e) => updateSet(idx, setIdx, 'type', e.target.value)}
+                                                        style={{ 
+                                                            padding: '6px 8px', fontSize: '0.85em', fontWeight: 600,
+                                                            color: set.type === 'warmup' ? '#ea580c' : set.type === 'feeder' ? '#0284c7' : '#16a34a',
+                                                            borderColor: set.type === 'warmup' ? '#fed7aa' : set.type === 'feeder' ? '#bae6fd' : '#bbf7d0',
+                                                            background: set.type === 'warmup' ? '#fff7ed' : set.type === 'feeder' ? '#f0f9ff' : '#f0fdf4',
+                                                            width: '100%'
+                                                        }}
+                                                    >
+                                                        <option value="warmup">Aquecimento</option>
+                                                        <option value="feeder">Preparação</option>
+                                                        <option value="working">Trabalho</option>
+                                                        <option value="custom">Outro...</option>
+                                                    </select>
+                                                )}
+
+                                                <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.series} onChange={(e) => updateSet(idx, setIdx, 'series', e.target.value)} placeholder="-" />
+                                                <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.reps} onChange={(e) => updateSet(idx, setIdx, 'reps', e.target.value)} placeholder="-" />
+                                                <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.load} onChange={(e) => updateSet(idx, setIdx, 'load', e.target.value)} placeholder="kg" />
+                                                <input className="input" style={{ width: '100%', minWidth: 0, padding: '6px 8px' }} value={set.rest} onChange={(e) => updateSet(idx, setIdx, 'rest', e.target.value)} placeholder="s" />
+                                                
+                                                <button 
+                                                    onClick={() => removeSet(idx, setIdx)}
+                                                    style={{ background: '#fee2e2', border: 'none', color: '#ef4444', width: 24, height: 24, borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                    title="Remover série"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                                {set.type === 'custom' && (
+                                                    <button 
+                                                        onClick={() => updateSet(idx, setIdx, 'type', 'working')}
+                                                        style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', marginLeft: -30, marginRight: 10 }}
+                                                        title="Cancelar"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Botões para Adicionar Sets */}
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                                        <button onClick={() => addSet(idx, 'warmup')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#fff7ed', color: '#ea580c', border: '1px solid #fed7aa', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Aquecimento</button>
+                                        <button onClick={() => addSet(idx, 'feeder')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#f0f9ff', color: '#0284c7', border: '1px solid #bae6fd', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Preparação</button>
+                                        <button onClick={() => addSet(idx, 'working')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Trabalho</button>
+                                        <button onClick={() => addSet(idx, 'custom')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Outro</button>
+                                    </div>
+
+                                    {/* Footer do Card: Toggle Avançado, Obs e Vídeo */}
+                                    <div style={{ display: 'flex', gap: 20, paddingTop: 16, marginTop: 16, borderTop: '1px solid #f1f5f9' }}>
+                                        
+                                        {/* Botão Toggle Avançado */}
+                                        {/* (Removido pois agora é sempre visível/dinâmico) */}
+
+                                        {/* Obs e Video Inputs */}
+                                        <div style={{ flex: 1, display: 'grid', gap: 10 }}>
+                                            <input 
+                                                className="input" 
+                                                style={{ fontSize: '0.9em' }} 
+                                                value={ex.notes || ''} 
+                                                onChange={(e) => updateExercise(idx, { notes: e.target.value })} 
+                                                placeholder="Observações do exercício..." 
+                                            />
+                                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                <input 
+                                                    className="input" 
+                                                    style={{ fontSize: '0.9em', flex: 1 }} 
+                                                    value={ex.videoUrl || ''} 
+                                                    onChange={(e) => updateExercise(idx, { videoUrl: e.target.value })} 
+                                                    placeholder="Link ou Upload..." 
+                                                />
+                                                <label 
+                                                    style={{ 
+                                                        cursor: 'pointer', 
+                                                        background: '#f1f5f9', 
+                                                        padding: '8px 12px', 
+                                                        borderRadius: '6px', 
+                                                        border: '1px solid #cbd5e1',
+                                                        display: 'flex', 
+                                                        alignItems: 'center', 
+                                                        gap: 6,
+                                                        fontSize: '0.9em',
+                                                        color: '#475569',
+                                                        whiteSpace: 'nowrap'
+                                                    }}
+                                                    title="Fazer upload de vídeo"
+                                                >
+                                                    {uploadingIdx === idx ? '⏳...' : '📁 Upload'}
+                                                    <input 
+                                                        type="file" 
+                                                        accept="video/*" 
+                                                        style={{ display: 'none' }} 
+                                                        onChange={(e) => handleUpload(idx, e.target.files?.[0])}
+                                                        disabled={uploadingIdx !== null}
+                                                    />
+                                                </label>
+                                            </div>
+                                            
+                                            {/* Preview do Vídeo (Expansível) */}
+                                            {ex.videoUrl && (
+                                                <div style={{ marginTop: 8, position: 'relative', width: 'fit-content' }}>
+                                                    <button 
+                                                        onClick={() => updateExercise(idx, { videoUrl: '' })}
+                                                        style={{
+                                                            position: 'absolute', top: -10, right: -10, zIndex: 10,
+                                                            background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%',
+                                                            width: 24, height: 24, cursor: 'pointer', fontWeight: 'bold',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                                                        }}
+                                                        title="Remover vídeo"
+                                                    >
+                                                        ✕
+                                                    </button>
+
+                                                    {getYouTubeId(ex.videoUrl) ? (
+                                                        <div style={{ background: '#000', borderRadius: 8, overflow: 'hidden' }}>
+                                                            <iframe
+                                                                width="320"
+                                                                height="180"
+                                                                src={`https://www.youtube.com/embed/${getYouTubeId(ex.videoUrl)}`}
+                                                                frameBorder="0"
+                                                                allowFullScreen
+                                                            ></iframe>
+                                                        </div>
+                                                    ) : ex.videoUrl.match(/\.(mp4|mov|webm)$/i) || ex.videoUrl.includes('supabase.co') ? (
+                                                        <video 
+                                                            src={ex.videoUrl} 
+                                                            controls 
+                                                            style={{ width: 320, borderRadius: 8, background: '#000' }}
+                                                        />
+                                                    ) : (
+                                                        <div style={{ width: 320, padding: 10, background: '#000', borderRadius: 8, color: 'white', textAlign: 'center' }}>
+                                                            <a href={ex.videoUrl} target="_blank" rel="noreferrer" style={{ color: '#60a5fa' }}>Abrir Vídeo Externo ↗</a>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
                             </div>
                         )}
-                    </div>
+                    </Draggable>
+                    ))}
+                    {provided.placeholder}
                 </div>
-            </div>
+            )}
+        </Droppable>
+      </DragDropContext>
 
+      {exercises.length === 0 && (
+          <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', border: '2px dashed #e2e8f0', borderRadius: 12 }}>
+              Nenhum exercício adicionado. Clique no botão acima para começar.
           </div>
-        ))}
-
-        {exercises.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', border: '2px dashed #e2e8f0', borderRadius: 12 }}>
-                Nenhum exercício adicionado. Clique no botão acima para começar.
-            </div>
-        )}
-
-        <button className="btn" onClick={addExercise} style={{ padding: '12px', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1' }}>
-            + Adicionar Outro Exercício
-        </button>
-      </div>
+      )}
 
       {msg && <div className="form-success" style={{ marginTop: 20 }}>{msg}</div>}
       
