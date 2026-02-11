@@ -41,6 +41,7 @@ export default function WorkoutsActive() {
         const { data: students } = await supabase
           .from('profiles')
           .select('id, full_name')
+          .eq('personal_id', user.id) // Filtra apenas alunos DESTE personal
           .or('role.eq.student,role.eq.aluno')
         
         const names: Record<string, string> = {}
