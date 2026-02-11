@@ -79,7 +79,19 @@ export default function DietCreate() {
                 .eq('personal_id', user.id)
                 .single()
             if (config?.logo_url) {
-                setLogoUrl(config.logo_url)
+                // Converte para Base64 para garantir que saia no PDF
+                try {
+                    const response = await fetch(config.logo_url)
+                    const blob = await response.blob()
+                    const reader = new FileReader()
+                    reader.onloadend = () => {
+                        setLogoUrl(reader.result as string)
+                    }
+                    reader.readAsDataURL(blob)
+                } catch (e) {
+                    console.error('Erro ao converter logo:', e)
+                    setLogoUrl(config.logo_url)
+                }
             } else {
                 setLogoUrl('https://placehold.co/400x200/1e3a8a/ffffff?text=LOGO+DO+PERSONAL')
             }

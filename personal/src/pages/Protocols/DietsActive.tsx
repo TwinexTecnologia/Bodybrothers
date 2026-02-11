@@ -126,6 +126,25 @@ export default function DietsActive() {
   }
 
   const exportDietPdf = async (d: DietRecord) => {
+    // 0. Converte logo para Base64 para evitar problemas de CORS no html2canvas
+    let base64Logo = ''
+    if (logoUrl && !logoUrl.includes('placehold.co')) {
+        try {
+            const response = await fetch(logoUrl)
+            const blob = await response.blob()
+            base64Logo = await new Promise((resolve) => {
+                const reader = new FileReader()
+                reader.onloadend = () => resolve(reader.result as string)
+                reader.readAsDataURL(blob)
+            })
+        } catch (e) {
+            console.error('Erro ao converter logo para base64:', e)
+            base64Logo = logoUrl // Tenta usar URL normal como fallback
+        }
+    } else {
+        base64Logo = logoUrl // Placeholder usa URL normal
+    }
+
     // 1. Cria container temporário
     const container = document.createElement('div')
     container.style.position = 'absolute'
@@ -151,10 +170,17 @@ export default function DietsActive() {
 
     let html = ``
     
-    if (logoUrl) {
+    if (base64Logo) {
         html += `
             <div style="text-align: center; margin-bottom: 30px;">
-                <img src="${logoUrl}" style="max-height: 220px; object-fit: contain;" crossOrigin="anonymous" />
+                <img src="${base64Logo}" style="max-height: 120px; object-fit: contain;" />
+            </div>
+        `
+    } else {
+        // Fallback texto se não tiver logo
+        html += `
+             <div style="text-align: center; margin-bottom: 30px; padding: 20px; background: #1e3a8a; color: #fff; font-size: 20px; font-weight: bold;">
+                LOGO DO PERSONAL
             </div>
         `
     }
