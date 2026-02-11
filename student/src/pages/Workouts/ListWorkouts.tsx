@@ -706,7 +706,7 @@ function ListWorkouts() {
                 <div style={{ position: 'absolute', top: 16, left: 16, right: 16, height: 2, background: '#f1f5f9', zIndex: 0, borderRadius: 2 }} />
                 
                 {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, i) => {
-                    const isActive = activeDays.includes(i)
+                    const isActive = Array.isArray(activeDays) && activeDays.includes(i)
                     const todayIndex = new Date().getDay()
                     const isToday = i === todayIndex
                     const isPast = i < todayIndex
@@ -770,7 +770,7 @@ function ListWorkouts() {
             </div>
         ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                {workoutsByDay.map(group => (
+                {Array.isArray(workoutsByDay) && workoutsByDay.map(group => (
                     <div key={group.dayKey} style={{ background: '#fff', borderRadius: 24, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.03)' }}>
                         <div style={{ padding: '24px', borderBottom: '1px solid #f8fafc' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -821,7 +821,7 @@ function ListWorkouts() {
                     <div style={{ marginTop: 24 }}>
                          <h3 style={{ fontSize: '1.1rem', color: '#64748b', margin: '0 0 20px 0', fontWeight: 600 }}>Outros Treinos Disponíveis</h3>
                          <div style={{ display: 'grid', gap: 16 }}>
-                            {unscheduledWorkouts.map(w => (
+                            {Array.isArray(unscheduledWorkouts) && unscheduledWorkouts.map(w => (
                                 <div key={w.id} style={{ background: '#fff', padding: 20, borderRadius: 20, border: '1px solid #f1f5f9', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
                                         <h4 style={{ margin: 0, color: '#0f172a', fontSize: '1.1rem' }}>{w.title}</h4>
@@ -931,7 +931,7 @@ function ListWorkouts() {
                             </div>
                         )}
 
-                        {selectedWorkout.data.exercises.map((ex, i) => (
+                        {selectedWorkout.data.exercises && Array.isArray(selectedWorkout.data.exercises) && selectedWorkout.data.exercises.map((ex, i) => (
                             <div key={i} style={{ 
                                 background: '#fff', 
                                 borderRadius: 16, 
