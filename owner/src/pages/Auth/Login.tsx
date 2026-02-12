@@ -58,23 +58,23 @@ export default function Login() {
         fontFamily: 'Inter, sans-serif',
         paddingBottom: '25vh'
     }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
         {/* Logo Centralizada */}
-        <div style={{ textAlign: 'center', marginBottom: 0, zIndex: 1 }}>
+        <div style={{ textAlign: 'center', zIndex: 1 }}>
             <img 
                src="https://cdtouwfxwuhnlzqhcagy.supabase.co/storage/v1/object/public/Imagens/ChatGPT%20Image%209%20de%20fev.%20de%202026%2C%2022_23_47.png" 
                alt="FitBody Pro" 
                style={{ 
-                   maxWidth: 400,
+                   maxWidth: 220, // Reduzi para ficar mais elegante
                    height: 'auto', 
-                   filter: 'drop-shadow(0 0 25px rgba(56, 189, 248, 0.5))',
+                   filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))', // Sombra mais suave
                }} 
                onError={(e) => {
                    e.currentTarget.style.display = 'none'
                    e.currentTarget.nextElementSibling?.removeAttribute('hidden')
                }} 
             />
-            <h1 hidden style={{ color: '#fff', margin: 0, fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-1px' }}>
+            <h1 hidden style={{ color: '#fff', margin: '16px 0 0 0', fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-1px' }}>
                 <span style={{ color: '#38bdf8' }}>FitBody</span> Pro
             </h1>
         </div>
@@ -82,10 +82,9 @@ export default function Login() {
         <div className="login-card" style={{ 
             width: 380, 
             padding: 32, 
-            borderRadius: 16, 
+            borderRadius: 24, // Mais arredondado
             background: '#fff', 
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', 
-            marginTop: -110,
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', // Sombra mais forte para destacar do fundo escuro
             zIndex: 10,
             position: 'relative'
         }}>
