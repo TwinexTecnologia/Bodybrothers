@@ -33,7 +33,9 @@ export default function Overview() {
     inactiveWorkouts: 0,
     monthlyRevenue: 0,
     monthlyCash: 0, // Novo estado para Caixa
-    loading: true
+    loading: true,
+    pendingAnamnesis: 0, // NOVO
+    showAnamnesisPending: false // NOVO
   })
 
   // Recalcula gráfico quando filtros ou dados mudam
@@ -119,7 +121,9 @@ export default function Overview() {
             dietsActiveRes,
             dietsInactiveRes,
             workoutsActiveRes,
-            workoutsInactiveRes
+            workoutsInactiveRes,
+            profileRes, // NOVO
+            anamnesisRes // NOVO
         ] = await Promise.all([
             supabase.from('profiles').select('*').eq('personal_id', user.id).eq('role', 'aluno'),
             supabase.from('plans').select('*').eq('personal_id', user.id),
@@ -127,7 +131,9 @@ export default function Overview() {
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active'),
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active'),
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').eq('status', 'active'),
-            supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').neq('status', 'active')
+            supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').neq('status', 'active'),
+            supabase.from('profiles').select('data').eq('id', user.id).single(),
+            supabase.from('protocols').select('*').eq('personal_id', user.id).eq('type', 'anamnesis')
         ])
 
         const studentsRaw = studentsRes.data || []
@@ -148,6 +154,23 @@ export default function Overview() {
         const activeStudentsList = students.filter(s => s.status !== 'inativo')
         const activeStudents = activeStudentsList.length
         const inactiveStudents = totalStudents - activeStudents
+
+        // LÓGICA DE ANAMNESES PENDENTES
+        let pendingAnamnesisCount = 0
+        const showAnamnesisPending = profileRes.data?.data?.config?.anamnesisReviewRequired === true
+        
+        if (showAnamnesisPending) {
+            const allAnamnesis = anamnesisRes.data || []
+            // Filtra apenas de alunos ATIVOS e que NÃO foram revisadas
+            const activeStudentIds = activeStudentsList.map(s => s.id)
+            
+            pendingAnamnesisCount = allAnamnesis.filter(a => {
+                const isFromActiveStudent = activeStudentIds.includes(a.student_id)
+                const data = a.data || a.content || {}
+                const notReviewed = !data.reviewed_at
+                return isFromActiveStudent && notReviewed
+            }).length
+        }
 
         const plans = (plansRes.data || []) as PlanRecord[]
         
@@ -293,7 +316,9 @@ export default function Overview() {
           inactiveWorkouts: workoutsInactiveRes.count || 0,
           monthlyRevenue,
           monthlyCash,
-          loading: false
+          loading: false,
+          pendingAnamnesis: pendingAnamnesisCount,
+          showAnamnesisPending
         })
 
       } catch (error) {
@@ -424,6 +449,56 @@ export default function Overview() {
                       </svg>
                   </div>
               </div>
+
+              {/* Item Anamneses (Condicional) */}
+              {stats.showAnamnesisPending && (
+                  <div 
+                    style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        cursor: 'pointer', 
+                        padding: '12px', 
+                        borderRadius: 8, 
+                        background: '#fff', 
+                        border: '1px solid #e2e8f0',
+                        borderLeft: `4px solid ${stats.pendingAnamnesis > 0 ? '#3b82f6' : '#22c55e'}`, // Azul para análise, verde se ok
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                        transition: 'all 0.2s'
+                    }}
+                    onClick={() => navigate('/protocols/anamnesis-pending')}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                  >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div style={{ 
+                              width: 36, height: 36, borderRadius: '50%', 
+                              background: stats.pendingAnamnesis > 0 ? '#eff6ff' : '#dcfce7',
+                              color: stats.pendingAnamnesis > 0 ? '#3b82f6' : '#16a34a',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}>
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                  <polyline points="14 2 14 8 20 8"></polyline>
+                                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                                  <polyline points="10 9 9 9 8 9"></polyline>
+                              </svg>
+                          </div>
+                          <div>
+                              <div style={{ fontWeight: 600, fontSize: 14, color: '#334155' }}>Anamneses</div>
+                              <div style={{ fontSize: 12, color: '#64748b' }}>
+                                  {stats.pendingAnamnesis === 0 ? 'Tudo analisado' : `${stats.pendingAnamnesis} aguardando análise`}
+                              </div>
+                          </div>
+                      </div>
+                      <div style={{ color: '#94a3b8' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="9 18 15 12 9 6"></polyline>
+                          </svg>
+                      </div>
+                  </div>
+              )}
 
           </div>
         </div>
