@@ -109,19 +109,38 @@ export default function AnamnesisPending() {
     }
 
     const handleMarkAsReviewed = async (item: ReviewItem) => {
-        if (!confirm(`Confirmar que analisou a anamnese de ${item.student.name}?`)) return
+        // Pega o valor atual de dias para renovação (padrão 90 se não tiver)
+        const currentRenew = item.data.renew_in_days || 90
+        
+        // Pergunta ao personal
+        const daysStr = prompt(
+            `Confirmar revisão de ${item.student.name}?\n\nDaqui a quantos dias a anamnese deve vencer novamente?`, 
+            String(currentRenew)
+        )
+
+        if (daysStr === null) return // Cancelou
+
+        const days = parseInt(daysStr)
+        if (isNaN(days) || days <= 0) {
+            alert('Por favor, insira um número válido de dias.')
+            return
+        }
         
         setMarkingId(item.id)
         try {
-            // Atualiza o JSON data adicionando reviewed_at
-            const newData = { ...item.data, reviewed_at: new Date().toISOString() }
+            // Atualiza o JSON data adicionando reviewed_at e atualizando renew_in_days
+            const newData = { 
+                ...item.data, 
+                reviewed_at: new Date().toISOString(),
+                renew_in_days: days 
+            }
             
             // Tenta atualizar tanto data quanto content para garantir
             const { error } = await supabase
                 .from('protocols')
                 .update({ 
                     data: newData,
-                    content: newData // Alguns registros usam content
+                    content: newData 
                 })
                 .eq('id', item.id)
 
@@ -129,7 +148,7 @@ export default function AnamnesisPending() {
 
             // Remove da lista localmente
             setReviewItems(prev => prev.filter(i => i.id !== item.id))
-            alert('Anamnese marcada como concluída!')
+            alert(`Anamnese concluída! Próxima renovação em ${days} dias.`)
         } catch (err: any) {
             alert('Erro ao atualizar: ' + err.message)
         } finally {

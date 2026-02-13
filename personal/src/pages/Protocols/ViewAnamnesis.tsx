@@ -85,11 +85,29 @@ export default function ViewAnamnesis() {
     }
 
     const handleMarkAsReviewed = async () => {
-        if (!confirm('Marcar esta anamnese como analisada/concluída?')) return
+        const currentData = data.content || {}
+        const currentRenew = currentData.renew_in_days || 90
+
+        const daysStr = prompt(
+            `Confirmar conclusão da anamnese?\n\nDaqui a quantos dias ela deve vencer novamente?`, 
+            String(currentRenew)
+        )
+
+        if (daysStr === null) return
+
+        const days = parseInt(daysStr)
+        if (isNaN(days) || days <= 0) {
+            alert('Por favor, insira um número válido.')
+            return
+        }
+
         setMarking(true)
         try {
-            const currentData = data.content || {}
-            const newData = { ...currentData, reviewed_at: new Date().toISOString() }
+            const newData = { 
+                ...currentData, 
+                reviewed_at: new Date().toISOString(),
+                renew_in_days: days
+            }
             
             const { error } = await supabase
                 .from('protocols')
@@ -101,7 +119,7 @@ export default function ViewAnamnesis() {
 
             if (error) throw error
 
-            alert('Anamnese marcada como concluída!')
+            alert(`Anamnese concluída! Próxima renovação em ${days} dias.`)
             navigate(-1) // Volta para a lista
         } catch (err: any) {
             alert('Erro: ' + err.message)
