@@ -8,6 +8,7 @@ export default function ViewAnamnesis() {
     const navigate = useNavigate()
     const [data, setData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    const [marking, setMarking] = useState(false)
 
     useEffect(() => {
         if (!id) return
@@ -83,6 +84,32 @@ export default function ViewAnamnesis() {
         }
     }
 
+    const handleMarkAsReviewed = async () => {
+        if (!confirm('Marcar esta anamnese como analisada/concluída?')) return
+        setMarking(true)
+        try {
+            const currentData = data.content || {}
+            const newData = { ...currentData, reviewed_at: new Date().toISOString() }
+            
+            const { error } = await supabase
+                .from('protocols')
+                .update({ 
+                    data: newData,
+                    content: newData 
+                })
+                .eq('id', id)
+
+            if (error) throw error
+
+            alert('Anamnese marcada como concluída!')
+            navigate(-1) // Volta para a lista
+        } catch (err: any) {
+            alert('Erro: ' + err.message)
+        } finally {
+            setMarking(false)
+        }
+    }
+
     if (loading) return <div style={{ padding: 20 }}>Carregando...</div>
     if (!data) return <div style={{ padding: 20 }}>Anamnese não encontrada.</div>
 
@@ -90,22 +117,41 @@ export default function ViewAnamnesis() {
     // Adaptação para diferentes estruturas de dados
     const questions = Array.isArray(content) ? content : (content.questions || [])
     const answers = content.answers || {}
+    const isReviewed = !!content.reviewed_at
 
     // Se questions estiver vazio, pode ser que o conteúdo seja apenas respostas chave-valor
     const hasQuestions = questions.length > 0
 
     return (
         <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px', paddingBottom: 100 }}>
-            <button 
-                onClick={() => navigate(-1)} 
-                style={{ 
-                    display: 'flex', alignItems: 'center', gap: 8, 
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    marginBottom: 20, color: '#64748b', fontWeight: 600 
-                }}
-            >
-                <ArrowLeft size={20} /> Voltar
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <button 
+                    onClick={() => navigate(-1)} 
+                    style={{ 
+                        display: 'flex', alignItems: 'center', gap: 8, 
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#64748b', fontWeight: 600 
+                    }}
+                >
+                    <ArrowLeft size={20} /> Voltar
+                </button>
+
+                {!isReviewed && (
+                    <button 
+                        onClick={handleMarkAsReviewed}
+                        disabled={marking}
+                        className="btn"
+                        style={{ 
+                            background: '#16a34a', color: '#fff', border: 'none', 
+                            padding: '10px 20px', borderRadius: 8, fontWeight: 600,
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                            boxShadow: '0 4px 6px -1px rgba(22, 163, 74, 0.3)'
+                        }}
+                    >
+                        {marking ? 'Salvando...' : '✅ Marcar como Concluída'}
+                    </button>
+                )}
+            </div>
 
             <div style={{ background: '#fff', borderRadius: 12, padding: 32, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
                 <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 20, marginBottom: 24 }}>
