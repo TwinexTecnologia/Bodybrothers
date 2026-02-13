@@ -21,6 +21,7 @@ export default function EditPersonal() {
     const [logoUrl, setLogoUrl] = useState('')
     const [uploadingLogo, setUploadingLogo] = useState(false)
     const [evolutionMode, setEvolutionMode] = useState('anamnesis') // 'anamnesis' | 'standalone'
+    const [anamnesisReviewRequired, setAnamnesisReviewRequired] = useState(false) // Nova configuração
 
     useEffect(() => {
         if (!id) {
@@ -52,6 +53,7 @@ export default function EditPersonal() {
         setBrandName(data.data?.branding?.brandName || '')
         setLogoUrl(data.data?.branding?.logoUrl || '')
         setEvolutionMode(data.data?.config?.evolutionMode || 'anamnesis')
+        setAnamnesisReviewRequired(data.data?.config?.anamnesisReviewRequired || false)
         setLoading(false)
     }
 
@@ -108,7 +110,8 @@ export default function EditPersonal() {
             },
             config: {
                 ...(currentData.config || {}),
-                evolutionMode
+                evolutionMode,
+                anamnesisReviewRequired
             }
         }
 
@@ -192,6 +195,21 @@ export default function EditPersonal() {
                                 <strong>Via Anamnese:</strong> Fotos são extraídas automaticamente das respostas das anamneses.<br/>
                                 <strong>Avulso:</strong> O personal envia fotos diretamente na tela de evolução, sem precisar de formulário.
                             </span>
+                        </label>
+                        
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#f8fafc', padding: 16, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                            <input 
+                                type="checkbox"
+                                checked={anamnesisReviewRequired}
+                                onChange={e => setAnamnesisReviewRequired(e.target.checked)}
+                                style={{ width: 20, height: 20, cursor: 'pointer' }}
+                            />
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontWeight: 600, color: '#0f172a' }}>Exigir aprovação manual de anamneses?</span>
+                                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                    Se marcado, o personal deve aprovar cada anamnese manualmente antes de ela contar como válida/renovada.
+                                </span>
+                            </div>
                         </label>
                     </div>
 

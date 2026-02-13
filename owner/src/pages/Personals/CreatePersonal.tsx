@@ -38,6 +38,9 @@ export default function CreatePersonal() {
   const [logoUrl, setLogoUrl] = useState('')
   const [uploadingLogo, setUploadingLogo] = useState(false)
 
+  const [evolutionMode, setEvolutionMode] = useState('anamnesis')
+  const [anamnesisReviewRequired, setAnamnesisReviewRequired] = useState(false)
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return
     
@@ -111,7 +114,8 @@ export default function CreatePersonal() {
                         logoUrl
                     },
                     config: {
-                        evolutionMode: 'anamnesis' // Default config
+                        evolutionMode,
+                        anamnesisReviewRequired
                     }
                 }
             }
@@ -218,6 +222,51 @@ export default function CreatePersonal() {
                     placeholder="Mínimo 6 caracteres" 
                     style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }}
                 />
+            </label>
+          </div>
+
+          <div style={{ borderTop: '1px solid #f1f5f9', margin: '10px 0' }}></div>
+          <h3 style={{ margin: 0, color: '#0f172a' }}>Configurações</h3>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={{ fontWeight: 500, color: '#475569' }}>Modo de Evolução</span>
+                <select 
+                    value={evolutionMode} 
+                    onChange={e => setEvolutionMode(e.target.value)} 
+                    style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff' }}
+                >
+                    <option value="anamnesis">Anamnese</option>
+                    <option value="manual">Manual</option>
+                </select>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 30 }}>
+                <input 
+                    type="checkbox"
+                    checked={anamnesisReviewRequired}
+                    onChange={e => setAnamnesisReviewRequired(e.target.checked)}
+                    style={{ width: 18, height: 18 }}
+                />
+                <span style={{ fontWeight: 500, color: '#475569' }}>Exigir Revisão de Anamnese?</span>
+            </label>
+          </div>
+
+          <div style={{ borderTop: '1px solid #f1f5f9', margin: '10px 0' }}></div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#f8fafc', padding: 16, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <input 
+                    type="checkbox"
+                    checked={anamnesisReviewRequired}
+                    onChange={e => setAnamnesisReviewRequired(e.target.checked)}
+                    style={{ width: 20, height: 20, cursor: 'pointer' }}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>Exigir aprovação manual de anamneses?</span>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                        Se marcado, o personal deve aprovar cada anamnese manualmente antes de ela contar como válida/renovada.
+                    </span>
+                </div>
             </label>
           </div>
 

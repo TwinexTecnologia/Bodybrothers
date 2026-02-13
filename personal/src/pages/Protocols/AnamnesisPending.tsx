@@ -22,6 +22,7 @@ export default function AnamnesisPending() {
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]) // Itens para revisar
     const [loading, setLoading] = useState(true)
     const [markingId, setMarkingId] = useState<string | null>(null)
+    const [isReviewRequired, setIsReviewRequired] = useState(false)
 
     useEffect(() => {
         load()
@@ -31,6 +32,16 @@ export default function AnamnesisPending() {
         try {
             const { data: { user } } = await supabase.auth.getUser()
             if (user) {
+                // 1. Busca perfil do personal para ver configuração
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('data')
+                    .eq('id', user.id)
+                    .single()
+
+                const reviewRequired = profile?.data?.config?.anamnesisReviewRequired === true
+                setIsReviewRequired(reviewRequired)
+
                 const [students, modelsRes, responsesRes] = await Promise.all([
                     listStudentsByPersonal(user.id),
                     supabase.from('protocols').select('*').eq('personal_id', user.id).eq('type', 'anamnesis_model'),
@@ -55,20 +66,22 @@ export default function AnamnesisPending() {
                         // 2. Busca respostas
                         const studentResponses = allResponses.filter(r => r.student_id === student.id)
                         
-                        // Lógica de Revisão (Novas Respostas)
-                        // Pega todas as respostas que NÃO foram revisadas ainda
-                        studentResponses.forEach(resp => {
-                            const respData = resp.data || resp.content || {}
-                            // Se não tem reviewed_at, precisa de revisão
-                            if (!respData.reviewed_at) {
-                                resultReview.push({
-                                    id: resp.id,
-                                    student,
-                                    answeredAt: resp.created_at,
-                                    data: respData
-                                })
-                            }
-                        })
+                        // Lógica de Revisão (Novas Respostas) - APENAS SE CONFIGURADO
+                        if (reviewRequired) {
+                            // Pega todas as respostas que NÃO foram revisadas ainda
+                            studentResponses.forEach(resp => {
+                                const respData = resp.data || resp.content || {}
+                                // Se não tem reviewed_at, precisa de revisão
+                                if (!respData.reviewed_at) {
+                                    resultReview.push({
+                                        id: resp.id,
+                                        student,
+                                        answeredAt: resp.created_at,
+                                        data: respData
+                                    })
+                                }
+                            })
+                        }
 
                         if (studentResponses.length === 0) {
                             // Nunca respondeu -> Ignora (ou mostra como missing se quiser)
@@ -77,10 +90,29 @@ export default function AnamnesisPending() {
                             studentResponses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                             const last = studentResponses[0]
                             
+                            // Se reviewRequired, ignora data de criação e considera reviewed_at como base
+                            // MAS se ainda não foi revisada, ela cai na lista de cima (resultReview) e não aqui.
+                            // Se já foi revisada, usamos reviewed_at. Se não é required, usamos created_at.
+                            
+                            const lastData = last.data || last.content || {}
+                            
+                            // Se precisa de revisão mas ainda não foi revisada, ela "não conta" como válida ainda
+                            // Então o aluno tecnicamente está "Vencido" ou "Pendente de Análise"
+                            // Para simplificar: se está em resultReview, não mostramos como vencido aqui embaixo para não duplicar
+                            const isPendingReview = reviewRequired && !lastData.reviewed_at
+                            if (isPendingReview) return 
+
+                            // Data base para cálculo de vencimento
+                            // Se reviewRequired = true, usa reviewed_at (se existir)
+                            // Se reviewRequired = false, usa created_at
+                            const baseDateStr = (reviewRequired && lastData.reviewed_at) 
+                                ? lastData.reviewed_at 
+                                : last.created_at
+                            
                             const renewDays = last.renew_in_days || 90
                             if (renewDays) {
-                                const created = new Date(last.created_at)
-                                const expireDate = new Date(created.getTime() + (renewDays * 24 * 60 * 60 * 1000))
+                                const baseDate = new Date(baseDateStr)
+                                const expireDate = new Date(baseDate.getTime() + (renewDays * 24 * 60 * 60 * 1000))
                                 expireDate.setHours(0, 0, 0, 0)
                                 
                                 const nowZero = new Date(now)
@@ -165,48 +197,50 @@ export default function AnamnesisPending() {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
                 
-                {/* SEÇÃO 1: AGUARDANDO ANÁLISE (NOVO) */}
-                <div className="section">
-                    <h2 style={{ fontSize: '1.2rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        🔔 Aguardando Análise <span style={{ background: '#3b82f6', color: '#fff', fontSize: '0.8rem', padding: '2px 8px', borderRadius: 12 }}>{reviewItems.length}</span>
-                    </h2>
-                    
-                    {reviewItems.length === 0 ? (
-                        <div style={{ padding: 20, background: '#f8fafc', borderRadius: 8, color: '#64748b', fontSize: '0.9rem' }}>
-                            Nenhuma anamnese recente para analisar.
-                        </div>
-                    ) : (
-                        <div style={{ display: 'grid', gap: 10 }}>
-                            {reviewItems.map(item => (
-                                <div key={item.id} className="form-card" style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderLeft: '4px solid #3b82f6', background: '#eff6ff' }}>
-                                    <div>
-                                        <div style={{ fontWeight: 'bold', fontSize: '1.1em', color: '#1e3a8a' }}>{item.student.name}</div>
-                                        <div style={{ fontSize: 13, color: '#3b82f6', marginTop: 4 }}>
-                                            Respondeu em {new Date(item.answeredAt).toLocaleDateString()} às {new Date(item.answeredAt).toLocaleTimeString().slice(0,5)}
+                {/* SEÇÃO 1: AGUARDANDO ANÁLISE (SOMENTE SE CONFIGURADO) */}
+                {isReviewRequired && (
+                    <div className="section">
+                        <h2 style={{ fontSize: '1.2rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            🔔 Aguardando Análise <span style={{ background: '#3b82f6', color: '#fff', fontSize: '0.8rem', padding: '2px 8px', borderRadius: 12 }}>{reviewItems.length}</span>
+                        </h2>
+                        
+                        {reviewItems.length === 0 ? (
+                            <div style={{ padding: 20, background: '#f8fafc', borderRadius: 8, color: '#64748b', fontSize: '0.9rem' }}>
+                                Nenhuma anamnese recente para analisar.
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gap: 10 }}>
+                                {reviewItems.map(item => (
+                                    <div key={item.id} className="form-card" style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderLeft: '4px solid #3b82f6', background: '#eff6ff' }}>
+                                        <div>
+                                            <div style={{ fontWeight: 'bold', fontSize: '1.1em', color: '#1e3a8a' }}>{item.student.name}</div>
+                                            <div style={{ fontSize: 13, color: '#3b82f6', marginTop: 4 }}>
+                                                Respondeu em {new Date(item.answeredAt).toLocaleDateString()} às {new Date(item.answeredAt).toLocaleTimeString().slice(0,5)}
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 8 }}>
+                                            <button 
+                                                className="btn"
+                                                onClick={() => navigate(`/protocols/view/${item.id}`)}
+                                                style={{ background: '#fff', color: '#3b82f6', border: '1px solid #bfdbfe', padding: '8px 12px' }}
+                                            >
+                                                Ver Respostas
+                                            </button>
+                                            <button 
+                                                className="btn" 
+                                                disabled={markingId === item.id}
+                                                onClick={() => handleMarkAsReviewed(item)}
+                                                style={{ background: '#3b82f6', color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}
+                                            >
+                                                {markingId === item.id ? '...' : '✅ Concluir'}
+                                            </button>
                                         </div>
                                     </div>
-                                    <div style={{ display: 'flex', gap: 8 }}>
-                                        <button 
-                                            className="btn"
-                                            onClick={() => navigate(`/protocols/view/${item.id}`)}
-                                            style={{ background: '#fff', color: '#3b82f6', border: '1px solid #bfdbfe', padding: '8px 12px' }}
-                                        >
-                                            Ver Respostas
-                                        </button>
-                                        <button 
-                                            className="btn" 
-                                            disabled={markingId === item.id}
-                                            onClick={() => handleMarkAsReviewed(item)}
-                                            style={{ background: '#3b82f6', color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}
-                                        >
-                                            {markingId === item.id ? '...' : '✅ Concluir'}
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* SEÇÃO 2: PENDÊNCIAS (VENCIDOS) */}
                 <div className="section">
