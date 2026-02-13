@@ -9,6 +9,7 @@ export default function ViewAnamnesis() {
     const [data, setData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [marking, setMarking] = useState(false)
+    const [confirmModal, setConfirmModal] = useState<{ open: boolean, days: number }>({ open: false, days: 90 })
 
     useEffect(() => {
         if (!id) return
@@ -84,25 +85,24 @@ export default function ViewAnamnesis() {
         }
     }
 
-    const handleMarkAsReviewed = async () => {
+    const handleOpenConfirm = () => {
         const currentData = data.content || {}
         const currentRenew = currentData.renew_in_days || 90
+        setConfirmModal({ open: true, days: currentRenew })
+    }
 
-        const daysStr = prompt(
-            `Confirmar conclusão da anamnese?\n\nDaqui a quantos dias ela deve vencer novamente?`, 
-            String(currentRenew)
-        )
+    const handleConfirmReview = async () => {
+        const { days } = confirmModal
 
-        if (daysStr === null) return
-
-        const days = parseInt(daysStr)
-        if (isNaN(days) || days <= 0) {
+        if (days <= 0) {
             alert('Por favor, insira um número válido.')
             return
         }
 
+        setConfirmModal(prev => ({ ...prev, open: false }))
         setMarking(true)
         try {
+            const currentData = data.content || {}
             const newData = { 
                 ...currentData, 
                 reviewed_at: new Date().toISOString(),
@@ -119,7 +119,7 @@ export default function ViewAnamnesis() {
 
             if (error) throw error
 
-            alert(`Anamnese concluída! Próxima renovação em ${days} dias.`)
+            // alert(`Anamnese concluída! Próxima renovação em ${days} dias.`)
             navigate(-1) // Volta para a lista
         } catch (err: any) {
             alert('Erro: ' + err.message)
@@ -156,7 +156,7 @@ export default function ViewAnamnesis() {
 
                 {!isReviewed && (
                     <button 
-                        onClick={handleMarkAsReviewed}
+                        onClick={handleOpenConfirm}
                         disabled={marking}
                         className="btn"
                         style={{ 
@@ -170,6 +170,63 @@ export default function ViewAnamnesis() {
                     </button>
                 )}
             </div>
+
+            {/* MODAL DE CONFIRMAÇÃO */}
+            {confirmModal.open && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.5)', zIndex: 9999,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+                }}>
+                    <div style={{
+                        background: '#fff', borderRadius: 16, padding: 24,
+                        width: '100%', maxWidth: 400,
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                    }}>
+                        <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', color: '#0f172a' }}>Confirmar Conclusão</h3>
+                        <p style={{ margin: '0 0 20px 0', color: '#64748b', fontSize: '0.95rem' }}>
+                            A anamnese será marcada como analisada e a data de validade será atualizada.
+                        </p>
+
+                        <label style={{ display: 'block', marginBottom: 20 }}>
+                            <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+                                Renovar novamente em quantos dias?
+                            </span>
+                            <input 
+                                type="number"
+                                value={confirmModal.days}
+                                onChange={e => setConfirmModal(prev => ({ ...prev, days: parseInt(e.target.value) || 0 }))}
+                                style={{
+                                    width: '100%', padding: '10px 12px', borderRadius: 8,
+                                    border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none'
+                                }}
+                            />
+                        </label>
+
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                            <button 
+                                onClick={() => setConfirmModal(prev => ({ ...prev, open: false }))}
+                                style={{
+                                    background: '#fff', border: '1px solid #cbd5e1', color: '#475569',
+                                    padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer'
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={handleConfirmReview}
+                                style={{
+                                    background: '#16a34a', border: 'none', color: '#fff',
+                                    padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer',
+                                    boxShadow: '0 4px 6px -1px rgba(22, 163, 74, 0.3)'
+                                }}
+                            >
+                                Confirmar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div style={{ background: '#fff', borderRadius: 12, padding: 32, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
                 <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 20, marginBottom: 24 }}>
