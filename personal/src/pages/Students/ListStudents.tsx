@@ -74,6 +74,7 @@ const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], a
     if (studentAnamneses.length === 0) return { status: 'pending', label: 'Pendente', color: '#9ca3af', fontWeight: 400 }
 
     try {
+        // Pega o modelo mais recente (para saber a validade padrão se precisar)
         const sorted = studentAnamneses.sort((a, b) => {
             const da = a.validUntil ? new Date(a.validUntil).getTime() : Infinity
             const db = b.validUntil ? new Date(b.validUntil).getTime() : Infinity
@@ -81,66 +82,63 @@ const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], a
         })
         const nearest = sorted[0]
         
-        if (nearest.validUntil) {
-            const modelResponses = allResponses.filter(r => r.modelId === nearest.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-            const lastResponse = modelResponses[0]
+        // CORREÇÃO: Busca a última resposta do aluno INDEPENDENTE DO MODELO ATIVO
+        const studentResponses = allResponses
+            .filter(r => r.studentId === studentId)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            
+        const lastResponse = studentResponses[0]
 
-            // =================================================================================
-            // LÓGICA HÍBRIDA: Manual (Check) vs Automática (Mensal)
-            // =================================================================================
-            if (lastResponse) {
+        // LÓGICA HÍBRIDA: Manual (Check) vs Automática (Mensal)
+        if (lastResponse) {
                 const data = lastResponse.data || lastResponse.content || {}
                 
                 // CASO 1: Personal revisou e definiu dias manualmente (renew_in_days existe)
                 if (data.renew_in_days && data.reviewed_at) {
                     const reviewDate = new Date(data.reviewed_at)
-                    // Normaliza data de revisão para garantir cálculo consistente
-                    // Se revisou hoje, considera a data de hoje sem horas
                     reviewDate.setHours(0, 0, 0, 0)
                     
                     const daysToAdd = parseInt(data.renew_in_days)
                     
                     const dueDate = new Date(reviewDate)
                     dueDate.setDate(dueDate.getDate() + daysToAdd)
-                    dueDate.setHours(23, 59, 59, 999) // Vence no final do dia alvo
+                    dueDate.setHours(23, 59, 59, 999) 
                     
                     const now = new Date()
-                    // Não zeramos o now aqui para ter precisão, ou zeramos para contar dias cheios?
-                    // Se zerarmos now, comparamos D x D.
                     now.setHours(0, 0, 0, 0)
                     
                     const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) - 1 
-                    // -1 porque dueDate está em 23:59:59. Se hoje é 10 e vence dia 19 (9 dias), 
-                    // diff = 9 dias e 23h. Math.ceil vira 10. Por isso o -1 corrige para 9.
                     
                     if (daysLeft < 0) return { status: 'overdue', label: `🔴 Vencida (${Math.abs(daysLeft)}d)`, color: '#ef4444', fontWeight: 600 }
                     if (daysLeft === 0) return { status: 'warning', label: `🟡 Vence Hoje`, color: '#f59e0b', fontWeight: 600 }
                     return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
                 }
 
-                // CASO 2: Lógica Automática (Projeção Mensal baseada na data original)
-                // (Mantém o comportamento antigo para quem não tem revisão manual)
-                const validDate = new Date(nearest.validUntil)
-                if (!isNaN(validDate.getTime())) {
-                    const now = new Date()
-                    now.setHours(0, 0, 0, 0)
-                    
-                    const validLocal = new Date(validDate.getUTCFullYear(), validDate.getUTCMonth(), validDate.getUTCDate())
-                    validLocal.setHours(0, 0, 0, 0)
+                // CASO 2: Lógica Automática (Projeção Mensal baseada na data original DO MODELO ATIVO)
+                if (nearest && nearest.validUntil) {
+                    const validDate = new Date(nearest.validUntil)
+                    if (!isNaN(validDate.getTime())) {
+                        const now = new Date()
+                        now.setHours(0, 0, 0, 0)
+                        
+                        const validLocal = new Date(validDate.getUTCFullYear(), validDate.getUTCMonth(), validDate.getUTCDate())
+                        validLocal.setHours(0, 0, 0, 0)
 
-                    let nextDueDate = new Date(validLocal)
-                    const today = new Date()
-                    today.setHours(0,0,0,0)
-                    
-                    while (nextDueDate < today) {
-                        nextDueDate.setMonth(nextDueDate.getMonth() + 1)
+                        let nextDueDate = new Date(validLocal)
+                        const today = new Date()
+                        today.setHours(0,0,0,0)
+                        
+                        while (nextDueDate < today) {
+                            nextDueDate.setMonth(nextDueDate.getMonth() + 1)
+                        }
+                        const daysLeft = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                        return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
                     }
-                    const daysLeft = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-                    return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
                 }
-            }
-            
-            // Sem resposta ainda
+        }
+        
+        // Sem resposta ainda
+        if (nearest && nearest.validUntil) {
             const validDate = new Date(nearest.validUntil)
             if (!isNaN(validDate.getTime())) {
                 const now = new Date()
@@ -150,8 +148,6 @@ const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], a
                 let daysLeft = Math.ceil((validLocal.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
                 if (daysLeft < 0) {
-                     // Se já venceu a data inicial e não respondeu, projeta para o próximo mês também?
-                     // Ou mostra vencida? O código original mostrava vencida se < 0 e não tivesse resposta.
                      return { status: 'overdue', label: `🔴 Vencida (${Math.abs(daysLeft)}d)`, color: '#ef4444', fontWeight: 600 }
                 }
                 return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
@@ -299,6 +295,8 @@ export default function ListStudents() {
 
   // Debug State
   const [debugData, setDebugData] = useState<any>(null)
+  const [simulateDays, setSimulateDays] = useState('30')
+  const [savingDebug, setSavingDebug] = useState(false)
 
   const toggleDebug = (studentId: string) => {
       const studentAnamneses = anamneses.filter(a => a.studentId === studentId)
@@ -309,7 +307,7 @@ export default function ListStudents() {
       })
       const nearest = sorted[0]
       
-      let debugInfo = { msg: 'Sem anamnese' }
+      let debugInfo = { msg: 'Sem anamnese', studentId }
       
       if (nearest && nearest.validUntil) {
           const modelResponses = responses.filter(r => r.modelId === nearest.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -327,21 +325,75 @@ export default function ListStudents() {
                   raw_data: data
               }
           } else {
-              debugInfo = { ...debugInfo, msg: 'Sem resposta' }
+              debugInfo = { ...debugInfo, msg: 'Sem resposta vinculada ao modelo' }
           }
+      } else {
+         // Tenta achar qualquer resposta do aluno
+         const anyResponse = responses.filter(r => r.studentId === studentId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+         if(anyResponse) {
+             debugInfo = { ...debugInfo, msg: 'Tem resposta mas sem modelo ativo', responseId: anyResponse.id }
+         }
       }
       setDebugData(debugInfo)
+  }
+
+  const handleSimulateCheck = async () => {
+      if (!debugData || !debugData.responseId) return
+      setSavingDebug(true)
+      try {
+          const newData = {
+              ...debugData.raw_data,
+              reviewed_at: new Date().toISOString(),
+              renew_in_days: simulateDays
+          }
+          
+          const { error } = await supabase
+            .from('protocols')
+            .update({ data: newData })
+            .eq('id', debugData.responseId)
+
+          if (error) throw error
+          
+          alert(`Salvo com sucesso! ${simulateDays} dias.`)
+          window.location.reload() // Recarrega para ver a mudança
+      } catch (err) {
+          alert('Erro ao salvar: ' + JSON.stringify(err))
+      } finally {
+          setSavingDebug(false)
+      }
   }
 
   return (
     <div>
       {/* Indicador de Versão e Debug */}
       <div style={{background: '#8b5cf6', color: '#fff', padding: 8, fontSize: 12, marginBottom: 10, borderRadius: 4}}>
-         <div style={{fontWeight: 'bold', textAlign: 'center'}}>✅ v3.2 - Debug Ativo (Clique no nome do aluno para ver dados)</div>
+         <div style={{fontWeight: 'bold', textAlign: 'center'}}>✅ v3.3 - Debug + Simulador de Check</div>
          {debugData && (
              <div style={{marginTop: 8, background: 'rgba(0,0,0,0.2)', padding: 8, borderRadius: 4, fontFamily: 'monospace', whiteSpace: 'pre-wrap'}}>
                  {JSON.stringify(debugData, null, 2)}
-                 <button onClick={() => setDebugData(null)} style={{display: 'block', marginTop: 4, background: '#fff', color: '#000', border: 'none', padding: '2px 6px', borderRadius: 2, cursor: 'pointer'}}>Fechar Debug</button>
+                 
+                 {debugData.responseId && (
+                     <div style={{marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.3)', paddingTop: 10}}>
+                        <div style={{fontWeight: 'bold', marginBottom: 5}}>⚡ Simulador de Check (Force Update)</div>
+                        <div style={{display: 'flex', gap: 5}}>
+                            <input 
+                                type="number" 
+                                value={simulateDays} 
+                                onChange={e => setSimulateDays(e.target.value)}
+                                style={{color: '#000', padding: 4, width: 80, borderRadius: 2}}
+                            />
+                            <button 
+                                onClick={handleSimulateCheck}
+                                disabled={savingDebug}
+                                style={{background: '#10b981', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 2, cursor: 'pointer'}}
+                            >
+                                {savingDebug ? 'Salvando...' : 'Salvar no Banco'}
+                            </button>
+                        </div>
+                     </div>
+                 )}
+
+                 <button onClick={() => setDebugData(null)} style={{display: 'block', marginTop: 10, background: '#fff', color: '#000', border: 'none', padding: '2px 6px', borderRadius: 2, cursor: 'pointer'}}>Fechar Debug</button>
              </div>
          )}
       </div>
