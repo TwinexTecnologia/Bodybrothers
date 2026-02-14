@@ -85,20 +85,38 @@ const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], a
             const modelResponses = allResponses.filter(r => r.modelId === nearest.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
             const lastResponse = modelResponses[0]
 
-            const validDate = new Date(nearest.validUntil)
-            if (!isNaN(validDate.getTime())) {
-                // Normaliza para comparar apenas DATAS (ignora horas/fuso)
-                const now = new Date()
-                now.setHours(0, 0, 0, 0)
+            // =================================================================================
+            // LÓGICA HÍBRIDA: Manual (Check) vs Automática (Mensal)
+            // =================================================================================
+            if (lastResponse) {
+                const data = lastResponse.data || lastResponse.content || {}
                 
-                // Ajusta validDate para considerar o dia localmente correto
-                // Se validDate for UTC 00:00, ajustamos para não voltar um dia no fuso BR
-                const validLocal = new Date(validDate.getUTCFullYear(), validDate.getUTCMonth(), validDate.getUTCDate())
-                validLocal.setHours(0, 0, 0, 0)
+                // CASO 1: Personal revisou e definiu dias manualmente (renew_in_days existe)
+                if (data.renew_in_days && data.reviewed_at) {
+                    const reviewDate = new Date(data.reviewed_at)
+                    const daysToAdd = parseInt(data.renew_in_days)
+                    
+                    const dueDate = new Date(reviewDate.getTime() + (daysToAdd * 24 * 60 * 60 * 1000))
+                    dueDate.setHours(23, 59, 59, 999)
+                    
+                    const now = new Date()
+                    const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                    
+                    if (daysLeft < 0) return { status: 'overdue', label: `🔴 Vencida (${Math.abs(daysLeft)}d)`, color: '#ef4444', fontWeight: 600 }
+                    if (daysLeft === 0) return { status: 'warning', label: `🟡 Vence Hoje`, color: '#f59e0b', fontWeight: 600 }
+                    return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
+                }
 
-                let daysLeft = Math.ceil((validLocal.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-                
-                if (lastResponse) {
+                // CASO 2: Lógica Automática (Projeção Mensal baseada na data original)
+                // (Mantém o comportamento antigo para quem não tem revisão manual)
+                const validDate = new Date(nearest.validUntil)
+                if (!isNaN(validDate.getTime())) {
+                    const now = new Date()
+                    now.setHours(0, 0, 0, 0)
+                    
+                    const validLocal = new Date(validDate.getUTCFullYear(), validDate.getUTCMonth(), validDate.getUTCDate())
+                    validLocal.setHours(0, 0, 0, 0)
+
                     let nextDueDate = new Date(validLocal)
                     const today = new Date()
                     today.setHours(0,0,0,0)
@@ -106,23 +124,31 @@ const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], a
                     while (nextDueDate < today) {
                         nextDueDate.setMonth(nextDueDate.getMonth() + 1)
                     }
-                    daysLeft = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-                    return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
-                } else if (daysLeft < 0) {
-                    return { status: 'overdue', label: `🔴 Vencida (${Math.abs(daysLeft)}d)`, color: '#ef4444', fontWeight: 600 }
-                } else if (daysLeft === 0) {
-                    return { status: 'warning', label: `🟡 Vence Hoje`, color: '#f59e0b', fontWeight: 600 }
-                } else if (daysLeft <= 7) {
-                    return { status: 'warning', label: `🟡 Vence em ${daysLeft} dias`, color: '#f59e0b', fontWeight: 600 }
-                } else {
+                    const daysLeft = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
                     return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
                 }
-            } else {
-                return { status: 'error', label: 'Data Inválida', color: '#f59e0b', fontWeight: 400 }
             }
-        } else {
-            return { status: 'none', label: 'Sem validade', color: '#6b7280', fontWeight: 400 }
+            
+            // Sem resposta ainda
+            const validDate = new Date(nearest.validUntil)
+            if (!isNaN(validDate.getTime())) {
+                const now = new Date()
+                now.setHours(0, 0, 0, 0)
+                const validLocal = new Date(validDate.getUTCFullYear(), validDate.getUTCMonth(), validDate.getUTCDate())
+                validLocal.setHours(0, 0, 0, 0)
+                let daysLeft = Math.ceil((validLocal.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+                if (daysLeft < 0) {
+                     // Se já venceu a data inicial e não respondeu, projeta para o próximo mês também?
+                     // Ou mostra vencida? O código original mostrava vencida se < 0 e não tivesse resposta.
+                     return { status: 'overdue', label: `🔴 Vencida (${Math.abs(daysLeft)}d)`, color: '#ef4444', fontWeight: 600 }
+                }
+                return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
+            }
         }
+        
+        return { status: 'none', label: 'Sem validade', color: '#6b7280', fontWeight: 400 }
+
     } catch (err) {
         return { status: 'error', label: 'Erro Data', color: '#ef4444', fontWeight: 400 }
     }
