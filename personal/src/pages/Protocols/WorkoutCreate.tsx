@@ -337,36 +337,6 @@ export default function WorkoutCreate() {
             }
         }
 
-        // AUTO-IMPORTAR PARA BIBLIOTECA
-        // Verifica se tem exercícios novos com vídeo e salva na biblioteca
-        const libraryNames = new Set(library.map(e => e.name.toLowerCase().trim()))
-        let newCount = 0
-        
-        for (const ex of cleanExercises) {
-            if (ex.videoUrl && ex.name) {
-                const nameKey = ex.name.toLowerCase().trim()
-                if (!libraryNames.has(nameKey)) {
-                    try {
-                        await createExercise(personalId, {
-                            name: ex.name.trim(),
-                            muscle_group: ex.group,
-                            video_url: ex.videoUrl
-                        })
-                        libraryNames.add(nameKey)
-                        newCount++
-                    } catch (e) {
-                        console.error('Erro ao auto-importar exercício:', e)
-                    }
-                }
-            }
-        }
-        
-        if (newCount > 0) {
-            // Recarrega biblioteca local
-            listExercises(personalId).then(setLibrary)
-            console.log(`${newCount} exercícios novos salvos na biblioteca automaticamente.`)
-        }
-
       } catch (err: any) {
           console.error('Erro ao salvar treino:', err)
           setMsg(`Erro ao salvar: ${err.message}`)
