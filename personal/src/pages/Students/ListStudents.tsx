@@ -94,13 +94,24 @@ const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], a
                 // CASO 1: Personal revisou e definiu dias manualmente (renew_in_days existe)
                 if (data.renew_in_days && data.reviewed_at) {
                     const reviewDate = new Date(data.reviewed_at)
+                    // Normaliza data de revisão para garantir cálculo consistente
+                    // Se revisou hoje, considera a data de hoje sem horas
+                    reviewDate.setHours(0, 0, 0, 0)
+                    
                     const daysToAdd = parseInt(data.renew_in_days)
                     
-                    const dueDate = new Date(reviewDate.getTime() + (daysToAdd * 24 * 60 * 60 * 1000))
-                    dueDate.setHours(23, 59, 59, 999)
+                    const dueDate = new Date(reviewDate)
+                    dueDate.setDate(dueDate.getDate() + daysToAdd)
+                    dueDate.setHours(23, 59, 59, 999) // Vence no final do dia alvo
                     
                     const now = new Date()
-                    const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                    // Não zeramos o now aqui para ter precisão, ou zeramos para contar dias cheios?
+                    // Se zerarmos now, comparamos D x D.
+                    now.setHours(0, 0, 0, 0)
+                    
+                    const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) - 1 
+                    // -1 porque dueDate está em 23:59:59. Se hoje é 10 e vence dia 19 (9 dias), 
+                    // diff = 9 dias e 23h. Math.ceil vira 10. Por isso o -1 corrige para 9.
                     
                     if (daysLeft < 0) return { status: 'overdue', label: `🔴 Vencida (${Math.abs(daysLeft)}d)`, color: '#ef4444', fontWeight: 600 }
                     if (daysLeft === 0) return { status: 'warning', label: `🟡 Vence Hoje`, color: '#f59e0b', fontWeight: 600 }
@@ -289,8 +300,8 @@ export default function ListStudents() {
   return (
     <div>
       {/* Indicador de Versão */}
-      <div style={{background: '#3b82f6', color: '#fff', padding: 4, textAlign: 'center', fontSize: 11, fontWeight: 'bold', marginBottom: 10, borderRadius: 4}}>
-         ✅ v3.0 - Lógica Híbrida Ativa
+      <div style={{background: '#8b5cf6', color: '#fff', padding: 4, textAlign: 'center', fontSize: 11, fontWeight: 'bold', marginBottom: 10, borderRadius: 4}}>
+         ✅ v3.1 - Correção Fuso Horário (Dias Exatos)
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
