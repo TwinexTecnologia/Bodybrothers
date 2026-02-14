@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { listStudentsByPersonal } from '../../store/students'
