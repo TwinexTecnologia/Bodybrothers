@@ -69,41 +69,62 @@ const getFinancialStatus = (student: StudentRecord, plan: PlanRecord | undefined
 }
 
 const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], allResponses: AnamnesisResponse[]) => {
-    // 1. Acha o modelo vinculado ao aluno (se tiver)
-    const studentModels = allAnamneses.filter(a => a.studentId === studentId)
-    if (studentModels.length === 0) return { status: 'none', label: 'Sem anamnese', color: '#9ca3af', fontWeight: 400 }
-
-    // 2. Acha as respostas desse aluno
-    const studentResponses = allResponses.filter(r => r.studentId === studentId)
+    const studentAnamneses = allAnamneses.filter(a => a.studentId === studentId)
     
-    if (studentResponses.length === 0) {
-        return { status: 'pending', label: 'Nunca respondeu', color: '#9ca3af', fontWeight: 400 }
-    }
+    if (studentAnamneses.length === 0) return { status: 'pending', label: 'Pendente', color: '#9ca3af', fontWeight: 400 }
 
-    // 3. Pega a última resposta
-    const lastResponse = studentResponses.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
-    
-    // 4. Calcula validade baseada na resposta
-    const data = lastResponse.data || lastResponse.content || {}
-    const baseDateStr = data.reviewed_at || lastResponse.createdAt
-    const renewDays = data.renew_in_days || 90 // Padrão 90 se não tiver
+    try {
+        const sorted = studentAnamneses.sort((a, b) => {
+            const da = a.validUntil ? new Date(a.validUntil).getTime() : Infinity
+            const db = b.validUntil ? new Date(b.validUntil).getTime() : Infinity
+            return da - db
+        })
+        const nearest = sorted[0]
+        
+        if (nearest.validUntil) {
+            const modelResponses = allResponses.filter(r => r.modelId === nearest.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            const lastResponse = modelResponses[0]
 
-    const baseDate = new Date(baseDateStr)
-    const dueDate = new Date(baseDate.getTime() + (renewDays * 24 * 60 * 60 * 1000))
-    dueDate.setHours(23, 59, 59, 999) // Fim do dia
+            const validDate = new Date(nearest.validUntil)
+            if (!isNaN(validDate.getTime())) {
+                // Normaliza para comparar apenas DATAS (ignora horas/fuso)
+                const now = new Date()
+                now.setHours(0, 0, 0, 0)
+                
+                // Ajusta validDate para considerar o dia localmente correto
+                // Se validDate for UTC 00:00, ajustamos para não voltar um dia no fuso BR
+                const validLocal = new Date(validDate.getUTCFullYear(), validDate.getUTCMonth(), validDate.getUTCDate())
+                validLocal.setHours(0, 0, 0, 0)
 
-    const now = new Date()
-    const diffTime = dueDate.getTime() - now.getTime()
-    const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-    if (daysLeft < 0) {
-        return { status: 'overdue', label: `🔴 Vencida (${Math.abs(daysLeft)}d)`, color: '#ef4444', fontWeight: 600 }
-    } else if (daysLeft === 0) {
-        return { status: 'warning', label: `🟡 Vence Hoje`, color: '#f59e0b', fontWeight: 600 }
-    } else if (daysLeft <= 7) {
-        return { status: 'warning', label: `🟡 Vence em ${daysLeft} dias`, color: '#f59e0b', fontWeight: 600 }
-    } else {
-        return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
+                let daysLeft = Math.ceil((validLocal.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                
+                if (lastResponse) {
+                    let nextDueDate = new Date(validLocal)
+                    const today = new Date()
+                    today.setHours(0,0,0,0)
+                    
+                    while (nextDueDate < today) {
+                        nextDueDate.setMonth(nextDueDate.getMonth() + 1)
+                    }
+                    daysLeft = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                    return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
+                } else if (daysLeft < 0) {
+                    return { status: 'overdue', label: `🔴 Vencida (${Math.abs(daysLeft)}d)`, color: '#ef4444', fontWeight: 600 }
+                } else if (daysLeft === 0) {
+                    return { status: 'warning', label: `🟡 Vence Hoje`, color: '#f59e0b', fontWeight: 600 }
+                } else if (daysLeft <= 7) {
+                    return { status: 'warning', label: `🟡 Vence em ${daysLeft} dias`, color: '#f59e0b', fontWeight: 600 }
+                } else {
+                    return { status: 'ok', label: `✅ ${daysLeft} dias`, color: '#10b981', fontWeight: 600 }
+                }
+            } else {
+                return { status: 'error', label: 'Data Inválida', color: '#f59e0b', fontWeight: 400 }
+            }
+        } else {
+            return { status: 'none', label: 'Sem validade', color: '#6b7280', fontWeight: 400 }
+        }
+    } catch (err) {
+        return { status: 'error', label: 'Erro Data', color: '#ef4444', fontWeight: 400 }
     }
 }
 
