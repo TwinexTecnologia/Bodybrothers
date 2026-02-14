@@ -297,11 +297,53 @@ export default function ListStudents() {
       minWidth: 160
   }
 
+  // Debug State
+  const [debugData, setDebugData] = useState<any>(null)
+
+  const toggleDebug = (studentId: string) => {
+      const studentAnamneses = anamneses.filter(a => a.studentId === studentId)
+      const sorted = studentAnamneses.sort((a, b) => {
+          const da = a.validUntil ? new Date(a.validUntil).getTime() : Infinity
+          const db = b.validUntil ? new Date(b.validUntil).getTime() : Infinity
+          return da - db
+      })
+      const nearest = sorted[0]
+      
+      let debugInfo = { msg: 'Sem anamnese' }
+      
+      if (nearest && nearest.validUntil) {
+          const modelResponses = responses.filter(r => r.modelId === nearest.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          const lastResponse = modelResponses[0]
+          
+          if (lastResponse) {
+              const data = lastResponse.data || lastResponse.content || {}
+              debugInfo = {
+                  ...debugInfo,
+                  msg: 'Dados encontrados',
+                  responseId: lastResponse.id,
+                  createdAt: lastResponse.createdAt,
+                  reviewedAt: data.reviewed_at,
+                  renewInDays: data.renew_in_days,
+                  raw_data: data
+              }
+          } else {
+              debugInfo = { ...debugInfo, msg: 'Sem resposta' }
+          }
+      }
+      setDebugData(debugInfo)
+  }
+
   return (
     <div>
-      {/* Indicador de Versão */}
-      <div style={{background: '#8b5cf6', color: '#fff', padding: 4, textAlign: 'center', fontSize: 11, fontWeight: 'bold', marginBottom: 10, borderRadius: 4}}>
-         ✅ v3.1 - Correção Fuso Horário (Dias Exatos)
+      {/* Indicador de Versão e Debug */}
+      <div style={{background: '#8b5cf6', color: '#fff', padding: 8, fontSize: 12, marginBottom: 10, borderRadius: 4}}>
+         <div style={{fontWeight: 'bold', textAlign: 'center'}}>✅ v3.2 - Debug Ativo (Clique no nome do aluno para ver dados)</div>
+         {debugData && (
+             <div style={{marginTop: 8, background: 'rgba(0,0,0,0.2)', padding: 8, borderRadius: 4, fontFamily: 'monospace', whiteSpace: 'pre-wrap'}}>
+                 {JSON.stringify(debugData, null, 2)}
+                 <button onClick={() => setDebugData(null)} style={{display: 'block', marginTop: 4, background: '#fff', color: '#000', border: 'none', padding: '2px 6px', borderRadius: 2, cursor: 'pointer'}}>Fechar Debug</button>
+             </div>
+         )}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -455,7 +497,13 @@ export default function ListStudents() {
                             )}
                         </div>
                         <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.8rem' }} title={s.name}>{s.name}</div>
+                            <div 
+                                style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.8rem', cursor: 'help' }} 
+                                title="Clique para ver debug da Anamnese"
+                                onClick={() => toggleDebug(s.id)}
+                            >
+                                {s.name}
+                            </div>
                             <div style={{ fontSize: '0.7rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={s.email}>{s.email}</div>
                             <div style={{ marginTop: 1 }}>
                                 <span style={{ 
