@@ -200,6 +200,11 @@ export default function AnamnesisPending() {
 
     return (
         <div>
+            {/* Indicador de Versão para Debug */}
+            <div style={{background: '#22c55e', color: '#fff', padding: 4, textAlign: 'center', fontSize: 11, fontWeight: 'bold', marginBottom: 10, borderRadius: 4}}>
+                ✅ v2.1 - Correção Aplicada (Toast + Fix SQL)
+            </div>
+
             {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
             <h1>Gestão de Anamneses</h1>
             <button className="btn" onClick={() => navigate('/dashboard/overview')} style={{ marginBottom: 20, background: 'transparent', color: '#666', border: '1px solid #ccc' }}>← Voltar</button>
