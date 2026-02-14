@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { ArrowLeft, Calendar, User } from 'lucide-react'
+import { getWorkoutById } from '../../store/workouts'
+import { Toast, type ToastType } from '../../components/Toast'
 
 export default function ViewAnamnesis() {
     const { id } = useParams()
@@ -10,6 +11,7 @@ export default function ViewAnamnesis() {
     const [loading, setLoading] = useState(true)
     const [marking, setMarking] = useState(false)
     const [confirmModal, setConfirmModal] = useState<{ open: boolean, days: number }>({ open: false, days: 90 })
+    const [toast, setToast] = useState<{ msg: string, type: ToastType } | null>(null)
 
     useEffect(() => {
         if (!id) return
@@ -95,7 +97,7 @@ export default function ViewAnamnesis() {
         const { days } = confirmModal
 
         if (days <= 0) {
-            alert('Por favor, insira um número válido.')
+            setToast({ msg: 'Por favor, insira um número válido.', type: 'error' })
             return
         }
 
@@ -109,20 +111,20 @@ export default function ViewAnamnesis() {
                 renew_in_days: days
             }
             
+            // CORREÇÃO: Remove 'content'
             const { error } = await supabase
                 .from('protocols')
                 .update({ 
-                    data: newData,
-                    content: newData 
+                    data: newData
                 })
                 .eq('id', id)
 
             if (error) throw error
 
-            // alert(`Anamnese concluída! Próxima renovação em ${days} dias.`)
-            navigate(-1) // Volta para a lista
+            setToast({ msg: `Anamnese concluída!`, type: 'success' })
+            setTimeout(() => navigate(-1), 1500)
         } catch (err: any) {
-            alert('Erro: ' + err.message)
+            setToast({ msg: 'Erro: ' + err.message, type: 'error' })
         } finally {
             setMarking(false)
         }
@@ -142,6 +144,7 @@ export default function ViewAnamnesis() {
 
     return (
         <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px', paddingBottom: 100 }}>
+            {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <button 
                     onClick={() => navigate(-1)} 

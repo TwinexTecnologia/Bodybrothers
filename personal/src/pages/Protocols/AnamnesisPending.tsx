@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react'
-import { listStudentsByPersonal, type StudentRecord } from '../../store/students'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { listStudentsByPersonal } from '../../store/students'
 import { useNavigate } from 'react-router-dom'
+import { Toast, type ToastType } from '../../components/Toast'
 
 type PendingItem = {
-    student: StudentRecord
-    status: 'expired' | 'missing'
-    dueDate?: string // Data que venceu
+    student: any;
+    status: 'expired' | 'warning' | 'ok';
+    dueDate: string;
 }
 
 type ReviewItem = {
-    id: string
-    student: StudentRecord
-    answeredAt: string
-    data: any
+    id: string;
+    student: any;
+    answeredAt: string;
+    data: any;
 }
 
 export default function AnamnesisPending() {
@@ -23,6 +25,7 @@ export default function AnamnesisPending() {
     const [loading, setLoading] = useState(true)
     const [markingId, setMarkingId] = useState<string | null>(null)
     const [isReviewRequired, setIsReviewRequired] = useState(false)
+    const [toast, setToast] = useState<{ msg: string, type: ToastType } | null>(null)
     
     // Estados do Modal de Confirmação
     const [confirmModal, setConfirmModal] = useState<{ open: boolean, item: ReviewItem | null, days: number }>({ 
@@ -157,7 +160,7 @@ export default function AnamnesisPending() {
         if (!item) return
 
         if (days <= 0) {
-            alert('Por favor, insira um número válido de dias.')
+            setToast({ msg: 'Por favor, insira um número válido de dias.', type: 'error' })
             return
         }
         
@@ -172,12 +175,11 @@ export default function AnamnesisPending() {
                 renew_in_days: days 
             }
             
-            // Tenta atualizar tanto data quanto content para garantir
+            // CORREÇÃO: Atualiza apenas 'data', pois 'content' não existe no schema
             const { error } = await supabase
                 .from('protocols')
                 .update({ 
-                    data: newData,
-                    content: newData 
+                    data: newData
                 })
                 .eq('id', item.id)
 
@@ -185,9 +187,9 @@ export default function AnamnesisPending() {
 
             // Remove da lista localmente
             setReviewItems(prev => prev.filter(i => i.id !== item.id))
-            // Feedback visual sutil ao invés de alert
+            setToast({ msg: `Anamnese concluída! Renovação em ${days} dias.`, type: 'success' })
         } catch (err: any) {
-            alert('Erro ao atualizar: ' + err.message)
+            setToast({ msg: 'Erro ao atualizar: ' + err.message, type: 'error' })
         } finally {
             setMarkingId(null)
             setConfirmModal({ open: false, item: null, days: 90 })
@@ -198,6 +200,7 @@ export default function AnamnesisPending() {
 
     return (
         <div>
+            {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
             <h1>Gestão de Anamneses</h1>
             <button className="btn" onClick={() => navigate('/dashboard/overview')} style={{ marginBottom: 20, background: 'transparent', color: '#666', border: '1px solid #ccc' }}>← Voltar</button>
             
