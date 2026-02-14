@@ -96,18 +96,22 @@ const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], a
                 // CASO 1: Personal revisou e definiu dias manualmente (renew_in_days existe)
                 if (data.renew_in_days && data.reviewed_at) {
                     const reviewDate = new Date(data.reviewed_at)
-                    reviewDate.setHours(0, 0, 0, 0)
+                    // Normaliza para dia UTC ou Local? Vamos usar Local para garantir consistência visual
+                    const reviewLocal = new Date(reviewDate.getFullYear(), reviewDate.getMonth(), reviewDate.getDate())
                     
                     const daysToAdd = parseInt(data.renew_in_days)
                     
-                    const dueDate = new Date(reviewDate)
+                    const dueDate = new Date(reviewLocal)
                     dueDate.setDate(dueDate.getDate() + daysToAdd)
-                    dueDate.setHours(23, 59, 59, 999) 
+                    // dueDate agora é 00:00 do dia do vencimento
                     
                     const now = new Date()
-                    now.setHours(0, 0, 0, 0)
+                    const nowLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate()) // 00:00 de hoje
                     
-                    const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) - 1 
+                    // Diferença em milissegundos
+                    const diffTime = dueDate.getTime() - nowLocal.getTime()
+                    // Diferença em dias inteiros
+                    const daysLeft = Math.round(diffTime / (1000 * 60 * 60 * 24))
                     
                     if (daysLeft < 0) return { status: 'overdue', label: `🔴 Vencida (${Math.abs(daysLeft)}d)`, color: '#ef4444', fontWeight: 600 }
                     if (daysLeft === 0) return { status: 'warning', label: `🟡 Vence Hoje`, color: '#f59e0b', fontWeight: 600 }
