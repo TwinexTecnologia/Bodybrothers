@@ -288,6 +288,11 @@ export default function ListStudents() {
 
   return (
     <div>
+      {/* Indicador de Versão */}
+      <div style={{background: '#3b82f6', color: '#fff', padding: 4, textAlign: 'center', fontSize: 11, fontWeight: 'bold', marginBottom: 10, borderRadius: 4}}>
+         ✅ v3.0 - Lógica Híbrida Ativa
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1 style={{ margin: 0, fontSize: '1.8rem', color: '#0f172a' }}>Gerenciar Alunos</h1>
         <button className="btn" style={{ background: '#10b981', padding: '10px 20px', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 8 }} onClick={() => navigate('/students/create')}>
