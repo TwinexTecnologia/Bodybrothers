@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { getWorkoutById } from '../../store/workouts'
 import { Toast, type ToastType } from '../../components/Toast'
+import { ArrowLeft, Calendar, User } from 'lucide-react'
 
 export default function ViewAnamnesis() {
     const { id } = useParams()
