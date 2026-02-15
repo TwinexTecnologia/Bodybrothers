@@ -185,6 +185,7 @@ export default function AnamnesisPending() {
             }
             
             // 3. Atualiza
+            console.log('Enviando update para o banco:', newData)
             const { error } = await supabase
                 .from('protocols')
                 .update({ 
@@ -193,7 +194,8 @@ export default function AnamnesisPending() {
                 .eq('id', item.id)
 
             if (error) throw error
-
+            
+            console.log('Update sucesso!')
             // Remove da lista localmente
             setReviewItems(prev => prev.filter(i => i.id !== item.id))
             setToast({ msg: `Anamnese concluída! Renovação em ${days} dias.`, type: 'success' })
