@@ -167,14 +167,24 @@ export default function AnamnesisPending() {
         setMarkingId(item.id)
         
         try {
-            // Atualiza o JSON data adicionando reviewed_at e atualizando renew_in_days
+            // 1. Busca dados atuais do banco para garantir integridade
+            const { data: currentProtocol, error: fetchError } = await supabase
+                .from('protocols')
+                .select('data')
+                .eq('id', item.id)
+                .single()
+            
+            if (fetchError) throw fetchError
+
+            // 2. Prepara novo objeto data
+            const currentData = currentProtocol?.data || {}
             const newData = { 
-                ...item.data, 
+                ...currentData, 
                 reviewed_at: new Date().toISOString(),
                 renew_in_days: days 
             }
             
-            // CORREÇÃO: Atualiza apenas 'data', pois 'content' não existe no schema
+            // 3. Atualiza
             const { error } = await supabase
                 .from('protocols')
                 .update({ 
@@ -188,6 +198,7 @@ export default function AnamnesisPending() {
             setReviewItems(prev => prev.filter(i => i.id !== item.id))
             setToast({ msg: `Anamnese concluída! Renovação em ${days} dias.`, type: 'success' })
         } catch (err: any) {
+            console.error('Erro ao confirmar:', err)
             setToast({ msg: 'Erro ao atualizar: ' + err.message, type: 'error' })
         } finally {
             setMarkingId(null)
