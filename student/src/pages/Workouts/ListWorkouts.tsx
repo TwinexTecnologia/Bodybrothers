@@ -502,17 +502,6 @@ function ListWorkouts() {
       return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Calcula meta de dias baseada no agendamento
-  const uniqueScheduledDays = new Set<string>()
-  if (schedule && typeof schedule === 'object') {
-      Object.values(schedule).forEach((days: any) => {
-          if (Array.isArray(days)) {
-              days.forEach(d => uniqueScheduledDays.add(String(d).toLowerCase()))
-          }
-      })
-  }
-  const totalDaysGoal = uniqueScheduledDays.size > 0 ? uniqueScheduledDays.size : 5
-
   if (session.active && session.workout && session.workout.data) {
       // Modo Sessão (Mantido com melhorias sutis)
       return (
@@ -824,7 +813,7 @@ function ListWorkouts() {
         <div style={{ background: '#fff', borderRadius: 24, padding: '20px 16px', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.05)', marginBottom: 32, border: '1px solid rgba(0,0,0,0.02)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <h2 style={{ fontSize: '1.1rem', color: '#0f172a', margin: 0, fontWeight: 800, letterSpacing: '-0.5px' }}>Frequência Semanal</h2>
-                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>{weeklyFreq} / {totalDaysGoal} treinos</span>
+                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>{activeDays.length} / 7 dias</span>
             </div>
             
             <div className="frequency-scroll">
