@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { Bell, AlertCircle, Clock, DollarSign, FileText, Dumbbell, X } from 'lucide-react'
+import { Bell, AlertCircle, Clock, DollarSign, FileText, Dumbbell, X, MessageSquare } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { supabase } from '../lib/supabase'
 
 type PersonalNotification = {
     id: string
-    type: 'financial_overdue' | 'financial_due_soon' | 'financial_paid' | 'anamnesis_overdue' | 'anamnesis_answered' | 'workout_finished'
+    type: 'financial_overdue' | 'financial_due_soon' | 'financial_paid' | 'anamnesis_overdue' | 'anamnesis_answered' | 'workout_finished' | 'feedback' | 'system'
     title: string
     description: string
     date: Date
@@ -88,6 +88,16 @@ export default function NotificationBellV2() {
                     .eq('personal_id', currentUser.id)
                     .eq('type', 'anamnesis_model')
                     .lt('ends_at', todayStr)
+
+                // 5. Notificações do Sistema (Feedbacks, etc)
+                const { data: sysNotifications, error: sysError } = await supabase
+                    .from('notifications')
+                    .select('id, type, title, message, created_at, link')
+                    .eq('user_id', currentUser.id)
+                    .gte('created_at', recentLimitStr)
+
+                if (sysError) console.error('Erro SysNotif:', sysError)
+                console.log('Notificações Sistema:', sysNotifications)
 
                 // COLETAR IDs PARA NOMES
                 const allStudentIds = new Set<string>()
@@ -179,6 +189,18 @@ export default function NotificationBellV2() {
                     })
                 })
 
+                // Sistema / Feedback
+                sysNotifications?.forEach((n: any) => {
+                    list.push({
+                        id: `sys-${n.id}`,
+                        type: n.type || 'system',
+                        title: n.title,
+                        description: n.message,
+                        date: new Date(n.created_at),
+                        link: n.link
+                    })
+                })
+
                 // ORDENAR: Mais recentes primeiro
                 list.sort((a, b) => b.date.getTime() - a.date.getTime())
 
@@ -216,6 +238,7 @@ export default function NotificationBellV2() {
             case 'anamnesis_overdue': return <AlertCircle size={18} color="#dc2626" />
             case 'anamnesis_answered': return <FileText size={18} color="#2563eb" />
             case 'workout_finished': return <Dumbbell size={18} color="#16a34a" />
+            case 'feedback': return <MessageSquare size={18} color="#2563eb" />
             default: return <Bell size={18} />
         }
     }
@@ -227,7 +250,8 @@ export default function NotificationBellV2() {
             case 'financial_due_soon': return '#fef3c7'
             case 'financial_paid': 
             case 'workout_finished': return '#dcfce7'
-            case 'anamnesis_answered': return '#dbeafe'
+            case 'anamnesis_answered': 
+            case 'feedback': return '#dbeafe'
             default: return '#f1f5f9'
         }
     }

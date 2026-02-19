@@ -47,8 +47,6 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
             return mapFromDb(data)
         }
 
-        // alert('Iniciando notificação...') // Debug
-
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('personal_id, full_name')
@@ -56,13 +54,10 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
             .single()
 
         if (profileError) {
-            console.error('Erro ao buscar perfil:', profileError)
-            // alert(`Erro perfil: ${profileError.message}`)
+            console.error('Erro ao buscar perfil do aluno para notificar:', profileError)
         }
 
         if (profile?.personal_id) {
-            // alert(`Enviando para Personal: ${profile.personal_id}`)
-            
             const { error: notifError } = await supabase.from('notifications').insert({
                 user_id: profile.personal_id,
                 title: 'Novo Feedback de Treino',
@@ -72,19 +67,15 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
             })
 
             if (notifError) {
-                console.error('ERRO NOTIF:', notifError)
-                alert(`Erro ao notificar: ${notifError.message} (Provável RLS)`)
+                console.error('ERRO AO INSERIR NOTIFICAÇÃO:', notifError)
             } else {
-                console.log('Notificação enviada!')
-                // alert('Notificação enviada com sucesso!')
+                console.log('Notificação enviada com sucesso!')
             }
         } else {
-            console.warn('Aluno sem personal vinculado.')
-            alert('Aviso: Este aluno não tem Personal vinculado, notificação não enviada.')
+            console.warn('Aluno não tem personal_id vinculado. Nenhuma notificação enviada.')
         }
-    } catch (err: any) {
-        console.error('Exceção notificação:', err)
-        alert(`Erro interno notificação: ${err.message}`)
+    } catch (err) {
+        console.error('Exceção ao notificar personal:', err)
     }
 
     return mapFromDb(data)
