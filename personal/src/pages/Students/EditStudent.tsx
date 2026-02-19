@@ -612,11 +612,13 @@ export default function EditStudent() {
 
               if (setsToRender.length > 0) {
                   setsToRender.forEach((s, idx) => {
-                      const label = s.type === 'warmup' ? '(Warm)' : 
-                                    s.type === 'feeder' ? '(Feed)' : 
-                                    s.type === 'topset' ? '(Top)' : ''
+                      const label = s.type === 'warmup' ? 'Aquece' : 
+                                    s.type === 'feeder' ? 'Prep.' : 
+                                    s.type === 'working' ? 'Trab.' : 
+                                    s.type === 'topset' ? 'Top Set' : 
+                                    s.type === 'custom' ? (s.customLabel || 'Outro') : ''
                       
-                      setsCell += `${s.series} x ${s.reps} ${label}`
+                      setsCell += `${s.series} x ${s.reps} ${label ? `(${label})` : ''}`
                       loadCell += s.load || '-'
 
                       if (idx < setsToRender.length - 1) {
@@ -646,9 +648,9 @@ export default function EditStudent() {
               headStyles: { fillColor: [15, 23, 42], textColor: 255 },
               styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
               columnStyles: {
-                  0: { cellWidth: 50 }, // Exercício
-                  1: { cellWidth: 25 }, // Séries
-                  2: { cellWidth: 35 }, // Carga (Aumentado para caber PROGRESSIVA)
+                  0: { cellWidth: 45 }, // Exercício (Reduzi um pouco)
+                  1: { cellWidth: 35 }, // Séries (Aumentei para caber labels)
+                  2: { cellWidth: 30 }, // Carga
                   3: { cellWidth: 25 }, // Descanso
                   4: { cellWidth: 'auto' } // Obs (Resto)
               },

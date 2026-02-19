@@ -447,11 +447,14 @@ function ListWorkouts() {
 
                   if (setsToRender.length > 0) {
                       setsToRender.forEach((s, idx) => {
-                          const label = s.type === 'warmup' ? '(Warm)' : 
-                                        s.type === 'feeder' ? '(Feed)' : 
-                                        s.type === 'topset' ? '(Top)' : ''
+                          const label = s.type === 'warmup' ? 'Aquece' : 
+                                        s.type === 'feeder' ? 'Prep.' : 
+                                        s.type === 'working' ? 'Trab.' : 
+                                        s.type === 'topset' ? 'Top Set' : 
+                                        s.type === 'custom' ? (s.customLabel || 'Outro') : ''
                           
-                          setsCell += `${s.series} x ${s.reps} ${label}`
+                          // Formato: "1 x 10 (Trab.)"
+                          setsCell += `${s.series} x ${s.reps} ${label ? `(${label})` : ''}`
                           loadCell += s.load || '-'
 
                           if (idx < setsToRender.length - 1) {
