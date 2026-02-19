@@ -52,7 +52,9 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
             supabase.from('notifications').insert({
                 user_id: profile.personal_id,
                 title: 'Treino Concluído',
-                message: `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}"`,
+                message: notes 
+                    ? `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}". Feedback: "${notes}"`
+                    : `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}"`,
                 type: 'feedback',
                 link: `/students/details/${data.student_id}`,
             }).then(() => console.log('Notificação enviada'))

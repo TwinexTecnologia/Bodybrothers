@@ -235,7 +235,7 @@ export default function NotificationBellV2() {
             case 'anamnesis_overdue': return <AlertCircle size={18} color="#dc2626" />
             case 'anamnesis_answered': return <FileText size={18} color="#2563eb" />
             case 'workout_finished': return <Dumbbell size={18} color="#16a34a" />
-            case 'feedback': return <MessageSquare size={18} color="#2563eb" />
+            case 'feedback': return <MessageSquare size={18} color="#ea580c" />
             default: return <Bell size={18} />
         }
     }
@@ -247,8 +247,8 @@ export default function NotificationBellV2() {
             case 'financial_due_soon': return '#fef3c7'
             case 'financial_paid': 
             case 'workout_finished': return '#dcfce7'
-            case 'anamnesis_answered': 
-            case 'feedback': return '#dbeafe'
+            case 'anamnesis_answered': return '#dbeafe'
+            case 'feedback': return '#ffedd5'
             default: return '#f1f5f9'
         }
     }
