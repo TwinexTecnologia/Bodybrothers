@@ -894,7 +894,7 @@ export default function EditStudent() {
                     <div style={{ ...sectionTitleStyle, justifyContent: 'space-between' }}>
                         <span>💪 Treinos</span>
                         <button className="btn" onClick={handleExportWorkoutsPDF} title="Baixar todos os treinos em PDF" style={{ padding: '6px 12px', background: '#e0f2fe', color: '#0369a1', border: 'none', fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            📄 PDF
+                            Exportar Treino
                         </button>
                     </div>
                     
