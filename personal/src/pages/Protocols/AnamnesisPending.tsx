@@ -242,7 +242,7 @@ export default function AnamnesisPending() {
                                         <div style={{ display: 'flex', gap: 8 }}>
                                             <button 
                                                 className="btn"
-                                                onClick={() => navigate(`/protocols/view/${item.id}`)}
+                                                onClick={() => navigate(`/protocols/anamnesis/view/${item.id}`)}
                                                 style={{ background: '#fff', color: '#3b82f6', border: '1px solid #bfdbfe', padding: '8px 12px' }}
                                             >
                                                 Ver Respostas
