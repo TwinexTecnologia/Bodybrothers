@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../../auth/useAuth'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
-import { Dumbbell, Utensils, AlertCircle, CheckCircle, Clock, X, DollarSign } from 'lucide-react'
+import { Dumbbell, Utensils, AlertCircle, CheckCircle, Clock, X, DollarSign, FileText } from 'lucide-react'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 export default function Overview() {
   const { user } = useAuth()
@@ -198,6 +200,114 @@ export default function Overview() {
       navigate(path)
   }
 
+  const handleExportPDF = async () => {
+      try {
+          // Busca perfil para workoutIds
+          const { data: profile } = await supabase.from('profiles').select('data').eq('id', user?.id).single()
+          const workoutIds = profile?.data?.workoutIds || []
+
+          // Busca Treinos Completos
+          let query = supabase.from('protocols').select('*').eq('type', 'workout').eq('status', 'active')
+          
+          if (workoutIds.length > 0) {
+              query = query.or(`student_id.eq.${user?.id},id.in.(${workoutIds.join(',')})`)
+          } else {
+              query = query.eq('student_id', user?.id)
+          }
+
+          const { data: workouts, error } = await query
+
+          if (error || !workouts || workouts.length === 0) {
+              alert('Nenhum treino encontrado para exportar.')
+              return
+          }
+
+          const doc = new jsPDF()
+          
+          // Header
+          doc.setFontSize(18)
+          doc.setTextColor(15, 23, 42)
+          doc.text(`Ficha de Treino - ${stats.name.toUpperCase()}`, 14, 20)
+          
+          doc.setFontSize(10)
+          doc.setTextColor(100, 116, 139)
+          doc.text(`Gerado via FitBody Pro em ${new Date().toLocaleDateString()}`, 14, 26)
+
+          let yPos = 35
+
+          workouts.forEach((workout, index) => {
+              // Título
+              doc.setFontSize(14)
+              doc.setTextColor(15, 23, 42)
+              doc.text(workout.title, 14, yPos)
+              yPos += 8
+
+              // Obs
+              if (workout.data?.notes) {
+                  doc.setFontSize(10)
+                  doc.setTextColor(100, 116, 139)
+                  const splitNotes = doc.splitTextToSize(`Obs: ${workout.data.notes}`, 180)
+                  doc.text(splitNotes, 14, yPos)
+                  yPos += (splitNotes.length * 5) + 4
+              }
+
+              // Tabela
+              const tableBody = (workout.data?.exercises || []).map((ex: any) => {
+                  let setsText = ''
+                  if (ex.sets && ex.sets.length > 0) {
+                       const mainSet = ex.sets.find((s: any) => s.type === 'working') || ex.sets[0]
+                       setsText = `${mainSet.series} x ${mainSet.reps}`
+                       if (ex.sets.length > 1) setsText += '*'
+                  } else {
+                       setsText = `${ex.series || '-'} x ${ex.reps || '-'}`
+                  }
+
+                  let loadText = ex.load || ''
+                  if (ex.sets && ex.sets.length > 0) loadText = ex.sets[0].load || ''
+
+                  return [
+                      ex.name,
+                      setsText,
+                      loadText,
+                      ex.rest || '',
+                      ex.notes || ''
+                  ]
+              })
+
+              autoTable(doc, {
+                  startY: yPos,
+                  head: [['Exercício', 'Séries/Reps', 'Carga', 'Descanso', 'Obs']],
+                  body: tableBody,
+                  theme: 'grid',
+                  headStyles: { fillColor: [15, 23, 42], textColor: 255 },
+                  styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
+                  columnStyles: {
+                      0: { cellWidth: 50 },
+                      1: { cellWidth: 25 },
+                      2: { cellWidth: 35 },
+                      3: { cellWidth: 25 },
+                      4: { cellWidth: 'auto' }
+                  },
+                  margin: { top: 20 },
+                  didDrawPage: (data) => { yPos = data.cursor?.y || 20 }
+              })
+
+              yPos = (doc as any).lastAutoTable.finalY + 15
+              
+              if (index < workouts.length - 1 && yPos > 250) {
+                  doc.addPage()
+                  yPos = 20
+              }
+          })
+
+          doc.save(`Treinos_${stats.name}.pdf`)
+
+      } catch (error) {
+          console.error(error)
+          alert('Erro ao gerar PDF')
+      }
+  }
+
   return (
     <>
       <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
@@ -299,7 +409,34 @@ export default function Overview() {
                 subtitle={stats.diets > 0 ? 'Clique para ver seu plano alimentar' : 'Nenhuma dieta ativa'}
             />
 
-            <div style={{ 
+            {/* Card PDF */}
+            <div 
+                onClick={handleExportPDF}
+                style={{ 
+                    background: '#fff', padding: 24, borderRadius: 16, 
+                    border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-4px)')}
+                onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
+            >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                    <div style={{ background: '#f3e8ff', padding: 12, borderRadius: 12, color: '#9333ea' }}>
+                        <FileText size={24} />
+                    </div>
+                </div>
+                <div>
+                    <h3 style={{ margin: 0, fontSize: '1rem', color: '#64748b', fontWeight: 500 }}>Ficha de Treino</h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '1.4rem', fontWeight: 700, color: '#0f172a' }}>
+                        Exportar PDF
+                    </p>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: '#9333ea' }}>Baixar ficha completa</p>
+                </div>
+            </div>
+
+            <div style={{  
                 background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 
                 padding: 24, borderRadius: 16, color: '#fff',
                 display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
