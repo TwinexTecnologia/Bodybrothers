@@ -51,12 +51,15 @@ export default function ViewAnamnesis() {
             // Normaliza para sempre usar 'content' no estado
             finalProtocol.content = content
 
-            if (!content.questions && content.modelId) {
-                console.log('Perguntas não encontradas na resposta. Buscando modelo original:', content.modelId)
+            // Tenta pegar o ID do modelo de vários lugares
+            const originalModelId = content.modelId || content.model_id || protocol.model_id
+
+            if ((!content.questions || content.questions.length === 0) && originalModelId) {
+                console.log('Perguntas não encontradas na resposta. Buscando modelo original:', originalModelId)
                 const { data: model, error: modelError } = await supabase
                     .from('protocols')
                     .select('*') // Busca tudo
-                    .eq('id', content.modelId)
+                    .eq('id', originalModelId)
                     .single()
                 
                 if (modelError) console.error('Erro ao buscar modelo original:', modelError)
@@ -299,8 +302,14 @@ export default function ViewAnamnesis() {
                         // Fallback melhorado para exibir imagens mesmo sem perguntas
                         Object.entries(answers).map(([key, value]: any, index) => {
                              // Tenta achar a pergunta se conseguimos carregar parcialmente
-                             const q = questions.find((x: any) => x.id === key)
-                             const label = q ? q.text : `Pergunta ${index + 1} (ID: ${key.substring(0, 8)}...)`
+                             let q = questions.find((x: any) => x.id === key)
+                             
+                             // Se não achou pelo ID, tenta pegar pelo índice (assumindo ordem)
+                             if (!q && questions.length > index) {
+                                 q = questions[index]
+                             }
+
+                             const label = q ? (q.text || q.question) : `Pergunta ${index + 1} (ID: ${key.substring(0, 8)}...)`
                              
                              const isImage = typeof value === 'string' && (value.includes('/storage/v1/object/') || value.match(/\.(jpeg|jpg|gif|png|webp)$/i))
 
