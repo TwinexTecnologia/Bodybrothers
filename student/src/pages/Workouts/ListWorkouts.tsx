@@ -427,31 +427,48 @@ function ListWorkouts() {
 
               // Tabela
               const tableBody = (workout.data?.exercises || []).map((ex: any) => {
-                  let setsText = ''
                   // Normaliza sets (mesma lógica do render)
                   let setsToRender: any[] = Array.isArray(ex.sets) ? ex.sets : []
                   
                   if (setsToRender.length === 0) {
+                      if (ex.warmupSeries || ex.warmupReps) {
+                          setsToRender.push({ type: 'warmup', series: ex.warmupSeries || '', reps: ex.warmupReps || '', load: ex.warmupLoad || '' })
+                      }
+                      if (ex.feederSeries || ex.feederReps) {
+                          setsToRender.push({ type: 'feeder', series: ex.feederSeries || '', reps: ex.feederReps || '', load: ex.feederLoad || '' })
+                      }
                       if (ex.series || ex.reps) {
-                          setsToRender.push({ series: ex.series || '', reps: ex.reps || '' })
+                          setsToRender.push({ type: 'working', series: ex.series || '', reps: ex.reps || '', load: ex.load || '' })
                       }
                   }
 
-                  if (setsToRender.length > 0) {
-                      const mainSet = setsToRender.find((s: any) => s.type === 'working') || setsToRender[0]
-                      setsText = `${mainSet.series} x ${mainSet.reps}`
-                      if (setsToRender.length > 1) setsText += '*'
-                  } else {
-                      setsText = `${ex.series || '-'} x ${ex.reps || '-'}`
-                  }
+                  let setsCell = ''
+                  let loadCell = ''
 
-                  let loadText = ex.load || ''
-                  if (setsToRender.length > 0) loadText = setsToRender[0].load || ''
+                  if (setsToRender.length > 0) {
+                      setsToRender.forEach((s, idx) => {
+                          const label = s.type === 'warmup' ? '(Warm)' : 
+                                        s.type === 'feeder' ? '(Feed)' : 
+                                        s.type === 'topset' ? '(Top)' : ''
+                          
+                          setsCell += `${s.series} x ${s.reps} ${label}`
+                          loadCell += s.load || '-'
+
+                          if (idx < setsToRender.length - 1) {
+                              setsCell += '\n'
+                              loadCell += '\n'
+                          }
+                      })
+                  } else {
+                      // Fallback antigo
+                      setsCell = `${ex.series || '-'} x ${ex.reps || '-'}`
+                      loadCell = ex.load || '-'
+                  }
 
                   return [
                       ex.name,
-                      setsText,
-                      loadText,
+                      setsCell,
+                      loadCell,
                       ex.rest || '',
                       ex.notes || ''
                   ]
