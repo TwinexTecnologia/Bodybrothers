@@ -58,6 +58,7 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
         }
 
         if (profile?.personal_id) {
+            console.log('Enviando notificação WEB com notes:', notes)
             const { error: notifError } = await supabase.from('notifications').insert({
                 user_id: profile.personal_id,
                 title: 'Novo Feedback de Treino',

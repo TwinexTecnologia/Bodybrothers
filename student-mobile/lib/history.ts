@@ -49,6 +49,7 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
     .single()
     .then(({ data: profile }) => {
         if (profile?.personal_id) {
+            console.log('Enviando notificação com notes:', notes)
             supabase.from('notifications').insert({
                 user_id: profile.personal_id,
                 title: 'Treino Concluído',
