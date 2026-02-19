@@ -587,16 +587,16 @@ export default function EditStudent() {
           yPos += 8
 
           // Observações do Treino
-          if (workout.data?.notes) {
+          if (workout.notes) {
               doc.setFontSize(10)
               doc.setTextColor(100, 116, 139)
-              const splitNotes = doc.splitTextToSize(`Obs: ${workout.data.notes}`, 180)
+              const splitNotes = doc.splitTextToSize(`Obs: ${workout.notes}`, 180)
               doc.text(splitNotes, 14, yPos)
               yPos += (splitNotes.length * 5) + 4
           }
 
           // Tabela de Exercícios
-          const tableBody = (workout.data?.exercises || []).map((ex: any) => {
+          const tableBody = (workout.exercises || []).map((ex: any) => {
               // Formata Séries/Reps
               let setsText = ''
               if (ex.sets && ex.sets.length > 0) {
