@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/useAuth'
-import { Dumbbell, ChevronRight, PlayCircle, Clock, X, StopCircle, CheckCircle, Calendar, MessageSquare, History, TrendingUp, ChevronLeft, Play, ArrowRight, Flame, BarChart2 } from 'lucide-react'
+import { Dumbbell, ChevronRight, PlayCircle, Clock, X, StopCircle, CheckCircle, Calendar, MessageSquare, History, TrendingUp, ChevronLeft, Play, ArrowRight, Flame, BarChart2, FileText } from 'lucide-react'
 import { startSession, finishSession, getWeeklyFrequency, getWeeklyActivity } from '../../store/history'
 import { ErrorBoundary } from '../../components/ErrorBoundary'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 // Atualizado para suportar múltiplos sets
 type ExerciseSet = {
@@ -387,6 +389,108 @@ function ListWorkouts() {
       return !days || !Array.isArray(days) || days.length === 0
   })
 
+  const handleExportPDF = () => {
+      if (workouts.length === 0) {
+          alert('Nenhum treino disponível para exportar.')
+          return
+      }
+
+      try {
+          const doc = new jsPDF()
+          
+          // Header
+          doc.setFontSize(18)
+          doc.setTextColor(15, 23, 42)
+          doc.text(`Ficha de Treino`, 14, 20)
+          
+          doc.setFontSize(10)
+          doc.setTextColor(100, 116, 139)
+          doc.text(`Gerado via FitBody Pro em ${new Date().toLocaleDateString()}`, 14, 26)
+
+          let yPos = 35
+
+          workouts.forEach((workout, index) => {
+              // Título
+              doc.setFontSize(14)
+              doc.setTextColor(15, 23, 42)
+              doc.text(workout.title, 14, yPos)
+              yPos += 8
+
+              // Obs
+              if (workout.data?.notes) {
+                  doc.setFontSize(10)
+                  doc.setTextColor(100, 116, 139)
+                  const splitNotes = doc.splitTextToSize(`Obs: ${workout.data.notes}`, 180)
+                  doc.text(splitNotes, 14, yPos)
+                  yPos += (splitNotes.length * 5) + 4
+              }
+
+              // Tabela
+              const tableBody = (workout.data?.exercises || []).map((ex: any) => {
+                  let setsText = ''
+                  // Normaliza sets (mesma lógica do render)
+                  let setsToRender: any[] = Array.isArray(ex.sets) ? ex.sets : []
+                  
+                  if (setsToRender.length === 0) {
+                      if (ex.series || ex.reps) {
+                          setsToRender.push({ series: ex.series || '', reps: ex.reps || '' })
+                      }
+                  }
+
+                  if (setsToRender.length > 0) {
+                      const mainSet = setsToRender.find((s: any) => s.type === 'working') || setsToRender[0]
+                      setsText = `${mainSet.series} x ${mainSet.reps}`
+                      if (setsToRender.length > 1) setsText += '*'
+                  } else {
+                      setsText = `${ex.series || '-'} x ${ex.reps || '-'}`
+                  }
+
+                  let loadText = ex.load || ''
+                  if (setsToRender.length > 0) loadText = setsToRender[0].load || ''
+
+                  return [
+                      ex.name,
+                      setsText,
+                      loadText,
+                      ex.rest || '',
+                      ex.notes || ''
+                  ]
+              })
+
+              autoTable(doc, {
+                  startY: yPos,
+                  head: [['Exercício', 'Séries/Reps', 'Carga', 'Descanso', 'Obs']],
+                  body: tableBody,
+                  theme: 'grid',
+                  headStyles: { fillColor: [15, 23, 42], textColor: 255 },
+                  styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
+                  columnStyles: {
+                      0: { cellWidth: 50 },
+                      1: { cellWidth: 25 },
+                      2: { cellWidth: 35 },
+                      3: { cellWidth: 25 },
+                      4: { cellWidth: 'auto' }
+                  },
+                  margin: { top: 20 },
+                  didDrawPage: (data) => { yPos = data.cursor?.y || 20 }
+              })
+
+              yPos = (doc as any).lastAutoTable.finalY + 15
+              
+              if (index < workouts.length - 1 && yPos > 250) {
+                  doc.addPage()
+                  yPos = 20
+              }
+          })
+
+          doc.save(`Meus_Treinos.pdf`)
+
+      } catch (error) {
+          console.error(error)
+          alert('Erro ao gerar PDF')
+      }
+  }
+
   // --- Renderização ---
 
   // Detecta mobile para ajustar layout
@@ -767,6 +871,20 @@ function ListWorkouts() {
                     )
                 })}
             </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
+            <button 
+                onClick={handleExportPDF}
+                style={{
+                    background: '#fff', border: '1px solid #e2e8f0', color: '#475569',
+                    padding: '8px 16px', borderRadius: 12, fontSize: '0.85rem', fontWeight: 600,
+                    display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
+                }}
+            >
+                <FileText size={16} /> Exportar Treinos em PDF
+            </button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
