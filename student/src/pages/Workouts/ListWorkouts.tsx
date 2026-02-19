@@ -485,9 +485,9 @@ function ListWorkouts() {
                   headStyles: { fillColor: [15, 23, 42], textColor: 255 },
                   styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
                   columnStyles: {
-                      0: { cellWidth: 50 },
-                      1: { cellWidth: 25 },
-                      2: { cellWidth: 35 },
+                      0: { cellWidth: 45 },
+                      1: { cellWidth: 35 },
+                      2: { cellWidth: 30 },
                       3: { cellWidth: 25 },
                       4: { cellWidth: 'auto' }
                   },

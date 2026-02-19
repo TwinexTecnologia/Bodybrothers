@@ -45,11 +45,11 @@ export const generateAndShareWorkoutPdf = async (studentId: string, studentName:
                 td { border-bottom: 1px solid #e2e8f0; padding: 8px; vertical-align: middle; }
                 tr:nth-child(even) { background-color: #f8fafc; }
                 
-                .th-ex { width: 40%; }
-                .th-sets { width: 15%; }
+                .th-ex { width: 30%; }
+                .th-sets { width: 25%; }
                 .th-load { width: 20%; }
-                .th-rest { width: 10%; }
-                .th-obs { width: 15%; }
+                .th-rest { width: 15%; }
+                .th-obs { width: 10%; }
             </style>
         </head>
         <body>
@@ -73,26 +73,39 @@ export const generateAndShareWorkoutPdf = async (studentId: string, studentName:
                         </thead>
                         <tbody>
                             ${(w.data.exercises || []).map((ex: any) => {
-                                // Lógica de formatação igual ao painel web
-                                let setsText = '';
-                                if (ex.sets && ex.sets.length > 0) {
-                                    const mainSet = ex.sets.find((s: any) => s.type === 'working') || ex.sets[0];
-                                    setsText = `${mainSet.series} x ${mainSet.reps}`;
-                                    if (ex.sets.length > 1) setsText += '*';
-                                } else {
-                                    setsText = `${ex.series || '-'} x ${ex.reps || '-'}`;
+                                // Lógica de Sets Múltiplos
+                                let setsToRender: any[] = Array.isArray(ex.sets) ? ex.sets : [];
+
+                                if (setsToRender.length === 0) {
+                                    if (ex.series || ex.reps) {
+                                        setsToRender.push({ type: 'working', series: ex.series || '', reps: ex.reps || '', load: ex.load || '' });
+                                    }
                                 }
 
-                                let loadText = ex.load || '';
-                                if (ex.sets && ex.sets.length > 0) {
-                                    loadText = ex.sets[0].load || '';
+                                let setsHtml = '';
+                                let loadHtml = '';
+
+                                if (setsToRender.length > 0) {
+                                    setsToRender.forEach((s, idx) => {
+                                        const label = s.type === 'warmup' ? 'Aquece' : 
+                                                      s.type === 'feeder' ? 'Prep.' : 
+                                                      s.type === 'working' ? 'Trab.' : 
+                                                      s.type === 'topset' ? 'Top Set' : 
+                                                      s.type === 'custom' ? (s.customLabel || 'Outro') : '';
+                                        
+                                        setsHtml += `<div style="margin-bottom: 2px">${s.series} x ${s.reps} <span style="font-size:10px; color:#64748b">${label ? `(${label})` : ''}</span></div>`;
+                                        loadHtml += `<div style="margin-bottom: 2px">${s.load || '-'}</div>`;
+                                    });
+                                } else {
+                                    setsHtml = `${ex.series || '-'} x ${ex.reps || '-'}`;
+                                    loadHtml = ex.load || '-';
                                 }
 
                                 return `
                                     <tr>
                                         <td>${ex.name}</td>
-                                        <td>${setsText}</td>
-                                        <td>${loadText}</td>
+                                        <td>${setsHtml}</td>
+                                        <td>${loadHtml}</td>
                                         <td>${ex.rest || ''}</td>
                                         <td>${ex.notes || ''}</td>
                                     </tr>
