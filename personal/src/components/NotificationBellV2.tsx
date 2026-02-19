@@ -224,6 +224,7 @@ export default function NotificationBellV2() {
 
     const handleClick = (n: PersonalNotification) => {
         setShowDropdown(false)
+        if (n.type === 'feedback') return // Apenas informativo
         if (n.link) navigate(n.link)
     }
 
@@ -310,11 +311,12 @@ export default function NotificationBellV2() {
                                     onClick={() => handleClick(n)}
                                     style={{ 
                                         padding: '12px 16px', borderBottom: '1px solid #f8fafc', 
-                                        cursor: 'pointer', transition: 'background 0.2s',
+                                        cursor: n.type === 'feedback' ? 'default' : 'pointer', 
+                                        transition: 'background 0.2s',
                                         display: 'flex', gap: 12, alignItems: 'flex-start'
                                     }}
-                                    onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                                    onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                                    onMouseEnter={e => n.type !== 'feedback' && (e.currentTarget.style.background = '#f8fafc')}
+                                    onMouseLeave={e => n.type !== 'feedback' && (e.currentTarget.style.background = '#fff')}
                                 >
                                     <div style={{ 
                                         marginTop: 2, 
