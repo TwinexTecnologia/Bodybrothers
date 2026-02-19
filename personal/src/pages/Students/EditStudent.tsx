@@ -597,28 +597,42 @@ export default function EditStudent() {
 
           // Tabela de Exercícios
           const tableBody = (workout.exercises || []).map((ex: any) => {
-              // Formata Séries/Reps
-              let setsText = ''
-              if (ex.sets && ex.sets.length > 0) {
-                   const mainSet = ex.sets.find((s: any) => s.type === 'working') || ex.sets[0]
-                   setsText = `${mainSet.series} x ${mainSet.reps}`
-                   // Se tiver variação, indica
-                   const hasVariation = ex.sets.some((s: any) => s.series !== mainSet.series || s.reps !== mainSet.reps)
-                   if (hasVariation) setsText += '*'
-              } else {
-                   setsText = `${ex.series || '-'} x ${ex.reps || '-'}`
+              // Normaliza sets
+              let setsToRender: any[] = Array.isArray(ex.sets) ? ex.sets : []
+              
+              if (setsToRender.length === 0) {
+                  // Fallback para campos antigos
+                  if (ex.series || ex.reps) {
+                      setsToRender.push({ type: 'working', series: ex.series || '', reps: ex.reps || '', load: ex.load || '' })
+                  }
               }
 
-              // Formata Carga
-              let loadText = ex.load || ''
-              if (ex.sets && ex.sets.length > 0) {
-                  loadText = ex.sets[0].load || ''
+              let setsCell = ''
+              let loadCell = ''
+
+              if (setsToRender.length > 0) {
+                  setsToRender.forEach((s, idx) => {
+                      const label = s.type === 'warmup' ? '(Warm)' : 
+                                    s.type === 'feeder' ? '(Feed)' : 
+                                    s.type === 'topset' ? '(Top)' : ''
+                      
+                      setsCell += `${s.series} x ${s.reps} ${label}`
+                      loadCell += s.load || '-'
+
+                      if (idx < setsToRender.length - 1) {
+                          setsCell += '\n'
+                          loadCell += '\n'
+                      }
+                  })
+              } else {
+                  setsCell = `${ex.series || '-'} x ${ex.reps || '-'}`
+                  loadCell = ex.load || '-'
               }
 
               return [
                   ex.name,
-                  setsText,
-                  loadText,
+                  setsCell,
+                  loadCell,
                   ex.rest || '',
                   ex.notes || ''
               ]
