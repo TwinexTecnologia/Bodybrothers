@@ -47,7 +47,8 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
             return mapFromDb(data)
         }
 
-        console.log('Iniciando processo de notificação...')
+        // alert('Iniciando notificação...') // Debug
+
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('personal_id, full_name')
@@ -55,36 +56,35 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
             .single()
 
         if (profileError) {
-            console.error('Erro ao buscar perfil do aluno para notificar:', profileError)
+            console.error('Erro ao buscar perfil:', profileError)
+            // alert(`Erro perfil: ${profileError.message}`)
         }
 
         if (profile?.personal_id) {
-            console.log('Enviando notificação para Personal ID:', profile.personal_id)
+            // alert(`Enviando para Personal: ${profile.personal_id}`)
+            
             const { error: notifError } = await supabase.from('notifications').insert({
                 user_id: profile.personal_id,
                 title: 'Novo Feedback de Treino',
-                message: `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}" com observações.`,
+                message: `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}" com observações: "${notes}"`,
                 type: 'feedback',
-                // Link para o painel do personal (assumindo rota /students/history)
-                // Ajuste a rota conforme seu frontend do personal
                 link: `/students/details/${data.student_id}` 
             })
 
             if (notifError) {
-                console.error('ERRO AO INSERIR NOTIFICAÇÃO:', notifError)
-                // DEBUG: Alertar erro para diagnóstico
-                alert(`Erro ao notificar personal: ${notifError.message || JSON.stringify(notifError)}`)
+                console.error('ERRO NOTIF:', notifError)
+                alert(`Erro ao notificar: ${notifError.message} (Provável RLS)`)
             } else {
-                console.log('Notificação enviada com sucesso!')
+                console.log('Notificação enviada!')
+                // alert('Notificação enviada com sucesso!')
             }
         } else {
-            console.warn('Aluno não tem personal_id vinculado. Nenhuma notificação enviada.')
-            // DEBUG
-            // alert('Aluno sem personal vinculado. Notificação ignorada.')
+            console.warn('Aluno sem personal vinculado.')
+            alert('Aviso: Este aluno não tem Personal vinculado, notificação não enviada.')
         }
-    } catch (err) {
-        console.error('Exceção ao notificar personal:', err)
-        alert('Erro interno ao notificar.')
+    } catch (err: any) {
+        console.error('Exceção notificação:', err)
+        alert(`Erro interno notificação: ${err.message}`)
     }
 
     return mapFromDb(data)
