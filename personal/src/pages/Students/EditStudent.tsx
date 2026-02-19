@@ -630,14 +630,16 @@ export default function EditStudent() {
               body: tableBody,
               theme: 'grid',
               headStyles: { fillColor: [15, 23, 42], textColor: 255 },
-              styles: { fontSize: 9, cellPadding: 3 },
+              styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
               columnStyles: {
-                  0: { cellWidth: 60 }, // Exercício
-                  4: { cellWidth: 50 }  // Obs
+                  0: { cellWidth: 50 }, // Exercício
+                  1: { cellWidth: 25 }, // Séries
+                  2: { cellWidth: 35 }, // Carga (Aumentado para caber PROGRESSIVA)
+                  3: { cellWidth: 25 }, // Descanso
+                  4: { cellWidth: 'auto' } // Obs (Resto)
               },
               margin: { top: 20 },
               didDrawPage: (data) => {
-                  // Se quebrou página, atualiza yPos
                   yPos = data.cursor?.y || 20
               }
           })
