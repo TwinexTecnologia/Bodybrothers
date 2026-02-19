@@ -54,26 +54,77 @@ export default function ViewAnamnesis() {
             // Tenta pegar o ID do modelo de vários lugares
             const originalModelId = content.modelId || content.model_id || protocol.model_id
 
-            if ((!content.questions || content.questions.length === 0) && originalModelId) {
-                console.log('Perguntas não encontradas na resposta. Buscando modelo original:', originalModelId)
-                const { data: model, error: modelError } = await supabase
-                    .from('protocols')
-                    .select('*') // Busca tudo
-                    .eq('id', originalModelId)
-                    .single()
-                
-                if (modelError) console.error('Erro ao buscar modelo original:', modelError)
+            if ((!content.questions || content.questions.length === 0)) {
+                console.log('Perguntas não encontradas na resposta. Tentando recuperar...')
+                let recoveredQuestions: any[] = []
 
-                if (model) {
-                    const modelData = model.content || model.data || {}
-                    console.log('Dados do modelo recuperado:', modelData)
+                // TENTATIVA 1: Buscar pelo ID do modelo original (se existir)
+                if (originalModelId) {
+                    const { data: model } = await supabase
+                        .from('protocols')
+                        .select('*')
+                        .eq('id', originalModelId)
+                        .single()
                     
-                    if (modelData.questions) {
-                        console.log('Perguntas recuperadas do modelo:', modelData.questions.length)
-                        finalProtocol.content.questions = modelData.questions
-                    } else {
-                        console.warn('Modelo encontrado, mas não possui campo questions no JSON.')
+                    if (model) {
+                        const modelData = model.content || model.data || {}
+                        if (modelData.questions) {
+                            recoveredQuestions = modelData.questions
+                        }
                     }
+                }
+
+                // TENTATIVA 2: Se falhou (modelo deletado), busca EM TODOS os modelos do personal para tentar casar IDs
+                if (recoveredQuestions.length === 0) {
+                    console.warn('Modelo original não encontrado. Iniciando busca profunda por perguntas órfãs...')
+                    
+                    // Busca TODOS os modelos deste personal para criar um dicionário de ID -> Texto
+                    const { data: allModels } = await supabase
+                        .from('protocols')
+                        .select('data') // Só precisamos do JSON
+                        .eq('personal_id', protocol.personal_id)
+                        .eq('type', 'anamnesis_model')
+                        .limit(50) // Limite seguro
+                    
+                    const questionMap = new Map<string, string>()
+                    
+                    // Popula o mapa com todas as perguntas já criadas por este personal
+                    if (allModels) {
+                        allModels.forEach((m: any) => {
+                            const qs = m.data?.questions || []
+                            qs.forEach((q: any) => {
+                                if (q.id && (q.text || q.question)) {
+                                    questionMap.set(q.id, q.text || q.question)
+                                }
+                            })
+                        })
+                    }
+
+                    // Reconstrói as perguntas baseadas nas RESPOSTAS que temos
+                    const answers = content.answers || {}
+                    const answerKeys = Object.keys(answers)
+
+                    recoveredQuestions = answerKeys.map((key, index) => {
+                        // Tenta achar o texto no mapa global
+                        const text = questionMap.get(key) || `Pergunta ${index + 1}`
+                        
+                        // Infere o tipo baseado na resposta
+                        const val = answers[key]
+                        let type = 'text'
+                        if (typeof val === 'string' && (val.includes('/storage/v1/object/') || val.match(/\.(jpeg|jpg|gif|png|webp)$/i))) {
+                            type = 'photo'
+                        }
+
+                        return {
+                            id: key,
+                            text: text,
+                            type: type
+                        }
+                    })
+                }
+
+                if (recoveredQuestions.length > 0) {
+                    finalProtocol.content.questions = recoveredQuestions
                 }
             }
             
