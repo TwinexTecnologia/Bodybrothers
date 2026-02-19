@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
 export const generateAndShareWorkoutPdf = async (studentId: string, studentName: string) => {
@@ -106,17 +107,23 @@ export const generateAndShareWorkoutPdf = async (studentId: string, studentName:
         `;
 
         // 3. Gerar PDF
-        const { uri } = await Print.printToFileAsync({
-            html: htmlContent,
-            base64: false
-        });
+        if (Platform.OS === 'web') {
+            await Print.printAsync({
+                html: htmlContent
+            });
+        } else {
+            const { uri } = await Print.printToFileAsync({
+                html: htmlContent,
+                base64: false
+            });
 
-        // 4. Compartilhar
-        await Sharing.shareAsync(uri, {
-            UTI: '.pdf',
-            mimeType: 'application/pdf',
-            dialogTitle: `Treinos - ${studentName}`
-        });
+            // 4. Compartilhar
+            await Sharing.shareAsync(uri, {
+                UTI: '.pdf',
+                mimeType: 'application/pdf',
+                dialogTitle: `Treinos - ${studentName}`
+            });
+        }
 
     } catch (error) {
         console.error('Erro ao gerar PDF:', error);
