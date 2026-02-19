@@ -61,7 +61,7 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
             const { error: notifError } = await supabase.from('notifications').insert({
                 user_id: profile.personal_id,
                 title: 'Novo Feedback de Treino',
-                message: `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}" com observações: "${notes}"`,
+                message: `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}". Feedback: "${notes}"`,
                 type: 'feedback',
                 link: `/students/details/${data.student_id}` 
             })

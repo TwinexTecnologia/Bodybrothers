@@ -204,6 +204,9 @@ export default function NotificationBellV2() {
                 // ORDENAR: Mais recentes primeiro
                 list.sort((a, b) => b.date.getTime() - a.date.getTime())
 
+                console.log('Total Notificações:', list.length)
+                console.log('Top 3 Notificações:', list.slice(0, 3))
+
                 setNotifications(list)
                 
                 // Calcular não lidos baseado no LocalStorage
