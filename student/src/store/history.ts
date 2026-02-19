@@ -41,8 +41,12 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
 
     if (error) throw error
 
-    // Notificar Personal
+    // Notificar Personal APENAS SE TIVER FEEDBACK
     try {
+        if (!notes || notes.trim().length === 0) {
+            return mapFromDb(data)
+        }
+
         console.log('Iniciando processo de notificação...')
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
@@ -58,8 +62,8 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
             console.log('Enviando notificação para Personal ID:', profile.personal_id)
             const { error: notifError } = await supabase.from('notifications').insert({
                 user_id: profile.personal_id,
-                title: 'Treino Concluído',
-                message: `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}"`,
+                title: 'Novo Feedback de Treino',
+                message: `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}" com observações.`,
                 type: 'feedback',
                 // Link para o painel do personal (assumindo rota /students/history)
                 // Ajuste a rota conforme seu frontend do personal
