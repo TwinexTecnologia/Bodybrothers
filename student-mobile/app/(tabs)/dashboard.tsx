@@ -2,11 +2,12 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal, FlatList } from 'react-native';
 import { useAuth } from '../../lib/auth';
 import { getWeeklyFrequency, getWeeklyActivity } from '../../lib/history';
-import { Check, X, LogOut, Activity, Dumbbell, Utensils, ChevronRight, Bell, AlertCircle, Clock } from 'lucide-react-native';
+import { Check, X, LogOut, Activity, Dumbbell, Utensils, ChevronRight, Bell, AlertCircle, Clock, FileText } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { useNotifications } from '../../hooks/useNotifications';
+import { generateAndShareWorkoutPdf } from '../../lib/pdf';
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
@@ -177,6 +178,15 @@ export default function Dashboard() {
             })}
           </View>
         </View>
+
+        {/* Botão de Exportar PDF */}
+        <TouchableOpacity 
+            style={styles.pdfButton}
+            onPress={() => user && generateAndShareWorkoutPdf(user.id, stats.name)}
+        >
+            <FileText size={20} color="#0f172a" />
+            <Text style={styles.pdfButtonText}>Exportar Treinos em PDF</Text>
+        </TouchableOpacity>
 
         {/* Grid de Cards Grandes */}
         <View style={styles.grid}>
@@ -369,6 +379,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   
+  // PDF Button
+  pdfButton: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      backgroundColor: '#fff', padding: 16, borderRadius: 16, marginBottom: 24,
+      borderWidth: 1, borderColor: '#e2e8f0',
+      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2
+  },
+  pdfButtonText: { color: '#0f172a', fontWeight: '600', fontSize: 14 },
+
   // Grid
   grid: {
       flexDirection: 'row',
