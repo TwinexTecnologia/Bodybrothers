@@ -11,6 +11,8 @@ import { isStudentOverdue } from '../../lib/finance_utils'
 import Modal from '../../components/Modal'
 import { supabase } from '../../lib/supabase'
 import { generateDietPdf } from '../../lib/pdf'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 export default function EditStudent() {
   const navigate = useNavigate()
@@ -557,6 +559,101 @@ export default function EditStudent() {
       }
   }
 
+  const handleExportWorkoutsPDF = () => {
+      if (studentWorkouts.length === 0) {
+          alert('O aluno não possui treinos ativos.')
+          return
+      }
+
+      const doc = new jsPDF()
+      const studentName = name || 'Aluno'
+      
+      // Header
+      doc.setFontSize(18)
+      doc.setTextColor(15, 23, 42) // Slate 900
+      doc.text(`Ficha de Treino - ${studentName}`, 14, 20)
+      
+      doc.setFontSize(10)
+      doc.setTextColor(100, 116, 139) // Slate 500
+      doc.text(`Gerado em ${new Date().toLocaleDateString()}`, 14, 26)
+
+      let yPos = 35
+
+      studentWorkouts.forEach((workout, index) => {
+          // Título do Treino
+          doc.setFontSize(14)
+          doc.setTextColor(15, 23, 42)
+          doc.text(workout.name, 14, yPos)
+          yPos += 8
+
+          // Observações do Treino
+          if (workout.data?.notes) {
+              doc.setFontSize(10)
+              doc.setTextColor(100, 116, 139)
+              const splitNotes = doc.splitTextToSize(`Obs: ${workout.data.notes}`, 180)
+              doc.text(splitNotes, 14, yPos)
+              yPos += (splitNotes.length * 5) + 4
+          }
+
+          // Tabela de Exercícios
+          const tableBody = (workout.data?.exercises || []).map((ex: any) => {
+              // Formata Séries/Reps
+              let setsText = ''
+              if (ex.sets && ex.sets.length > 0) {
+                   const mainSet = ex.sets.find((s: any) => s.type === 'working') || ex.sets[0]
+                   setsText = `${mainSet.series} x ${mainSet.reps}`
+                   // Se tiver variação, indica
+                   const hasVariation = ex.sets.some((s: any) => s.series !== mainSet.series || s.reps !== mainSet.reps)
+                   if (hasVariation) setsText += '*'
+              } else {
+                   setsText = `${ex.series || '-'} x ${ex.reps || '-'}`
+              }
+
+              // Formata Carga
+              let loadText = ex.load || ''
+              if (ex.sets && ex.sets.length > 0) {
+                  loadText = ex.sets[0].load || ''
+              }
+
+              return [
+                  ex.name,
+                  setsText,
+                  loadText,
+                  ex.rest || '',
+                  ex.notes || ''
+              ]
+          })
+
+          autoTable(doc, {
+              startY: yPos,
+              head: [['Exercício', 'Séries/Reps', 'Carga', 'Descanso', 'Obs']],
+              body: tableBody,
+              theme: 'grid',
+              headStyles: { fillColor: [15, 23, 42], textColor: 255 },
+              styles: { fontSize: 9, cellPadding: 3 },
+              columnStyles: {
+                  0: { cellWidth: 60 }, // Exercício
+                  4: { cellWidth: 50 }  // Obs
+              },
+              margin: { top: 20 },
+              didDrawPage: (data) => {
+                  // Se quebrou página, atualiza yPos
+                  yPos = data.cursor?.y || 20
+              }
+          })
+
+          yPos = (doc as any).lastAutoTable.finalY + 15
+          
+          // Se não for o último e tiver pouco espaço, nova página
+          if (index < studentWorkouts.length - 1 && yPos > 250) {
+              doc.addPage()
+              yPos = 20
+          }
+      })
+
+      doc.save(`Treinos_${studentName.replace(/\s+/g, '_')}.pdf`)
+  }
+
   const save = async () => {
     if (!selectedId) return
     const { data: { user } } = await supabase.auth.getUser()
@@ -794,6 +891,9 @@ export default function EditStudent() {
                 <div style={cardStyle}>
                     <div style={{ ...sectionTitleStyle, justifyContent: 'space-between' }}>
                         <span>💪 Treinos</span>
+                        <button className="btn" onClick={handleExportWorkoutsPDF} title="Baixar todos os treinos em PDF" style={{ padding: '6px 12px', background: '#e0f2fe', color: '#0369a1', border: 'none', fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            📄 PDF
+                        </button>
                     </div>
                     
                     <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8 }}>

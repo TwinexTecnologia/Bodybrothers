@@ -140,14 +140,14 @@ export default function Financial() {
                     <View style={styles.divider} />
 
                     <View style={styles.infoGrid}>
-                        <View>
+                        <View style={{ flex: 1 }}>
                             <Text style={styles.label}>Dia de Vencimento</Text>
                             <View style={styles.row}>
                                 <Calendar size={16} color="#0f172a" />
                                 <Text style={styles.value}>Dia {financialInfo.dueDay || plan.due_day}</Text>
                             </View>
                         </View>
-                        <View>
+                        <View style={{ flex: 1, alignItems: 'flex-end' }}>
                             <Text style={styles.label}>Próximo Pagamento</Text>
                             <Text style={styles.value}>
                                 {nextCharge ? nextCharge.date.toLocaleDateString('pt-BR') : '—'}
@@ -194,18 +194,18 @@ export default function Financial() {
                 ) : (
                     displayList.map((item, i) => (
                         <View key={i} style={[styles.listItem, i === displayList.length - 1 && { borderBottomWidth: 0 }]}>
-                            <View style={styles.row}>
+                            <View style={[styles.row, { flex: 1, marginRight: 16 }]}>
                                 <View style={[styles.statusIcon, item.status === 'paid' ? styles.bgSuccess : styles.bgGray]}>
                                     {item.status === 'paid' ? <CheckCircle size={16} color="#16a34a" /> : <Clock size={16} color="#64748b" />}
                                 </View>
-                                <View>
-                                    <Text style={styles.listTitle}>Mensalidade</Text>
-                                    <Text style={[styles.listSub, item.status === 'overdue' && { color: '#ef4444' }]}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.listTitle} numberOfLines={1} ellipsizeMode="tail">Mensalidade</Text>
+                                    <Text style={[styles.listSub, item.status === 'overdue' && { color: '#ef4444' }]} numberOfLines={1} ellipsizeMode="tail">
                                         {item.status === 'paid' ? `Pago em ${new Date(item.payment.paidAt).toLocaleDateString('pt-BR')}` : `Vence em ${item.date.toLocaleDateString('pt-BR')}`}
                                     </Text>
                                 </View>
                             </View>
-                            <View style={{ alignItems: 'flex-end' }}>
+                            <View style={{ alignItems: 'flex-end', minWidth: 100 }}>
                                 <Text style={styles.listAmount}>R$ {item.amount.toFixed(2)}</Text>
                                 <Text style={[
                                     styles.listStatus, 
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   
   divider: { height: 1, backgroundColor: '#f1f5f9', marginVertical: 24 },
   
-  infoGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+  infoGrid: { flexDirection: 'row', justifyContent: 'space-between', gap: 16 },
   label: { fontSize: 12, color: '#64748b', marginBottom: 4, textTransform: 'uppercase' },
   value: { fontSize: 16, fontWeight: '600', color: '#0f172a', marginLeft: 4 },
   row: { flexDirection: 'row', alignItems: 'center' },

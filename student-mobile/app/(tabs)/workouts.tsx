@@ -293,131 +293,83 @@ export default function Workouts() {
                           </View>
                       )}
 
-                      {selectedWorkout.data.exercises.map((ex, i) => (
-                          <View key={i} style={styles.exerciseCard}>
-                              <View style={{ flex: 1 }}>
-                                  <View style={styles.exerciseHeader}>
-                                      <View style={styles.exerciseIndex}>
-                                          <Text style={styles.indexText}>{i + 1}</Text>
-                                      </View>
+                      {selectedWorkout.data.exercises.map((ex, i) => {
+                          // Lógica Simplificada para pegar dados
+                          let series = ex.series;
+                          let reps = ex.reps;
+                          let load = ex.load;
+                          let rest = ex.rest;
+
+                          // Se tiver sets definidos, tenta pegar do primeiro working set ou do primeiro set
+                          if (ex.sets && ex.sets.length > 0) {
+                              const workingSet = ex.sets.find(s => s.type === 'working');
+                              if (workingSet) {
+                                  series = workingSet.series;
+                                  reps = workingSet.reps;
+                                  load = workingSet.load;
+                                  rest = workingSet.rest;
+                              } else {
+                                  series = ex.sets[0].series;
+                                  reps = ex.sets[0].reps;
+                                  load = ex.sets[0].load;
+                                  rest = ex.sets[0].rest;
+                              }
+                          }
+
+                          // Se series ainda estiver vazio, tenta pegar de warmup/feeder das props antigas
+                          if (!series && ex.warmupSeries) { series = ex.warmupSeries; reps = ex.warmupReps || ''; }
+
+                          return (
+                              <View key={i} style={styles.exerciseCard}>
+                                  {/* Coluna Esquerda */}
+                                  <View style={{ flex: 1, paddingRight: 12 }}>
                                       <Text style={styles.exerciseName}>{ex.name}</Text>
-                                  </View>
-
-                                  {/* Sets Logic */}
-                                  <View style={styles.setsContainer}>
-                                      {(() => {
-                                          let setsToRender: ExerciseSet[] = ex.sets || [];
-                                          if (setsToRender.length === 0) {
-                                              if (ex.warmupSeries) setsToRender.push({ type: 'warmup', series: ex.warmupSeries, reps: ex.warmupReps || '', load: ex.warmupLoad || '', rest: ex.warmupRest || '' });
-                                              if (ex.feederSeries) setsToRender.push({ type: 'feeder', series: ex.feederSeries, reps: ex.feederReps || '', load: ex.feederLoad || '', rest: ex.feederRest || '' });
-                                              if (ex.series) setsToRender.push({ type: 'working', series: ex.series, reps: ex.reps, load: ex.load, rest: ex.rest });
-                                          }
-
-                                          return setsToRender.map((set, idx) => {
-                                              let color = '#334155';
-                                              let bg = 'transparent';
-                                              let borderColor = 'transparent';
-                                              let label = '';
-
-                                              if (set.type === 'warmup') { 
-                                                  color = '#ea580c'; 
-                                                  bg = '#fff7ed'; 
-                                                  borderColor = '#ffedd5';
-                                                  label = 'AQUECIMENTO'; 
-                                              }
-                                              else if (set.type === 'working') { 
-                                                  color = '#16a34a'; 
-                                                  bg = '#f0fdf4'; 
-                                                  borderColor = '#dcfce7';
-                                                  label = 'TRABALHO'; 
-                                              }
-                                              else if (set.type === 'feeder') { 
-                                                  color = '#0284c7'; 
-                                                  bg = '#f0f9ff'; 
-                                                  borderColor = '#e0f2fe';
-                                                  label = 'PREPARAÇÃO'; 
-                                              }
-                                              else if (set.type === 'topset') { 
-                                                  color = '#4f46e5'; // Indigo
-                                                  bg = '#eef2ff'; 
-                                                  borderColor = '#e0e7ff';
-                                                  label = 'TOP SET'; 
-                                              }
-                                              else { 
-                                                  color = '#475569'; 
-                                                  bg = '#f8fafc'; 
-                                                  borderColor = '#e2e8f0';
-                                                  label = set.customLabel || 'OUTRO'; 
-                                              }
-
-                                              return (
-                                                  <View key={idx} style={{ 
-                                                      backgroundColor: bg, 
-                                                      borderRadius: 12, 
-                                                      padding: 12, 
-                                                      borderWidth: 1, 
-                                                      borderColor: borderColor,
-                                                      marginBottom: 4
-                                                  }}>
-                                                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                                                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                              <View style={{ backgroundColor: '#fff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, shadowColor: color, shadowOpacity: 0.1, shadowOffset: {width: 0, height: 1}, elevation: 1 }}>
-                                                                  <Text style={{ color: color, fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>{label}</Text>
-                                                              </View>
-                                                              <Text style={{ fontWeight: '700', color: '#1e293b', fontSize: 15 }}>{set.series} x {set.reps}</Text>
-                                                          </View>
-                                                          {set.load && <Text style={{ fontSize: 13, color: '#475569', fontWeight: '700', textTransform: 'uppercase' }}>{set.load}</Text>}
-                                                      </View>
-                                                      
-                                                      {set.rest && (
-                                                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                               <Clock size={14} color="#94a3b8" />
-                                                               <Text style={{ fontSize: 13, color: '#64748b', fontWeight: '500' }}>{set.rest}</Text>
-                                                           </View>
-                                                      )}
-                                                  </View>
-                                              );
-                                          });
-                                      })()}
-                                  </View>
-
-                                  {ex.notes && (
-                                      <View style={styles.exNote}>
-                                          <MessageSquare size={12} color="#f97316" />
-                                          <Text style={styles.exNoteText}>{ex.notes}</Text>
+                                      
+                                      <View style={{ gap: 4 }}>
+                                          <Text style={styles.simpleSetText}>
+                                              <Text style={styles.simpleSetLabel}>SÉRIES: </Text>
+                                              {series} x {reps}
+                                          </Text>
+                                          {load ? (
+                                              <Text style={styles.simpleSetText}>
+                                                  <Text style={styles.simpleSetLabel}>CARGA: </Text>
+                                                  {load}
+                                              </Text>
+                                          ) : null}
+                                          {rest ? (
+                                              <Text style={styles.simpleSetText}>
+                                                  <Text style={styles.simpleSetLabel}>DESCANSO: </Text>
+                                                  {rest}
+                                              </Text>
+                                          ) : null}
                                       </View>
-                                  )}
-                              </View>
 
-                              {/* Video Player Embutido */}
-                              {(ex.videoUrl || ex.video_url) ? (
-                                  <View style={styles.thumbBox}>
-                                      {Platform.OS === 'web' ? (
-                                          <iframe
-                                              src={(ex.videoUrl || ex.video_url)?.includes('youtube') 
-                                                  ? (ex.videoUrl || ex.video_url)?.replace('watch?v=', 'embed/') 
-                                                  : (ex.videoUrl || ex.video_url)}
-                                              style={{ width: '100%', height: '100%', border: 'none' }}
-                                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                              allowFullScreen
-                                          />
-                                      ) : (
-                                          <WebView
-                                              source={{ uri: (ex.videoUrl || ex.video_url)?.includes('youtube') ? (ex.videoUrl || ex.video_url) : (ex.videoUrl || ex.video_url) }}
-                                              style={{ flex: 1 }}
-                                              javaScriptEnabled={true}
-                                              domStorageEnabled={true}
-                                              allowsFullscreenVideo={true}
-                                          />
+                                      {ex.notes && (
+                                          <View style={styles.exNoteSimple}>
+                                              <Text style={styles.exNoteText}>{ex.notes}</Text>
+                                          </View>
                                       )}
                                   </View>
-                              ) : (
-                                  <View style={styles.noThumbBox}>
-                                      <Dumbbell size={20} color="#cbd5e1" />
-                                  </View>
-                              )}
-                          </View>
-                      ))}
+
+                                  {/* Coluna Direita (Thumbnail) */}
+                                  {(ex.videoUrl || ex.video_url) ? (
+                                      <TouchableOpacity 
+                                          style={styles.thumbBoxSmall}
+                                          onPress={() => setVideoModalUrl(ex.videoUrl || ex.video_url || null)}
+                                      >
+                                          <Image 
+                                              source={{ uri: getYoutubeThumbnail(ex.videoUrl || ex.video_url) || 'https://via.placeholder.com/150' }} 
+                                              style={{ width: '100%', height: '100%' }}
+                                              resizeMode="cover"
+                                          />
+                                          <View style={styles.playOverlaySmall}>
+                                              <Play size={24} fill="#fff" color="#fff" />
+                                          </View>
+                                      </TouchableOpacity>
+                                  ) : null}
+                              </View>
+                          );
+                      })}
                   </ScrollView>
               </View>
           )}
@@ -459,9 +411,9 @@ export default function Workouts() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   scrollContent: { padding: 16 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#0f172a' },
-  dateText: { fontSize: 12, color: '#64748b', textTransform: 'capitalize' },
+  headerRow: { flexDirection: 'column', alignItems: 'flex-start', marginBottom: 24, gap: 4 },
+  headerTitle: { fontSize: 28, fontWeight: '800', color: '#0f172a' },
+  dateText: { fontSize: 14, color: '#64748b', textTransform: 'capitalize', marginTop: 4 },
   emptyState: { padding: 40, alignItems: 'center', backgroundColor: '#fff', borderRadius: 20 },
   emptyText: { color: '#94a3b8', marginTop: 16 },
 
@@ -472,17 +424,17 @@ const styles = StyleSheet.create({
       borderWidth: 1, borderColor: '#f1f5f9'
   },
   sectionHeader: {
-      padding: 20, borderBottomWidth: 1, borderBottomColor: '#f8fafc',
+      padding: 16, borderBottomWidth: 1, borderBottomColor: '#f8fafc', // Padding reduzido
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start'
   },
-  sectionTitle: { fontSize: 20, fontWeight: '700', color: '#0f172a' },
-  sectionSubtitle: { fontSize: 14, color: '#64748b', marginTop: 4 },
-  countBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
-  countText: { fontSize: 12, fontWeight: '600', color: '#475569' },
-  workoutItem: { padding: 20 },
-  workoutTitleItem: { fontSize: 16, color: '#334155', marginBottom: 12, fontWeight: '500' },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a', flex: 1, marginRight: 8 }, // Flex 1 para não empurrar
+  sectionSubtitle: { fontSize: 13, color: '#64748b', marginTop: 4 },
+  countBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, minWidth: 60, alignItems: 'center' }, // Menor
+  countText: { fontSize: 11, fontWeight: '600', color: '#475569' },
+  workoutItem: { padding: 16 }, // Padding reduzido
+  workoutTitleItem: { fontSize: 15, color: '#334155', marginBottom: 10, fontWeight: '500' },
   viewButton: {
-      padding: 16, borderRadius: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
+      padding: 12, borderRadius: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' // Menor
   },
   viewButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   arrowBox: { backgroundColor: 'rgba(255,255,255,0.2)', padding: 6, borderRadius: 8 },
@@ -503,7 +455,7 @@ const styles = StyleSheet.create({
   modalHeader: { padding: 20, paddingBottom: 30 },
   backButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 24 },
   modalTitle: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 12 },
-  modalTags: { flexDirection: 'row', gap: 8 },
+  modalTags: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' }, // Adicionado flexWrap
   tag: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   tagText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   modalHero: { marginTop: 20, alignItems: 'center', gap: 16 },
@@ -513,20 +465,26 @@ const styles = StyleSheet.create({
   doneBadge: { backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
   doneText: { color: '#16a34a', fontWeight: '700', fontSize: 14 },
 
-  // Exercises
+  // Exercises - Novo Layout Horizontal
   notesBox: { backgroundColor: '#fff7ed', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#ffedd5', flexDirection: 'row', gap: 12, marginBottom: 24 },
   notesTitle: { color: '#ea580c', fontWeight: '800', fontSize: 12, textTransform: 'uppercase', marginBottom: 4 },
   notesText: { color: '#9a3412', fontSize: 14, lineHeight: 20 },
   
   exerciseCard: {
-      backgroundColor: '#fff', borderRadius: 16, padding: 12, marginBottom: 12,
-      flexDirection: 'column', gap: 16, borderWidth: 1, borderColor: '#f1f5f9', // Coluna
-      shadowColor: '#000', shadowOpacity: 0.02, shadowOffset: {width: 0, height: 2}, elevation: 1
+      backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12,
+      flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: '#f1f5f9',
+      shadowColor: '#000', shadowOpacity: 0.02, shadowOffset: {width: 0, height: 2}, elevation: 1,
+      alignItems: 'center'
   },
-  // Thumb
-  thumbBox: { width: '100%', height: 200, borderRadius: 12, overflow: 'hidden', position: 'relative', marginTop: 8 },
-  playOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' },
-  noThumbBox: { display: 'none' }, // Esconde se não tiver vídeo para economizar espaço
+  // Thumb Pequena Direita
+  thumbBoxSmall: { width: 100, height: 100, borderRadius: 12, overflow: 'hidden', position: 'relative', backgroundColor: '#000' },
+  playOverlaySmall: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' },
   
-  videoHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, alignItems: 'center' }
+  // Textos Simples
+  simpleSetText: { fontSize: 13, color: '#334155', fontWeight: '500', marginBottom: 2 },
+  simpleSetLabel: { fontSize: 11, color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', marginRight: 4 },
+  
+  exerciseName: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 8 },
+  exNoteSimple: { marginTop: 8, backgroundColor: '#fff7ed', padding: 8, borderRadius: 8 },
+  exNoteText: { fontSize: 12, color: '#c2410c' }
 });

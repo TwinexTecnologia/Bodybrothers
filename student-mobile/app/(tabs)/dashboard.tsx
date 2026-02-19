@@ -120,11 +120,13 @@ export default function Dashboard() {
         {/* Card de Frequência */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Activity size={20} color="#3b82f6" />
-              <Text style={styles.cardTitle}>Frequência Semanal</Text>
+            <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 8, width: '100%' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Activity size={20} color="#3b82f6" />
+                <Text style={styles.cardTitle}>Frequência Semanal</Text>
+                <Text style={styles.freqCount}>{frequency} treinos</Text>
+              </View>
             </View>
-            <Text style={styles.freqCount}>{frequency} treinos</Text>
           </View>
 
           <View style={styles.daysRow}>
@@ -295,6 +297,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
+    paddingRight: 4, // Margem extra para não colar na borda
   },
   greeting: {
     fontSize: 24,
@@ -342,9 +345,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#64748b',
     backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    overflow: 'hidden'
   },
   daysRow: {
     flexDirection: 'row',
@@ -372,25 +376,25 @@ const styles = StyleSheet.create({
       marginBottom: 24
   },
   bigCard: {
-      flex: 1,
-      backgroundColor: '#fff',
-      padding: 20,
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: '#f1f5f9',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.03,
-      shadowRadius: 8,
-      elevation: 2,
-      justifyContent: 'space-between',
-      minHeight: 140
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 16, // Reduzido
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+    justifyContent: 'space-between',
+    minHeight: 120 // Reduzido de 140
   },
   iconBox: {
-      width: 48, height: 48, borderRadius: 12,
-      justifyContent: 'center', alignItems: 'center',
-      marginBottom: 16,
-      borderWidth: 1
+    width: 40, height: 40, borderRadius: 12, // Reduzido de 48
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 1
   },
   bigCardLabel: { fontSize: 14, color: '#64748b', fontWeight: '500' },
   bigCardValue: { fontSize: 24, color: '#0f172a', fontWeight: 'bold', marginVertical: 4 },

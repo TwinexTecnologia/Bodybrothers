@@ -65,8 +65,13 @@ export default function Login() {
         <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ flex: 1, width: '100%' }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView 
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Logo */}
                 <Image
                     source={{ uri: "https://cdtouwfxwuhnlzqhcagy.supabase.co/storage/v1/object/public/Imagens/ChatGPT%20Image%209%20de%20fev.%20de%202026%2C%2022_23_47.png" }}
@@ -96,12 +101,7 @@ export default function Login() {
 
                         {!isRecovering && (
                             <View style={styles.inputGroup}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text style={styles.label}>Senha</Text>
-                                    <TouchableOpacity onPress={() => setIsRecovering(true)}>
-                                        <Text style={styles.forgotLink}>Esqueci minha senha</Text>
-                                    </TouchableOpacity>
-                                </View>
+                                <Text style={styles.label}>Senha</Text>
                                 <TextInput
                                     style={styles.input}
                                     placeholder="Sua senha"
@@ -111,6 +111,9 @@ export default function Login() {
                                     secureTextEntry
                                     autoCapitalize="none"
                                 />
+                                <TouchableOpacity onPress={() => setIsRecovering(true)} style={{ alignSelf: 'flex-end' }}>
+                                    <Text style={styles.forgotLink}>Esqueci minha senha</Text>
+                                </TouchableOpacity>
                             </View>
                         )}
 
@@ -163,7 +166,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     width: '100%',
-    height: 400, // Aumentado para ficar maior
+    height: 180, // Bem menor
     marginBottom: 0,
     zIndex: 1,
   },
@@ -172,14 +175,14 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 32,
+    padding: 24, // Menos padding
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
     marginBottom: 8,
-    marginTop: -80, // Mais grudado ainda
+    marginTop: -30,
     zIndex: 2,
   },
   title: {
@@ -204,7 +207,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#cbd5e1',
     borderRadius: 8,
-    padding: 12,
+    paddingHorizontal: 12,
+    height: 50, // Altura fixa maior
+    textAlignVertical: 'center', // Fix Android
     fontSize: 16,
     color: '#0f172a',
     backgroundColor: '#eff6ff'
