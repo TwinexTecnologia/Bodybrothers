@@ -49,6 +49,8 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
     .single()
     .then(({ data: profile }) => {
         if (profile?.personal_id) {
+            if (!notes || notes.trim().length === 0) return;
+
             console.log('Enviando notificação com notes:', notes)
             supabase.from('notifications').insert({
                 user_id: profile.personal_id,
