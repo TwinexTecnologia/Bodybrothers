@@ -72,16 +72,19 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
 
             if (notifError) {
                 console.error('ERRO AO INSERIR NOTIFICAÇÃO:', notifError)
-                // Possível erro: Tabela não existe ou RLS bloqueando
+                // DEBUG: Alertar erro para diagnóstico
+                alert(`Erro ao notificar personal: ${notifError.message || JSON.stringify(notifError)}`)
             } else {
                 console.log('Notificação enviada com sucesso!')
             }
         } else {
             console.warn('Aluno não tem personal_id vinculado. Nenhuma notificação enviada.')
+            // DEBUG
+            // alert('Aluno sem personal vinculado. Notificação ignorada.')
         }
     } catch (err) {
         console.error('Exceção ao notificar personal:', err)
-        // Não trava o fluxo se falhar a notificação
+        alert('Erro interno ao notificar.')
     }
 
     return mapFromDb(data)
