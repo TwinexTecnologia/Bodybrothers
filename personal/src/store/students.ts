@@ -174,7 +174,7 @@ export async function getStudentsWeeklyFrequency(studentIds: string[]): Promise<
 
     const { data, error } = await supabase
         .from('workout_history')
-        .select('student_id')
+        .select('student_id, finished_at') // Traz data para contar dias únicos
         .in('student_id', studentIds)
         .gte('finished_at', startOfWeek.toISOString())
 
@@ -184,8 +184,22 @@ export async function getStudentsWeeklyFrequency(studentIds: string[]): Promise<
     }
 
     const freq: Record<string, number> = {}
+    const studentDays: Record<string, Set<string>> = {}
+
     data.forEach(row => {
-        freq[row.student_id] = (freq[row.student_id] || 0) + 1
+        if (!studentDays[row.student_id]) {
+            studentDays[row.student_id] = new Set()
+        }
+        // Extrai apenas a data (YYYY-MM-DD) para contar dias únicos
+        if (row.finished_at) {
+            const date = new Date(row.finished_at).toISOString().split('T')[0]
+            studentDays[row.student_id].add(date)
+        }
+    })
+
+    // Converte Sets em contagem
+    Object.keys(studentDays).forEach(sid => {
+        freq[sid] = studentDays[sid].size
     })
     
     return freq
