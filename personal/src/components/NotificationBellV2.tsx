@@ -90,14 +90,11 @@ export default function NotificationBellV2() {
                     .lt('ends_at', todayStr)
 
                 // 5. Notificações do Sistema (Feedbacks, etc)
-                const { data: sysNotifications, error: sysError } = await supabase
+                const { data: sysNotifications } = await supabase
                     .from('notifications')
                     .select('id, type, title, message, created_at, link')
                     .eq('user_id', currentUser.id)
                     .gte('created_at', recentLimitStr)
-
-                if (sysError) console.error('Erro SysNotif:', sysError)
-                console.log('Notificações Sistema:', sysNotifications)
 
                 // COLETAR IDs PARA NOMES
                 const allStudentIds = new Set<string>()
@@ -203,9 +200,6 @@ export default function NotificationBellV2() {
 
                 // ORDENAR: Mais recentes primeiro
                 list.sort((a, b) => b.date.getTime() - a.date.getTime())
-
-                console.log('Total Notificações:', list.length)
-                console.log('Top 3 Notificações:', list.slice(0, 3))
 
                 setNotifications(list)
                 
