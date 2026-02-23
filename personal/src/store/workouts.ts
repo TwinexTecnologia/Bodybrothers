@@ -238,6 +238,23 @@ export async function duplicateWorkout(originalId: string, studentId: string, ne
 
   let finalTitle = newTitle || original.name
 
+  // LIMPEZA DE NOME: Se o treino original pertencia a outro aluno, tenta remover o sufixo " - Nome" antigo
+  if (!newTitle && original.studentId && original.studentId !== studentId) {
+      try {
+        const { data: oldStudent } = await supabase.from('profiles').select('full_name').eq('id', original.studentId).single()
+        if (oldStudent?.full_name) {
+            const oldFirstName = oldStudent.full_name.split(' ')[0]
+            const oldSuffix = ` - ${oldFirstName}`
+            // Verifica se termina com " - NomeAntigo"
+            if (finalTitle.endsWith(oldSuffix)) {
+                finalTitle = finalTitle.slice(0, -oldSuffix.length)
+            }
+        }
+      } catch (err) {
+        console.warn('Erro ao limpar nome antigo do treino:', err)
+      }
+  }
+
   // Se não foi passado um título novo e estamos vinculando a um aluno,
   // adiciona o nome do aluno ao título para fácil identificação
   if (!newTitle && studentId) {
