@@ -18,6 +18,40 @@ export default function NewEvolution() {
   const [submitting, setSubmitting] = useState(false);
   const [photos, setPhotos] = useState<Record<string, string>>({}); // id -> uri
   const [uploading, setUploading] = useState<string | null>(null);
+  
+  const [fields, setFields] = useState<{id: string, label: string, exampleUrl?: string}[]>([
+      { id: 'front', label: 'Frente' },
+      { id: 'side', label: 'Lado' },
+      { id: 'back', label: 'Costas' }
+  ]);
+
+  React.useEffect(() => {
+      if (user) loadPersonalConfig();
+  }, [user]);
+
+  async function loadPersonalConfig() {
+      try {
+          const { data: student } = await supabase
+              .from('profiles')
+              .select('personal_id')
+              .eq('id', user?.id)
+              .single();
+
+          if (student?.personal_id) {
+              const { data: personal } = await supabase
+                  .from('profiles')
+                  .select('data')
+                  .eq('id', student.personal_id)
+                  .single();
+              
+              if (personal?.data?.config?.evolutionFields?.length > 0) {
+                  setFields(personal.data.config.evolutionFields);
+              }
+          }
+      } catch (err) {
+          console.log('Erro ao carregar config:', err);
+      }
+  }
 
   const pickImage = async (poseId: string) => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -159,7 +193,7 @@ export default function NewEvolution() {
         </Text>
 
         <View style={styles.grid}>
-            {POSES.map(pose => (
+            {fields.map(pose => (
                 <View key={pose.id} style={styles.card}>
                     <Text style={styles.cardTitle}>{pose.label}</Text>
                     
@@ -179,24 +213,35 @@ export default function NewEvolution() {
                         </View>
                     ) : (
                         <View style={styles.actions}>
-                            <TouchableOpacity 
-                                style={styles.actionButton}
-                                onPress={() => takePhoto(pose.id)}
-                                disabled={!!uploading}
-                            >
-                                {uploading === pose.id ? <ActivityIndicator color="#64748b" /> : <Camera size={24} color="#64748b" />}
-                                <Text style={styles.actionText}>Câmera</Text>
-                            </TouchableOpacity>
+                            {pose.exampleUrl && (
+                                <View style={styles.exampleContainer}>
+                                    <Image source={{ uri: pose.exampleUrl }} style={styles.exampleImage} />
+                                    <View style={styles.exampleOverlay}>
+                                        <Text style={styles.exampleText}>Exemplo</Text>
+                                    </View>
+                                </View>
+                            )}
                             
-                            <View style={styles.divider} />
-                            
-                            <TouchableOpacity 
-                                style={styles.actionButton}
-                                onPress={() => pickImage(pose.id)}
-                                disabled={!!uploading}
-                            >
-                                <Text style={styles.actionText}>Galeria</Text>
-                            </TouchableOpacity>
+                            <View style={styles.buttonsRow}>
+                                <TouchableOpacity 
+                                    style={styles.actionButton}
+                                    onPress={() => takePhoto(pose.id)}
+                                    disabled={!!uploading}
+                                >
+                                    {uploading === pose.id ? <ActivityIndicator color="#64748b" /> : <Camera size={24} color="#64748b" />}
+                                    <Text style={styles.actionText}>Câmera</Text>
+                                </TouchableOpacity>
+                                
+                                <View style={styles.divider} />
+                                
+                                <TouchableOpacity 
+                                    style={styles.actionButton}
+                                    onPress={() => pickImage(pose.id)}
+                                    disabled={!!uploading}
+                                >
+                                    <Text style={styles.actionText}>Galeria</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     )}
                 </View>
@@ -242,7 +287,14 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 12, textAlign: 'center' },
   
-  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 16, backgroundColor: '#f8fafc', borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1' },
+  actions: { backgroundColor: '#f8fafc', borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1', overflow: 'hidden' },
+  buttonsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 16 },
+  
+  exampleContainer: { height: 120, position: 'relative', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  exampleImage: { width: '100%', height: '100%', resizeMode: 'cover', opacity: 0.8 },
+  exampleOverlay: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  exampleText: { color: '#fff', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  
   actionButton: { alignItems: 'center', justifyContent: 'center', gap: 4, padding: 8 },
   actionText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
   divider: { width: 1, height: 24, backgroundColor: '#cbd5e1' },

@@ -20,9 +20,11 @@ export default function PhotoEvolution() {
 
     // Controle de modo e upload
     const [evolutionMode, setEvolutionMode] = useState('anamnesis')
+    const [evolutionFields, setEvolutionFields] = useState<any[]>([]) // Campos customizados
     const [isUploading, setIsUploading] = useState(false)
     const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0])
     const [uploadFiles, setUploadFiles] = useState<FileList | null>(null)
+    const [fieldFiles, setFieldFiles] = useState<Record<string, File>>({}) // Mapa de arquivos por campo
     const [uploading, setUploading] = useState(false)
 
     useEffect(() => {
@@ -51,6 +53,10 @@ export default function PhotoEvolution() {
                 
                 if (personal?.data?.config?.evolutionMode) {
                     mode = personal.data.config.evolutionMode
+                }
+                
+                if (personal?.data?.config?.evolutionFields) {
+                    setEvolutionFields(personal.data.config.evolutionFields)
                 }
             }
 
@@ -161,7 +167,25 @@ export default function PhotoEvolution() {
 
     const handleUpload = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!uploadFiles || uploadFiles.length === 0) return
+        
+        // Validação
+        let filesToUpload: File[] = []
+        
+        if (evolutionFields.length > 0) {
+            // Se tem campos definidos, verifica se todos foram preenchidos (opcional, mas recomendado)
+            // Vamos iterar na ordem dos campos para garantir a ordem das fotos
+            filesToUpload = evolutionFields.map(f => fieldFiles[f.id]).filter(Boolean)
+            
+            if (filesToUpload.length === 0) {
+                alert('Selecione pelo menos uma foto.')
+                return
+            }
+        } else {
+            // Upload livre
+            if (!uploadFiles || uploadFiles.length === 0) return
+            filesToUpload = Array.from(uploadFiles)
+        }
+
         setUploading(true)
 
         try {
@@ -176,8 +200,8 @@ export default function PhotoEvolution() {
 
             const uploadedUrls: string[] = []
 
-            for (let i = 0; i < uploadFiles.length; i++) {
-                const file = uploadFiles[i]
+            for (let i = 0; i < filesToUpload.length; i++) {
+                const file = filesToUpload[i]
                 const fileExt = file.name.split('.').pop()
                 const fileName = `${user.id}/${Date.now()}_${i}.${fileExt}`
 
@@ -209,6 +233,7 @@ export default function PhotoEvolution() {
 
             setIsUploading(false)
             setUploadFiles(null)
+            setFieldFiles({})
             await loadPhotos(evolutionMode)
             alert('Fotos enviadas com sucesso!')
 
@@ -385,36 +410,87 @@ export default function PhotoEvolution() {
                             </div>
 
                             <div style={{ marginBottom: 32 }}>
-                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 8 }}>Selecione as Fotos</label>
-                                <div style={{ 
-                                    border: '2px dashed #cbd5e1', borderRadius: 16, padding: 24, 
-                                    textAlign: 'center', background: '#f8fafc', cursor: 'pointer',
-                                    position: 'relative', transition: 'all 0.2s'
-                                }}>
-                                    <input 
-                                        type="file" 
-                                        multiple 
-                                        accept="image/*"
-                                        onChange={e => setUploadFiles(e.target.files)}
-                                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-                                        required
-                                    />
-                                    <div style={{ pointerEvents: 'none' }}>
-                                        <div style={{ color: '#64748b', marginBottom: 8 }}>
-                                            <ImageIcon size={32} />
-                                        </div>
-                                        {uploadFiles && uploadFiles.length > 0 ? (
-                                            <div style={{ color: '#0f172a', fontWeight: 600 }}>
-                                                {uploadFiles.length} foto(s) selecionada(s)
+                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 8 }}>
+                                    {evolutionFields.length > 0 ? 'Fotos' : 'Selecione as Fotos'}
+                                </label>
+                                
+                                {evolutionFields.length > 0 ? (
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                                        {evolutionFields.map(field => (
+                                            <div key={field.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>{field.label}</label>
+                                                <div 
+                                                    style={{ 
+                                                        border: '2px dashed #cbd5e1', borderRadius: 12, padding: 16, 
+                                                        textAlign: 'center', background: '#f8fafc', cursor: 'pointer',
+                                                        position: 'relative', height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        overflow: 'hidden'
+                                                    }}
+                                                >
+                                                    <input 
+                                                        type="file" 
+                                                        accept="image/*"
+                                                        onChange={e => {
+                                                            if (e.target.files?.[0]) {
+                                                                setFieldFiles(prev => ({ ...prev, [field.id]: e.target.files![0] }))
+                                                            }
+                                                        }}
+                                                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }}
+                                                    />
+                                                    
+                                                    {fieldFiles[field.id] ? (
+                                                        <img 
+                                                            src={URL.createObjectURL(fieldFiles[field.id])} 
+                                                            alt="Preview" 
+                                                            style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', zIndex: 1 }} 
+                                                        />
+                                                    ) : field.exampleUrl ? (
+                                                        <div style={{ width: '100%', height: '100%', position: 'absolute', zIndex: 0 }}>
+                                                            <img src={field.exampleUrl} alt="Referência" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, filter: 'grayscale(100%)' }} />
+                                                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.3)' }}>
+                                                                <span style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem' }}>+ Adicionar</span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ color: '#94a3b8' }}>
+                                                            <Camera size={24} />
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                        ) : (
-                                            <>
-                                                <div style={{ color: '#0f172a', fontWeight: 600, marginBottom: 4 }}>Clique para enviar</div>
-                                                <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Frente, Costas, Lado...</div>
-                                            </>
-                                        )}
+                                        ))}
                                     </div>
-                                </div>
+                                ) : (
+                                    <div style={{ 
+                                        border: '2px dashed #cbd5e1', borderRadius: 16, padding: 24, 
+                                        textAlign: 'center', background: '#f8fafc', cursor: 'pointer',
+                                        position: 'relative', transition: 'all 0.2s'
+                                    }}>
+                                        <input 
+                                            type="file" 
+                                            multiple 
+                                            accept="image/*"
+                                            onChange={e => setUploadFiles(e.target.files)}
+                                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                                            required
+                                        />
+                                        <div style={{ pointerEvents: 'none' }}>
+                                            <div style={{ color: '#64748b', marginBottom: 8 }}>
+                                                <ImageIcon size={32} />
+                                            </div>
+                                            {uploadFiles && uploadFiles.length > 0 ? (
+                                                <div style={{ color: '#0f172a', fontWeight: 600 }}>
+                                                    {uploadFiles.length} foto(s) selecionada(s)
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div style={{ color: '#0f172a', fontWeight: 600, marginBottom: 4 }}>Clique para enviar</div>
+                                                    <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Frente, Costas, Lado...</div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

@@ -21,6 +21,7 @@ export default function EditPersonal() {
     const [logoUrl, setLogoUrl] = useState('')
     const [uploadingLogo, setUploadingLogo] = useState(false)
     const [evolutionMode, setEvolutionMode] = useState('anamnesis') // 'anamnesis' | 'standalone'
+    const [evolutionFields, setEvolutionFields] = useState<any[]>([]) // Novos campos customizados
     const [anamnesisReviewRequired, setAnamnesisReviewRequired] = useState(false) // Nova configuração
 
     useEffect(() => {
@@ -53,8 +54,41 @@ export default function EditPersonal() {
         setBrandName(data.data?.branding?.brandName || '')
         setLogoUrl(data.data?.branding?.logoUrl || '')
         setEvolutionMode(data.data?.config?.evolutionMode || 'anamnesis')
+        setEvolutionFields(data.data?.config?.evolutionFields || [])
         setAnamnesisReviewRequired(data.data?.config?.anamnesisReviewRequired || false)
         setLoading(false)
+    }
+
+    const handleAddField = () => {
+        setEvolutionFields(prev => [...prev, { id: Date.now().toString(), label: '', exampleUrl: '' }])
+    }
+
+    const handleRemoveField = (fieldId: string) => {
+        setEvolutionFields(prev => prev.filter(f => f.id !== fieldId))
+    }
+
+    const handleUpdateField = (fieldId: string, key: string, value: string) => {
+        setEvolutionFields(prev => prev.map(f => f.id === fieldId ? { ...f, [key]: value } : f))
+    }
+
+    const handleFieldExampleUpload = async (fieldId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return
+        const file = e.target.files[0]
+        const fileExt = file.name.split('.').pop()
+        const fileName = `examples/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+
+        try {
+            const { error: uploadError } = await supabase.storage
+                .from('logos') // Usando bucket logos por conveniência, ideal seria outro
+                .upload(fileName, file)
+
+            if (uploadError) throw uploadError
+
+            const { data } = supabase.storage.from('logos').getPublicUrl(fileName)
+            handleUpdateField(fieldId, 'exampleUrl', data.publicUrl)
+        } catch (err: any) {
+            alert('Erro upload: ' + err.message)
+        }
     }
 
     const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,6 +145,7 @@ export default function EditPersonal() {
             config: {
                 ...(currentData.config || {}),
                 evolutionMode,
+                evolutionFields, // Salva os campos
                 anamnesisReviewRequired
             }
         }
@@ -196,6 +231,47 @@ export default function EditPersonal() {
                                 <strong>Avulso:</strong> O personal envia fotos diretamente na tela de evolução, sem precisar de formulário.
                             </span>
                         </label>
+
+                        {/* Editor de Campos de Evolução (Apenas Standalone) */}
+                        {evolutionMode === 'standalone' && (
+                            <div style={{ background: '#f8fafc', padding: 16, borderRadius: 8, border: '1px solid #e2e8f0', gridColumn: 'span 1' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#334155' }}>Campos Personalizados de Upload</h4>
+                                    <button type="button" onClick={handleAddField} style={{ fontSize: '0.8rem', padding: '4px 8px', background: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: 4, cursor: 'pointer' }}>+ Campo</button>
+                                </div>
+                                
+                                {evolutionFields.length === 0 ? (
+                                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>Nenhum campo definido (Upload livre).</div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                        {evolutionFields.map((field, idx) => (
+                                            <div key={field.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: '#fff', padding: 8, borderRadius: 6, border: '1px solid #cbd5e1' }}>
+                                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                    <input 
+                                                        placeholder="Nome do Campo (ex: Frente)" 
+                                                        value={field.label}
+                                                        onChange={e => handleUpdateField(field.id, 'label', e.target.value)}
+                                                        style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #e2e8f0', fontSize: '0.9rem' }}
+                                                    />
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                        {field.exampleUrl ? (
+                                                            <img src={field.exampleUrl} alt="Exemplo" style={{ width: 30, height: 30, objectFit: 'cover', borderRadius: 4 }} />
+                                                        ) : (
+                                                            <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Sem foto ref.</span>
+                                                        )}
+                                                        <label style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#3b82f6', textDecoration: 'underline' }}>
+                                                            {field.exampleUrl ? 'Alterar' : 'Add Ref.'}
+                                                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleFieldExampleUpload(field.id, e)} />
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <button type="button" onClick={() => handleRemoveField(field.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}>✕</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         
                         <label style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#f8fafc', padding: 16, borderRadius: 8, border: '1px solid #e2e8f0' }}>
                             <input 
