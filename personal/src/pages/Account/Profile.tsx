@@ -155,58 +155,19 @@ export default function Profile() {
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: '1.8rem', color: '#0f172a', margin: 0 }}>Minha Conta</h1>
-        <p style={{ color: '#64748b', marginTop: 4 }}>Gerencie suas informações pessoais e segurança.</p>
+        <h1 style={{ fontSize: '1.8rem', color: '#0f172a', margin: 0 }}>Evolução dos Alunos</h1>
+        <p style={{ color: '#64748b', marginTop: 4 }}>Configure como seus alunos enviam fotos de evolução.</p>
       </div>
 
       <form onSubmit={handleUpdateProfile} style={{ display: 'grid', gap: 24 }}>
         
-        {/* Card: Informações Pessoais */}
-        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Informações Pessoais</h3>
-          </div>
-          <div style={{ padding: 24, display: 'grid', gap: 20 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <span style={{ fontWeight: 500, color: '#475569' }}>Nome Completo</span>
-                <input 
-                  value={name} 
-                  onChange={e => setName(e.target.value)} 
-                  style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '1rem' }}
-                />
-              </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <span style={{ fontWeight: 500, color: '#475569' }}>Telefone</span>
-                <input 
-                  value={phone} 
-                  onChange={e => setPhone(e.target.value)} 
-                  placeholder="(00) 00000-0000"
-                  style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '1rem' }}
-                />
-              </label>
-            </div>
-            
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <span style={{ fontWeight: 500, color: '#475569' }}>Email (Não alterável)</span>
-              <input 
-                value={email} 
-                disabled
-                style={{ padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', background: '#f1f5f9', color: '#94a3b8', fontSize: '1rem' }}
-              />
-            </label>
-          </div>
-        </div>
-
         {/* Card: Configuração de Evolução */}
         <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Evolução dos Alunos</h3>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Modo de Evolução</h3>
           </div>
           <div style={{ padding: 24, display: 'grid', gap: 20 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <span style={{ fontWeight: 500, color: '#475569' }}>Modo de Evolução</span>
-              
               <div style={{ padding: 12, borderRadius: 8, background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '1rem', fontWeight: 500 }}>
                   {evolutionMode === 'standalone' ? 'Fotos Avulsas (Standalone)' : 'Via Anamnese (Padrão)'}
               </div>
@@ -256,37 +217,6 @@ export default function Profile() {
                     )}
                 </div>
             )}
-          </div>
-        </div>
-
-        {/* Card: Segurança */}
-        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Segurança</h3>
-          </div>
-          <div style={{ padding: 24, display: 'grid', gap: 20 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <span style={{ fontWeight: 500, color: '#475569' }}>Nova Senha</span>
-                <input 
-                  type="password"
-                  value={newPassword} 
-                  onChange={e => setNewPassword(e.target.value)} 
-                  placeholder="Deixe em branco para manter a atual"
-                  style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '1rem' }}
-                />
-              </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <span style={{ fontWeight: 500, color: '#475569' }}>Confirmar Nova Senha</span>
-                <input 
-                  type="password"
-                  value={confirmPassword} 
-                  onChange={e => setConfirmPassword(e.target.value)} 
-                  placeholder="Repita a nova senha"
-                  style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '1rem' }}
-                />
-              </label>
-            </div>
           </div>
         </div>
 
