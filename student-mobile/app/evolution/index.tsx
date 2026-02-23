@@ -25,25 +25,53 @@ export default function Evolution() {
   
   const [modalVisible, setModalVisible] = useState(false);
   const [selectingFor, setSelectingFor] = useState<'A' | 'B' | null>(null);
+  const [evolutionMode, setEvolutionMode] = useState('anamnesis');
 
   useFocusEffect(
     useCallback(() => {
-      if (user) loadPhotos();
+      if (user) loadConfigAndPhotos();
     }, [user])
   );
 
-  async function loadPhotos() {
+  async function loadConfigAndPhotos() {
       try {
           setLoading(true);
           
-          // Fetch both anamnesis and standalone photos
-          const { data, error } = await supabase
+          // 1. Get Personal ID
+          const { data: student } = await supabase
+            .from('profiles')
+            .select('personal_id')
+            .eq('id', user?.id)
+            .single();
+
+          let mode = 'anamnesis';
+          if (student?.personal_id) {
+              const { data: personal } = await supabase
+                .from('profiles')
+                .select('data')
+                .eq('id', student.personal_id)
+                .single();
+              
+              if (personal?.data?.config?.evolutionMode) {
+                  mode = personal.data.config.evolutionMode;
+              }
+          }
+          setEvolutionMode(mode);
+
+          // 2. Fetch photos
+          let query = supabase
             .from('protocols')
             .select('*')
             .eq('student_id', user?.id)
-            .in('type', ['anamnesis', 'photos'])
             .order('created_at', { ascending: true });
 
+          if (mode === 'standalone') {
+              query = query.in('type', ['anamnesis', 'photos']);
+          } else {
+              query = query.eq('type', 'anamnesis');
+          }
+
+          const { data, error } = await query;
           if (error) throw error;
 
           const extractImages = (obj: any): string[] => {
@@ -134,9 +162,11 @@ export default function Evolution() {
           <ChevronLeft size={24} color="#0f172a" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Minha Evolução</Text>
-        <TouchableOpacity onPress={() => router.push('/evolution/new')} style={styles.addButton}>
-            <Plus size={24} color="#0f172a" />
-        </TouchableOpacity>
+        {evolutionMode === 'standalone' && (
+            <TouchableOpacity onPress={() => router.push('/evolution/new')} style={styles.addButton}>
+                <Plus size={24} color="#0f172a" />
+            </TouchableOpacity>
+        )}
       </View>
 
       {loading ? (
@@ -145,10 +175,16 @@ export default function Evolution() {
         </View>
       ) : history.length === 0 ? (
         <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Nenhuma foto encontrada.</Text>
-            <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/evolution/new')}>
-                <Text style={styles.emptyButtonText}>Adicionar Fotos</Text>
-            </TouchableOpacity>
+            <Text style={styles.emptyText}>
+                {evolutionMode === 'standalone' 
+                    ? 'Você ainda não enviou fotos de evolução.' 
+                    : 'Nenhuma foto encontrada nas anamneses.'}
+            </Text>
+            {evolutionMode === 'standalone' && (
+                <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/evolution/new')}>
+                    <Text style={styles.emptyButtonText}>Adicionar Fotos</Text>
+                </TouchableOpacity>
+            )}
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
