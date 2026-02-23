@@ -34,40 +34,53 @@ export default function PhotoEvolution() {
     async function loadConfigAndPhotos() {
         setLoading(true)
         try {
-            // 1. Tenta ler do PRÓPRIO PERFIL (Mais seguro contra RLS)
-            const { data: myself } = await supabase
-                .from('profiles')
-                .select('data, personal_id')
-                .eq('id', user.id)
-                .single()
-            
             let mode = 'anamnesis'
             let fields: any[] = []
 
-            // Prioridade: Config no perfil do aluno (propagada pelo personal)
-            // Agora checa campos primeiro para forçar standalone se tiver config
-            if (myself?.data?.config?.evolutionFields?.length > 0) {
+            // 1. Tenta ler do PROTOCOLO DE CONFIGURAÇÃO (Prioridade Máxima)
+            const { data: configProtocol } = await supabase
+                .from('protocols')
+                .select('data')
+                .eq('student_id', user.id)
+                .eq('type', 'evolution_config')
+                .single()
+
+            if (configProtocol?.data?.fields?.length > 0) {
                 mode = 'standalone'
-                fields = myself.data.config.evolutionFields
-                console.log('Config carregada do perfil do aluno (campos detectados):', fields)
-            }
-            else if (myself?.data?.config?.evolutionMode) {
-                mode = myself.data.config.evolutionMode
-                fields = myself.data.config.evolutionFields || []
-                console.log('Config carregada do perfil do aluno (modo):', mode, fields)
+                fields = configProtocol.data.fields
+                console.log('Config carregada via Protocolo:', fields)
             } 
-            // Fallback: Tenta ler do personal (Legado / Risco de RLS)
-            else if (myself?.personal_id) {
-                const { data: personal } = await supabase
+            else {
+                // 2. Fallback: Tenta ler do perfil do aluno (Legado)
+                const { data: myself } = await supabase
                     .from('profiles')
-                    .select('data')
-                    .eq('id', myself.personal_id)
+                    .select('data, personal_id')
+                    .eq('id', user.id)
                     .single()
                 
-                if (personal?.data?.config?.evolutionMode) {
-                    mode = personal.data.config.evolutionMode
-                    fields = personal.data.config.evolutionFields || []
-                    console.log('Config carregada do perfil do personal (fallback):', mode)
+                if (myself?.data?.config?.evolutionFields?.length > 0) {
+                    mode = 'standalone'
+                    fields = myself.data.config.evolutionFields
+                    console.log('Config carregada do perfil do aluno (campos detectados):', fields)
+                }
+                else if (myself?.data?.config?.evolutionMode) {
+                    mode = myself.data.config.evolutionMode
+                    fields = myself.data.config.evolutionFields || []
+                    console.log('Config carregada do perfil do aluno (modo):', mode, fields)
+                } 
+                // 3. Fallback Final: Tenta ler do personal (Legado / Risco de RLS)
+                else if (myself?.personal_id) {
+                    const { data: personal } = await supabase
+                        .from('profiles')
+                        .select('data')
+                        .eq('id', myself.personal_id)
+                        .single()
+                    
+                    if (personal?.data?.config?.evolutionMode) {
+                        mode = personal.data.config.evolutionMode
+                        fields = personal.data.config.evolutionFields || []
+                        console.log('Config carregada do perfil do personal (fallback):', mode)
+                    }
                 }
             }
 

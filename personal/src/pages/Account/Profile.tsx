@@ -141,32 +141,53 @@ export default function Profile() {
         setConfirmPassword('')
       }
 
-      // 2. Propagar configuração para TODOS os alunos do personal
-      // Isso garante que o aluno consiga ler a configuração sem problemas de permissão (RLS)
+      // 2. Propagar configuração via PROTOCOLOS (Mais seguro e garantido)
+      // Cria/Atualiza um protocolo 'evolution_config' para cada aluno
       if (evolutionMode === 'standalone') {
           const { data: students } = await supabase
             .from('profiles')
-            .select('id, data')
+            .select('id')
             .eq('personal_id', id)
+            .eq('role', 'aluno') // Garante que é aluno
           
           if (students && students.length > 0) {
-              const updates = students.map(student => {
-                  const studentData = student.data || {}
-                  const studentConfig = studentData.config || {}
-                  
-                  return supabase
-                    .from('profiles')
-                    .update({
-                        data: {
-                            ...studentData,
-                            config: {
-                                ...studentConfig,
-                                evolutionMode,
-                                evolutionFields
-                            }
-                        }
-                    })
-                    .eq('id', student.id)
+              setMsg(`Aplicando configuração para ${students.length} alunos...`)
+              
+              const updates = students.map(async (student) => {
+                  // Verifica se já existe config
+                  const { data: existing } = await supabase
+                      .from('protocols')
+                      .select('id')
+                      .eq('student_id', student.id)
+                      .eq('type', 'evolution_config')
+                      .single()
+
+                  const configData = {
+                      mode: evolutionMode,
+                      fields: evolutionFields,
+                      updated_at: new Date().toISOString()
+                  }
+
+                  if (existing) {
+                      return supabase
+                          .from('protocols')
+                          .update({
+                              data: configData,
+                              title: 'Configuração de Evolução'
+                          })
+                          .eq('id', existing.id)
+                  } else {
+                      return supabase
+                          .from('protocols')
+                          .insert({
+                              student_id: student.id,
+                              personal_id: id,
+                              type: 'evolution_config',
+                              title: 'Configuração de Evolução',
+                              status: 'active',
+                              data: configData
+                          })
+                  }
               })
               
               await Promise.all(updates)

@@ -347,36 +347,59 @@ export default function ListAnamnesis() {
         {answeringModel && (
             <div style={{ 
                 position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-                background: 'rgba(0,0,0,0.5)', zIndex: 2000, 
-                display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24
+                background: 'rgba(0,0,0,0.6)', zIndex: 2000, 
+                display: 'flex', justifyContent: 'center', alignItems: 'flex-end', // Mobile first: sheet bottom
+                backdropFilter: 'blur(4px)'
             }}>
                 <div style={{ 
-                    background: '#fff', width: '100%', maxWidth: 600, maxHeight: '90vh', 
-                    borderRadius: 24, overflow: 'hidden', display: 'flex', flexDirection: 'column',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                    background: '#fff', width: '100%', maxWidth: 600, height: '95vh', // Quase tela cheia no mobile
+                    borderTopLeftRadius: 24, borderTopRightRadius: 24, 
+                    // Em desktop pode ser centralizado e menor, mas vamos focar na experiencia mobile aqui
+                    // Vamos usar media query inline style hack ou apenas manter responsivo fluido
+                    display: 'flex', flexDirection: 'column',
+                    boxShadow: '0 -10px 40px rgba(0,0,0,0.2)',
+                    animation: 'slideUp 0.3s ease-out'
                 }}>
-                    <div style={{ padding: '24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
-                        <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>{answeringModel.title}</h2>
-                        <button onClick={() => setAnsweringModel(null)} style={{ background: '#f1f5f9', border: 'none', width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                            <X size={20} />
+                    <style>{`
+                        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+                        @media (min-width: 640px) {
+                            div[style*="height: 95vh"] {
+                                height: auto; maxHeight: 90vh;
+                                border-radius: 24px;
+                                align-self: center;
+                            }
+                        }
+                    `}</style>
+
+                    <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
+                        <div>
+                            <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a', lineHeight: 1.2 }}>{answeringModel.title}</h2>
+                            <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '0.85rem' }}>Preencha com atenção</p>
+                        </div>
+                        <button onClick={() => setAnsweringModel(null)} style={{ background: '#f1f5f9', border: 'none', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}>
+                            <X size={24} />
                         </button>
                     </div>
 
-                    <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-                        <div style={{ display: 'grid', gap: 24 }}>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 40px 24px', background: '#fff' }}>
+                        <div style={{ display: 'grid', gap: 32 }}>
                             {answeringModel.questions.map((q, i) => (
-                                <div key={q.id}>
-                                    <label style={{ display: 'block', fontWeight: 600, color: '#334155', marginBottom: 8 }}>
-                                        {i + 1}. {q.text} {q.required && <span style={{ color: '#ef4444' }}>*</span>}
+                                <div key={q.id} style={{ animation: `fadeIn 0.5s ease-out ${i * 0.05}s both` }}>
+                                    <label style={{ display: 'block', fontWeight: 700, color: '#1e293b', marginBottom: 12, fontSize: '1rem', lineHeight: 1.4 }}>
+                                        <span style={{ color: '#94a3b8', marginRight: 8, fontSize: '0.9rem' }}>{i + 1}.</span>
+                                        {q.text} {q.required && <span style={{ color: '#ef4444', marginLeft: 4 }}>*</span>}
                                     </label>
                                     
                                     {q.exampleImage && (
-                                        <div style={{ marginBottom: 12 }}>
-                                            <p style={{ margin: '0 0 4px 0', fontSize: '0.85rem', color: '#64748b' }}>Imagem de Referência:</p>
+                                        <div style={{ marginBottom: 16, borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                                            <div style={{ background: '#f8fafc', padding: '8px 12px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <AlertCircle size={14} color="#64748b" />
+                                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Exemplo</span>
+                                            </div>
                                             <img 
                                                 src={q.exampleImage} 
                                                 alt="Referência" 
-                                                style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                                                style={{ width: '100%', maxHeight: 250, objectFit: 'contain', display: 'block', background: '#000' }}
                                                 onClick={() => window.open(q.exampleImage, '_blank')}
                                             />
                                         </div>
@@ -386,8 +409,12 @@ export default function ListAnamnesis() {
                                         <textarea 
                                             value={answers[q.id] || ''}
                                             onChange={e => handleAnswerChange(q.id, e.target.value)}
-                                            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', minHeight: 80, fontFamily: 'inherit' }}
-                                            placeholder="Sua resposta..."
+                                            style={{ 
+                                                width: '100%', padding: 16, borderRadius: 12, border: '1px solid #cbd5e1', 
+                                                minHeight: 120, fontFamily: 'inherit', fontSize: '16px', lineHeight: '1.5',
+                                                backgroundColor: '#f8fafc', color: '#334155', resize: 'vertical'
+                                            }}
+                                            placeholder="Digite sua resposta aqui..."
                                         />
                                     )}
 
@@ -396,81 +423,103 @@ export default function ListAnamnesis() {
                                             type="number"
                                             value={answers[q.id] || ''}
                                             onChange={e => handleAnswerChange(q.id, e.target.value)}
-                                            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }}
+                                            style={{ 
+                                                width: '100%', padding: 16, borderRadius: 12, border: '1px solid #cbd5e1',
+                                                fontSize: '16px', backgroundColor: '#f8fafc', color: '#334155'
+                                            }}
                                             placeholder="0"
                                         />
                                     )}
 
                                     {q.type === 'boolean' && (
-                                        <div style={{ display: 'flex', gap: 16 }}>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                                                <input 
-                                                    type="radio" 
-                                                    name={q.id}
-                                                    checked={answers[q.id] === 'Sim'}
-                                                    onChange={() => handleAnswerChange(q.id, 'Sim')}
-                                                /> Sim
-                                            </label>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                                                <input 
-                                                    type="radio" 
-                                                    name={q.id}
-                                                    checked={answers[q.id] === 'Não'}
-                                                    onChange={() => handleAnswerChange(q.id, 'Não')}
-                                                /> Não
-                                            </label>
+                                        <div style={{ display: 'flex', gap: 12 }}>
+                                            {['Sim', 'Não'].map(opt => {
+                                                const isSelected = answers[q.id] === opt
+                                                return (
+                                                    <button
+                                                        key={opt}
+                                                        type="button" // Previne submit acidental
+                                                        onClick={() => handleAnswerChange(q.id, opt)}
+                                                        style={{
+                                                            flex: 1, padding: '14px', borderRadius: 12, fontSize: '16px', fontWeight: 600,
+                                                            border: isSelected ? '2px solid #0f172a' : '1px solid #e2e8f0',
+                                                            background: isSelected ? '#0f172a' : '#fff',
+                                                            color: isSelected ? '#fff' : '#64748b',
+                                                            cursor: 'pointer', transition: 'all 0.2s'
+                                                        }}
+                                                    >
+                                                        {opt}
+                                                    </button>
+                                                )
+                                            })}
                                         </div>
                                     )}
 
                                     {(q.type === 'select' || q.type === 'multi') && q.options && (
-                                        <select 
-                                            value={answers[q.id] || ''}
-                                            onChange={e => handleAnswerChange(q.id, e.target.value)}
-                                            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }}
-                                        >
-                                            <option value="">Selecione...</option>
-                                            {q.options.map(opt => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                            <select 
+                                                value={answers[q.id] || ''}
+                                                onChange={e => handleAnswerChange(q.id, e.target.value)}
+                                                style={{ 
+                                                    width: '100%', padding: 16, borderRadius: 12, border: '1px solid #cbd5e1',
+                                                    fontSize: '16px', backgroundColor: '#f8fafc', color: '#334155',
+                                                    appearance: 'none', backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007CB2%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")',
+                                                    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 16px top 50%', backgroundSize: '12px auto'
+                                                }}
+                                            >
+                                                <option value="">Selecione uma opção...</option>
+                                                {q.options.map(opt => (
+                                                    <option key={opt} value={opt}>{opt}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     )}
 
                                     {q.type === 'photo' && (
-                                        <div style={{ background: '#f8fafc', padding: 16, borderRadius: 8, border: '1px dashed #cbd5e1' }}>
+                                        <div style={{ background: '#f8fafc', padding: 20, borderRadius: 16, border: '2px dashed #cbd5e1', textAlign: 'center' }}>
                                             {answers[q.id] ? (
-                                                <div style={{ position: 'relative', display: 'inline-block' }}>
+                                                <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
                                                     <img 
                                                         src={answers[q.id]} 
                                                         alt="Upload preview" 
-                                                        style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 8 }} 
+                                                        style={{ width: '100%', maxHeight: 350, objectFit: 'cover', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} 
                                                     />
                                                     <button 
                                                         onClick={() => handleAnswerChange(q.id, null)}
                                                         style={{ 
-                                                            position: 'absolute', top: 4, right: 4, 
-                                                            background: 'transparent', color: '#ef4444', border: 'none', 
-                                                            cursor: 'pointer', padding: 4,
+                                                            position: 'absolute', top: 12, right: 12, 
+                                                            background: 'rgba(255,255,255,0.9)', color: '#ef4444', border: 'none', 
+                                                            cursor: 'pointer', padding: 8, borderRadius: '50%',
                                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                            filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.8))'
+                                                            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
                                                         }}
                                                         title="Remover foto"
                                                     >
-                                                        <X size={28} strokeWidth={3} />
+                                                        <X size={20} strokeWidth={2.5} />
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <input 
-                                                    type="file" 
-                                                    accept="image/*,.heic,.heif"
-                                                    onChange={async (e) => {
-                                                        const file = e.target.files?.[0]
-                                                        if (file) {
-                                                            const url = await uploadPhoto(file)
-                                                            if (url) handleAnswerChange(q.id, url)
-                                                        }
-                                                    }}
-                                                    style={{ width: '100%' }}
-                                                />
+                                                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, cursor: 'pointer', padding: '20px 0' }}>
+                                                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                                                        <ClipboardList size={28} />
+                                                    </div>
+                                                    <div>
+                                                        <span style={{ display: 'block', fontSize: '1rem', fontWeight: 600, color: '#334155' }}>Toque para enviar foto</span>
+                                                        <span style={{ display: 'block', fontSize: '0.85rem', color: '#94a3b8' }}>JPG, PNG ou HEIC</span>
+                                                    </div>
+                                                    <input 
+                                                        type="file" 
+                                                        accept="image/*,.heic,.heif"
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files?.[0]
+                                                            if (file) {
+                                                                const url = await uploadPhoto(file)
+                                                                if (url) handleAnswerChange(q.id, url)
+                                                            }
+                                                        }}
+                                                        style={{ display: 'none' }}
+                                                    />
+                                                </label>
                                             )}
                                         </div>
                                     )}
@@ -479,20 +528,26 @@ export default function ListAnamnesis() {
                         </div>
                     </div>
 
-                    <div style={{ padding: 24, borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                        <button onClick={() => setAnsweringModel(null)} style={{ padding: '12px 24px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600 }}>
+                    <div style={{ 
+                        padding: '20px 24px', borderTop: '1px solid #f1f5f9', background: '#fff', 
+                        display: 'flex', justifyContent: 'space-between', gap: 16,
+                        boxShadow: '0 -4px 20px rgba(0,0,0,0.05)'
+                    }}>
+                        <button onClick={() => setAnsweringModel(null)} style={{ padding: '16px', borderRadius: 12, border: 'none', background: '#f1f5f9', color: '#64748b', cursor: 'pointer', fontWeight: 600, fontSize: '1rem' }}>
                             Cancelar
                         </button>
                         <button 
                             onClick={handleSubmit}
                             disabled={submitting}
                             style={{ 
-                                padding: '12px 24px', borderRadius: 8, border: 'none', background: '#0f172a', color: '#fff', 
-                                cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8,
-                                opacity: submitting ? 0.7 : 1
+                                flex: 1,
+                                padding: '16px', borderRadius: 12, border: 'none', background: '#0f172a', color: '#fff', 
+                                cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                                fontSize: '1rem', opacity: submitting ? 0.7 : 1,
+                                boxShadow: '0 4px 12px rgba(15, 23, 42, 0.2)'
                             }}
                         >
-                            <Save size={18} /> {submitting ? 'Enviando...' : 'Enviar Respostas'}
+                            <Save size={20} /> {submitting ? 'Enviando...' : 'Enviar Respostas'}
                         </button>
                     </div>
                 </div>
