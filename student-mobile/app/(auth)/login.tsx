@@ -166,8 +166,8 @@ const styles = StyleSheet.create({
   },
   logo: {
     width: '100%',
-    height: 180, // Bem menor
-    marginBottom: 0,
+    height: 120, // Reduzido
+    marginBottom: 20,
     zIndex: 1,
   },
   card: {
@@ -175,28 +175,27 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 24, // Menos padding
+    padding: 20, // Reduzido padding
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
-    marginBottom: 8,
-    marginTop: -30,
+    shadowOffset: { width: 0, height: 4 }, // Sombra mais sutil
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+    marginBottom: 20,
     zIndex: 2,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22, // Levemente menor
     fontWeight: 'bold',
     color: '#0f172a',
     textAlign: 'center',
-    marginBottom: 24
+    marginBottom: 20
   },
   form: {
-    gap: 16
+    gap: 12 // Menor gap
   },
   inputGroup: {
-    gap: 8
+    gap: 6
   },
   label: {
     fontSize: 14,
@@ -208,28 +207,29 @@ const styles = StyleSheet.create({
     borderColor: '#cbd5e1',
     borderRadius: 8,
     paddingHorizontal: 12,
-    height: 50, // Altura fixa maior
-    textAlignVertical: 'center', // Fix Android
+    height: 45, // Altura padrão
+    textAlignVertical: 'center',
     fontSize: 16,
     color: '#0f172a',
-    backgroundColor: '#eff6ff'
+    backgroundColor: '#f8fafc' // Fundo mais leve
   },
   forgotLink: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#0ea5e9',
-    fontWeight: '600'
+    fontWeight: '600',
+    marginTop: 4
   },
   button: {
     backgroundColor: '#0ea5e9',
-    padding: 14,
+    padding: 12, // Botão mais compacto
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 8,
     shadowColor: '#0ea5e9',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2
   },
   buttonText: {
     color: '#fff',
