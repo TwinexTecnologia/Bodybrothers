@@ -134,7 +134,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <div className="submenu">
               <NavLink to="/students/list">Gerenciar Alunos</NavLink>
               {evolutionMode === 'standalone' && (
-                  <NavLink to="/evolution/central" style={{ color: '#0ea5e9' }}>📸 Evolução Fotográfica</NavLink>
+                  <>
+                    <NavLink to="/evolution/central" style={{ color: '#0ea5e9' }}>📸 Evolução Fotográfica</NavLink>
+                    <NavLink to="/account/profile" style={{ fontSize: '0.85rem', paddingLeft: 24, opacity: 0.8 }}>⚙️ Configurar Evolução</NavLink>
+                  </>
               )}
             </div>
           )}
