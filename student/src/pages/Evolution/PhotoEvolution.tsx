@@ -254,35 +254,87 @@ export default function PhotoEvolution() {
                 
                 {/* Modal de Upload dentro do empty state também */}
                 {isUploading && (
-                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, textAlign: 'left' }}>
-                        <div style={{ background: '#fff', padding: 24, borderRadius: 16, width: '100%', maxWidth: 500 }}>
-                            <h3 style={{ marginTop: 0, marginBottom: 16 }}>Adicionar Fotos de Evolução</h3>
+                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, textAlign: 'left' }}>
+                        <div style={{ background: '#fff', padding: 32, borderRadius: 24, width: '100%', maxWidth: 480, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                                <h3 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a', fontWeight: 700 }}>Nova Evolução</h3>
+                                <button onClick={() => setIsUploading(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8' }}>✕</button>
+                            </div>
+                            
                             <form onSubmit={handleUpload}>
-                                <label style={{ display: 'block', marginBottom: 16 }}>
-                                    <span style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Data das Fotos</span>
+                                <div style={{ marginBottom: 20 }}>
+                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 8 }}>Quando as fotos foram tiradas?</label>
                                     <input 
                                         type="date" 
                                         value={uploadDate} 
                                         onChange={e => setUploadDate(e.target.value)}
-                                        style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #cbd5e1' }}
+                                        style={{ 
+                                            width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #e2e8f0', 
+                                            fontSize: '1rem', background: '#f8fafc', color: '#0f172a', outline: 'none',
+                                            transition: 'all 0.2s'
+                                        }}
                                         required
                                     />
-                                </label>
-                                <label style={{ display: 'block', marginBottom: 24 }}>
-                                    <span style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Selecione as Fotos (Frente, Costas, Lado...)</span>
-                                    <input 
-                                        type="file" 
-                                        multiple 
-                                        accept="image/*"
-                                        onChange={e => setUploadFiles(e.target.files)}
-                                        style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #cbd5e1' }}
-                                        required
-                                    />
-                                </label>
-                                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                                    <button type="button" onClick={() => setIsUploading(false)} style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>Cancelar</button>
-                                    <button type="submit" disabled={uploading} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#0f172a', color: '#fff', cursor: 'pointer', opacity: uploading ? 0.7 : 1 }}>
-                                        {uploading ? 'Enviando...' : 'Salvar Fotos'}
+                                </div>
+
+                                <div style={{ marginBottom: 32 }}>
+                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 8 }}>Selecione as Fotos</label>
+                                    <div style={{ 
+                                        border: '2px dashed #cbd5e1', borderRadius: 16, padding: 24, 
+                                        textAlign: 'center', background: '#f8fafc', cursor: 'pointer',
+                                        position: 'relative', transition: 'all 0.2s'
+                                    }}>
+                                        <input 
+                                            type="file" 
+                                            multiple 
+                                            accept="image/*"
+                                            onChange={e => setUploadFiles(e.target.files)}
+                                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                                            required
+                                        />
+                                        <div style={{ pointerEvents: 'none' }}>
+                                            <div style={{ color: '#64748b', marginBottom: 8 }}>
+                                                <ImageIcon size={32} />
+                                            </div>
+                                            {uploadFiles && uploadFiles.length > 0 ? (
+                                                <div style={{ color: '#0f172a', fontWeight: 600 }}>
+                                                    {uploadFiles.length} foto(s) selecionada(s)
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div style={{ color: '#0f172a', fontWeight: 600, marginBottom: 4 }}>Clique para enviar</div>
+                                                    <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Frente, Costas, Lado...</div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setIsUploading(false)} 
+                                        style={{ 
+                                            padding: '14px', borderRadius: 12, border: 'none', background: '#f1f5f9', 
+                                            color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: '1rem'
+                                        }}
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        disabled={uploading} 
+                                        style={{ 
+                                            padding: '14px', borderRadius: 12, border: 'none', background: '#0f172a', 
+                                            color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '1rem',
+                                            opacity: uploading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+                                        }}
+                                    >
+                                        {uploading ? 'Enviando...' : (
+                                            <>
+                                                <Camera size={18} /> Salvar Fotos
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             </form>
@@ -307,37 +359,89 @@ export default function PhotoEvolution() {
 
     return (
         <div style={{ maxWidth: 1200, margin: '0 auto', paddingBottom: 40 }}>
-            {/* Modal de Upload */}
+            {/* Modal de Upload Moderno */}
             {isUploading && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-                    <div style={{ background: '#fff', padding: 24, borderRadius: 16, width: '100%', maxWidth: 500 }}>
-                        <h3 style={{ marginTop: 0, marginBottom: 16 }}>Adicionar Fotos de Evolução</h3>
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                    <div style={{ background: '#fff', padding: 32, borderRadius: 24, width: '100%', maxWidth: 480, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                            <h3 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a', fontWeight: 700 }}>Nova Evolução</h3>
+                            <button onClick={() => setIsUploading(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8' }}>✕</button>
+                        </div>
+                        
                         <form onSubmit={handleUpload}>
-                            <label style={{ display: 'block', marginBottom: 16 }}>
-                                <span style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Data das Fotos</span>
+                            <div style={{ marginBottom: 20 }}>
+                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 8 }}>Quando as fotos foram tiradas?</label>
                                 <input 
                                     type="date" 
                                     value={uploadDate} 
                                     onChange={e => setUploadDate(e.target.value)}
-                                    style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #cbd5e1' }}
+                                    style={{ 
+                                        width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #e2e8f0', 
+                                        fontSize: '1rem', background: '#f8fafc', color: '#0f172a', outline: 'none',
+                                        transition: 'all 0.2s'
+                                    }}
                                     required
                                 />
-                            </label>
-                            <label style={{ display: 'block', marginBottom: 24 }}>
-                                <span style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Selecione as Fotos (Frente, Costas, Lado...)</span>
-                                <input 
-                                    type="file" 
-                                    multiple 
-                                    accept="image/*"
-                                    onChange={e => setUploadFiles(e.target.files)}
-                                    style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #cbd5e1' }}
-                                    required
-                                />
-                            </label>
-                            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                                <button type="button" onClick={() => setIsUploading(false)} style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>Cancelar</button>
-                                <button type="submit" disabled={uploading} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#0f172a', color: '#fff', cursor: 'pointer', opacity: uploading ? 0.7 : 1 }}>
-                                    {uploading ? 'Enviando...' : 'Salvar Fotos'}
+                            </div>
+
+                            <div style={{ marginBottom: 32 }}>
+                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 8 }}>Selecione as Fotos</label>
+                                <div style={{ 
+                                    border: '2px dashed #cbd5e1', borderRadius: 16, padding: 24, 
+                                    textAlign: 'center', background: '#f8fafc', cursor: 'pointer',
+                                    position: 'relative', transition: 'all 0.2s'
+                                }}>
+                                    <input 
+                                        type="file" 
+                                        multiple 
+                                        accept="image/*"
+                                        onChange={e => setUploadFiles(e.target.files)}
+                                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                                        required
+                                    />
+                                    <div style={{ pointerEvents: 'none' }}>
+                                        <div style={{ color: '#64748b', marginBottom: 8 }}>
+                                            <ImageIcon size={32} />
+                                        </div>
+                                        {uploadFiles && uploadFiles.length > 0 ? (
+                                            <div style={{ color: '#0f172a', fontWeight: 600 }}>
+                                                {uploadFiles.length} foto(s) selecionada(s)
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div style={{ color: '#0f172a', fontWeight: 600, marginBottom: 4 }}>Clique para enviar</div>
+                                                <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Frente, Costas, Lado...</div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setIsUploading(false)} 
+                                    style={{ 
+                                        padding: '14px', borderRadius: 12, border: 'none', background: '#f1f5f9', 
+                                        color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: '1rem'
+                                    }}
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    disabled={uploading} 
+                                    style={{ 
+                                        padding: '14px', borderRadius: 12, border: 'none', background: '#0f172a', 
+                                        color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '1rem',
+                                        opacity: uploading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+                                    }}
+                                >
+                                    {uploading ? 'Enviando...' : (
+                                        <>
+                                            <Camera size={18} /> Salvar Fotos
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </form>
