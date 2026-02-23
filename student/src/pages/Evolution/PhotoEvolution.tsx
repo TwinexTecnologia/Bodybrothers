@@ -60,6 +60,7 @@ export default function PhotoEvolution() {
                 }
             }
 
+            console.log('Modo de evolução carregado:', mode)
             setEvolutionMode(mode)
             await loadPhotos(mode)
 
