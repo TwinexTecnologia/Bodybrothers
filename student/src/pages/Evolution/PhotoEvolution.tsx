@@ -34,34 +34,39 @@ export default function PhotoEvolution() {
     async function loadConfigAndPhotos() {
         setLoading(true)
         try {
-            // 1. Busca personal_id do aluno
-            const { data: student } = await supabase
+            // 1. Tenta ler do PRÓPRIO PERFIL (Mais seguro contra RLS)
+            const { data: myself } = await supabase
                 .from('profiles')
-                .select('personal_id')
+                .select('data, personal_id')
                 .eq('id', user.id)
                 .single()
             
             let mode = 'anamnesis'
+            let fields: any[] = []
 
-            if (student?.personal_id) {
-                // 2. Busca config do personal
+            // Prioridade: Config no perfil do aluno (propagada pelo personal)
+            if (myself?.data?.config?.evolutionMode) {
+                mode = myself.data.config.evolutionMode
+                fields = myself.data.config.evolutionFields || []
+                console.log('Config carregada do perfil do aluno:', mode, fields)
+            } 
+            // Fallback: Tenta ler do personal (Legado / Risco de RLS)
+            else if (myself?.personal_id) {
                 const { data: personal } = await supabase
                     .from('profiles')
                     .select('data')
-                    .eq('id', student.personal_id)
+                    .eq('id', myself.personal_id)
                     .single()
                 
                 if (personal?.data?.config?.evolutionMode) {
                     mode = personal.data.config.evolutionMode
-                }
-                
-                if (personal?.data?.config?.evolutionFields) {
-                    setEvolutionFields(personal.data.config.evolutionFields)
+                    fields = personal.data.config.evolutionFields || []
+                    console.log('Config carregada do perfil do personal (fallback):', mode)
                 }
             }
 
-            console.log('Modo de evolução carregado:', mode)
             setEvolutionMode(mode)
+            setEvolutionFields(fields)
             await loadPhotos(mode)
 
         } catch (error) {

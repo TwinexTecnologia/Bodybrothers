@@ -141,7 +141,40 @@ export default function Profile() {
         setConfirmPassword('')
       }
 
-      setMsg('Perfil atualizado com sucesso!')
+      // 2. Propagar configuração para TODOS os alunos do personal
+      // Isso garante que o aluno consiga ler a configuração sem problemas de permissão (RLS)
+      if (evolutionMode === 'standalone') {
+          const { data: students } = await supabase
+            .from('profiles')
+            .select('id, data')
+            .eq('personal_id', id)
+          
+          if (students && students.length > 0) {
+              const updates = students.map(student => {
+                  const studentData = student.data || {}
+                  const studentConfig = studentData.config || {}
+                  
+                  return supabase
+                    .from('profiles')
+                    .update({
+                        data: {
+                            ...studentData,
+                            config: {
+                                ...studentConfig,
+                                evolutionMode,
+                                evolutionFields
+                            }
+                        }
+                    })
+                    .eq('id', student.id)
+              })
+              
+              await Promise.all(updates)
+          }
+      }
+
+      setMsg('Configurações salvas e aplicadas aos alunos!')
+      // setStudents(prev => prev.map(s => s.id === selectedId ? { ...s, name, email } : s)) // Linha removida pois não existe aqui
     } catch (err: any) {
       console.error(err)
       setError(err.message || 'Erro ao atualizar perfil.')

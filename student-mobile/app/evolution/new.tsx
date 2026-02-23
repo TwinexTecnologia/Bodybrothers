@@ -31,17 +31,25 @@ export default function NewEvolution() {
 
   async function loadPersonalConfig() {
       try {
-          const { data: student } = await supabase
+          // Tenta ler do PRÓPRIO PERFIL (Mais seguro contra RLS)
+          const { data: myself } = await supabase
               .from('profiles')
-              .select('personal_id')
+              .select('data, personal_id')
               .eq('id', user?.id)
               .single();
 
-          if (student?.personal_id) {
+          // Prioridade: Config no perfil do aluno (propagada pelo personal)
+          if (myself?.data?.config?.evolutionFields?.length > 0) {
+              setFields(myself.data.config.evolutionFields);
+              return;
+          }
+
+          // Fallback: Tenta ler do personal (Legado / Risco de RLS)
+          if (myself?.personal_id) {
               const { data: personal } = await supabase
                   .from('profiles')
                   .select('data')
-                  .eq('id', student.personal_id)
+                  .eq('id', myself.personal_id)
                   .single();
               
               if (personal?.data?.config?.evolutionFields?.length > 0) {
