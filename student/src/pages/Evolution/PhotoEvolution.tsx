@@ -45,10 +45,16 @@ export default function PhotoEvolution() {
             let fields: any[] = []
 
             // Prioridade: Config no perfil do aluno (propagada pelo personal)
-            if (myself?.data?.config?.evolutionMode) {
+            // Agora checa campos primeiro para forçar standalone se tiver config
+            if (myself?.data?.config?.evolutionFields?.length > 0) {
+                mode = 'standalone'
+                fields = myself.data.config.evolutionFields
+                console.log('Config carregada do perfil do aluno (campos detectados):', fields)
+            }
+            else if (myself?.data?.config?.evolutionMode) {
                 mode = myself.data.config.evolutionMode
                 fields = myself.data.config.evolutionFields || []
-                console.log('Config carregada do perfil do aluno:', mode, fields)
+                console.log('Config carregada do perfil do aluno (modo):', mode, fields)
             } 
             // Fallback: Tenta ler do personal (Legado / Risco de RLS)
             else if (myself?.personal_id) {

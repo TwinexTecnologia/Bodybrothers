@@ -67,25 +67,21 @@ export async function addStudent(s: Omit<StudentRecord, 'id' | 'createdAt' | 'st
 }
 
 export async function updateStudent(id: string, updates: Partial<Omit<StudentRecord, 'id' | 'personalId' | 'status' | 'createdAt' | 'lastAccess'>>) {
-  const current = await getStudent(id)
-  const currentData = current ? { 
-      address: current.address, 
-      planId: current.planId, 
-      planStartDate: current.planStartDate,
-      dueDay: current.dueDay,
-      workoutIds: current.workoutIds,
-      workoutSchedule: current.workoutSchedule,
-      dietIds: current.dietIds,
-      tempPassword: current.tempPassword,
-      status: current.status,
-      avatarUrl: current.avatarUrl, // MANTEM A FOTO
-      whatsapp: current.whatsapp // Mantém whatsapp
-  } : {}
+  // Busca o dado RAW completo para não perder campos não mapeados (ex: config)
+  const { data: rawCurrent, error: fetchErr } = await supabase
+      .from('profiles')
+      .select('data, full_name, email')
+      .eq('id', id)
+      .single()
+  
+  if (fetchErr) throw fetchErr
+
+  const currentData = rawCurrent.data || {}
 
   const dbUpdates: any = {
     updated_at: new Date(),
     data: {
-      ...currentData,
+      ...currentData, // Mantém TUDO que já existe (incluindo config)
       ...(updates.address ? { address: updates.address } : {}),
       ...(updates.planId ? { planId: updates.planId } : {}),
       ...(updates.planStartDate ? { planStartDate: updates.planStartDate } : {}),
@@ -95,7 +91,7 @@ export async function updateStudent(id: string, updates: Partial<Omit<StudentRec
       ...(updates.dietIds ? { dietIds: updates.dietIds } : {}),
       ...(updates.tempPassword ? { tempPassword: updates.tempPassword } : {}),
       ...(updates.email ? { email: updates.email } : {}),
-      ...(updates.avatarUrl ? { avatarUrl: updates.avatarUrl } : {}), // Atualiza se vier novo
+      ...(updates.avatarUrl ? { avatarUrl: updates.avatarUrl } : {}), 
       ...(updates.whatsapp !== undefined ? { whatsapp: updates.whatsapp } : {})
     }
   }
