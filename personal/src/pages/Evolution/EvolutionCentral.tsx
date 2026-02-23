@@ -9,9 +9,32 @@ export default function EvolutionCentral() {
     const [searchTerm, setSearchTerm] = useState('')
     const [loading, setLoading] = useState(true)
 
+    // Configuração de Evolução
+    const [evolutionMode, setEvolutionMode] = useState('anamnesis') // 'anamnesis' | 'standalone'
+    const [evolutionFields, setEvolutionFields] = useState<any[]>([]) 
+    const [personalId, setPersonalId] = useState('')
+
     useEffect(() => {
         loadStudents()
+        loadPersonalConfig()
     }, [])
+
+    async function loadPersonalConfig() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        setPersonalId(user.id)
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('data')
+            .eq('id', user.id)
+            .single()
+
+        if (profile) {
+            setEvolutionMode(profile.data?.config?.evolutionMode || 'anamnesis')
+            setEvolutionFields(profile.data?.config?.evolutionFields || [])
+        }
+    }
 
     async function loadStudents() {
         const { data: { user } } = await supabase.auth.getUser()
@@ -41,12 +64,34 @@ export default function EvolutionCentral() {
 
     return (
         <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
-            <header style={{ marginBottom: 32 }}>
-                <h1 style={{ fontSize: 24, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <Camera size={28} /> Central de Evolução
-                </h1>
-                <p style={{ color: '#64748b' }}>Selecione um aluno para gerenciar ou adicionar novas fotos.</p>
+            <header style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h1 style={{ fontSize: 24, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Camera size={28} /> Central de Evolução
+                    </h1>
+                    <p style={{ color: '#64748b', margin: 0 }}>Selecione um aluno para gerenciar ou adicionar novas fotos.</p>
+                </div>
+                <button 
+                    onClick={() => navigate('/account/profile')}
+                    style={{ 
+                        background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', 
+                        padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontWeight: 600,
+                        fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 8
+                    }}
+                >
+                    ⚙️ Configurar
+                </button>
             </header>
+
+            {/* Aviso de Configuração */}
+            {evolutionMode === 'standalone' && evolutionFields.length === 0 && (
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: 16, marginBottom: 24, color: '#1e40af' }}>
+                    <strong>Dica:</strong> Você ativou o modo de fotos avulsas, mas não definiu campos personalizados (ex: Frente, Costas). 
+                    <button onClick={() => navigate('/account/profile')} style={{ background: 'none', border: 'none', color: '#2563eb', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600, marginLeft: 4 }}>
+                        Configurar agora
+                    </button>
+                </div>
+            )}
 
             <div style={{ marginBottom: 24, position: 'relative' }}>
                 <Search size={20} style={{ position: 'absolute', left: 12, top: 12, color: '#94a3b8' }} />
