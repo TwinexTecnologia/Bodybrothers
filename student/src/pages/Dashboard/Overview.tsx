@@ -39,7 +39,7 @@ export default function Overview() {
         // 1. Perfil (Nome) e Dados JSON
         const { data: profile } = await supabase
             .from('profiles')
-            .select('full_name, data')
+            .select('full_name, data, plan_id')
             .eq('id', user?.id)
             .single()
         
@@ -137,16 +137,34 @@ export default function Overview() {
         }
 
         // Verifica Financeiro (Pendências)
-        const { data: pendences } = await supabase
-            .from('financial_charges')
-            .select('*')
-            .eq('student_id', user?.id)
-            .eq('status', 'pending')
-            .lt('due_date', new Date().toISOString())
-            .order('due_date', { ascending: true })
-            .limit(1)
+        let pendingFinancial = null
         
-        const pendingFinancial = pendences?.[0] || null
+        // Verifica se plano é pago antes de buscar pendências
+        const planId = profile?.plan_id || profile?.data?.planId
+        let isFreePlan = false
+        
+        if (planId) {
+             const { data: planData } = await supabase.from('plans').select('price, title').eq('id', planId).single()
+             if (planData) {
+                 if (planData.price <= 0 || (planData.title && planData.title.toLowerCase().includes('permuta')) || (planData.title && planData.title.toLowerCase().includes('gratuito'))) {
+                     isFreePlan = true
+                 }
+             }
+        }
+
+        let pendingFinancial = null
+        if (!isFreePlan) {
+            const { data: pendences } = await supabase
+                .from('financial_charges')
+                .select('*')
+                .eq('student_id', user?.id)
+                .eq('status', 'pending')
+                .lt('due_date', new Date().toISOString())
+                .order('due_date', { ascending: true })
+                .limit(1)
+            
+            pendingFinancial = pendences?.[0] || null
+        }
 
         setStats({
             name: profile?.full_name || user?.email?.split('@')[0] || 'Aluno',
