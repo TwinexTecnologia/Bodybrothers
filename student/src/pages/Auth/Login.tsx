@@ -179,6 +179,32 @@ export default function Login() {
                 )}
                 </form>
             )}
+            
+            {/* Botão de Download do App Mobile */}
+            <div style={{ marginTop: 24, textAlign: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
+                <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: '#64748b' }}>Prefere usar no celular?</p>
+                <a 
+                    href="https://github.com/TwinexTecnologia/Bodybrothers/releases/latest/download/app-release.apk" 
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ 
+                        display: 'inline-flex', alignItems: 'center', gap: 8,
+                        background: '#0f172a', color: '#fff', 
+                        padding: '10px 16px', borderRadius: 8, 
+                        textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600,
+                        transition: 'transform 0.2s',
+                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4M17 9l-5 5-5-5M12 12.8V2.5"/>
+                    </svg>
+                    Baixar Aplicativo Android
+                </a>
+            </div>
+
         </div>
         <div style={{ color: '#64748b', fontSize: '0.875rem', marginTop: 10 }}>
             &copy; {new Date().getFullYear()} Twinex Tecnologia. Todos os direitos reservados.
