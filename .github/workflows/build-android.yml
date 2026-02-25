@@ -1,0 +1,48 @@
+name: Build Android App
+
+on:
+  workflow_dispatch: # Permite disparar manualmente na aba Actions
+  push:
+    branches:
+      - main
+    paths:
+      - 'student-mobile/**'
+      - '.github/workflows/build-android.yml'
+
+jobs:
+  build:
+    name: EAS Build Android
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./student-mobile
+    steps:
+      - name: Check for EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "You must provide an EXPO_TOKEN secret linked to this project's Expo account in this repo's secrets."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: npm
+          cache-dependency-path: student-mobile/package-lock.json
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Android App Bundle (AAB)
+        run: eas build --platform android --profile production --non-interactive --no-wait
