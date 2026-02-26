@@ -53,15 +53,15 @@ export default function Login() {
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        minHeight: '100vh',
+        minHeight: '100dvh', // Use dvh for mobile address bar
         background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
         fontFamily: 'Inter, sans-serif',
-        padding: '40px 20px',
+        padding: '20px',
         boxSizing: 'border-box'
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, width: '100%' }}>
         {/* Logo Centralizada */}
-        <div style={{ textAlign: 'center', marginBottom: 0, zIndex: 1 }}>
+        <div style={{ textAlign: 'center', marginBottom: 0, zIndex: 1, minHeight: 60 }}>
             <img 
                src="https://cdtouwfxwuhnlzqhcagy.supabase.co/storage/v1/object/public/Imagens/ChatGPT%20Image%209%20de%20fev.%20de%202026%2C%2022_23_47.png" 
                alt="Logo" 
@@ -74,7 +74,7 @@ export default function Login() {
                }} 
                onError={(e) => {
                    e.currentTarget.style.display = 'none'
-                   e.currentTarget.nextElementSibling?.removeAttribute('hidden')
+                   // Avoid accessing nextElementSibling directly to prevent crash
                }} 
             />
         </div>

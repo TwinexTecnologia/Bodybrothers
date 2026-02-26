@@ -3,8 +3,6 @@ import { useAuth } from '../../auth/useAuth'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { Dumbbell, Utensils, AlertCircle, CheckCircle, Clock, X, DollarSign, FileText } from 'lucide-react'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 
 export default function Overview() {
   const { user } = useAuth()
@@ -234,11 +232,14 @@ export default function Overview() {
           }
 
           const { data: workouts, error } = await query
-
           if (error || !workouts || workouts.length === 0) {
               alert('Nenhum treino encontrado para exportar.')
               return
           }
+
+          // Importação Dinâmica para evitar crash no mobile/build
+          const jsPDF = (await import('jspdf')).default
+          const autoTable = (await import('jspdf-autotable')).default
 
           const doc = new jsPDF()
           
