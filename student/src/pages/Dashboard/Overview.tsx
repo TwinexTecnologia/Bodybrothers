@@ -150,7 +150,6 @@ export default function Overview() {
              }
         }
 
-        let pendingFinancial = null
         if (!isFreePlan) {
             const { data: pendences } = await supabase
                 .from('financial_charges')
