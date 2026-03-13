@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Camera } from 'lucide-react'
-import { listStudentsByPersonal, updateStudent, getStudent, type StudentRecord } from '../../store/students'
+import { listStudentsByPersonal, updateStudent, getStudent, toggleStudentActive, type StudentRecord } from '../../store/students'
 import { listActiveDiets, type DietRecord, listStudentDiets, duplicateDiet, updateDiet, deleteDietIfPersonalized } from '../../store/diets'
 import { listActiveWorkouts, duplicateWorkout, updateWorkout, setWorkoutStatus, type WorkoutRecord } from '../../store/workouts'
 import { listLibraryModels, listStudentModels, duplicateModel, updateModel, deleteModel, type AnamnesisModel } from '../../store/anamnesis'
@@ -672,6 +672,25 @@ export default function EditStudent() {
       doc.save(`Treinos_${studentName.replace(/\s+/g, '_')}.pdf`)
   }
 
+  const handleToggleStatus = async () => {
+      if (!selectedId) return
+      const current = students.find(s => s.id === selectedId)
+      if (!current) return
+
+      const newStatus = current.status === 'ativo' ? 'inativo' : 'ativo'
+      
+      if (newStatus === 'inativo') {
+          if (!confirm('Tem certeza que deseja inativar este aluno? Ele perderá o acesso ao app imediatamente.')) return
+      }
+
+      setLoading(true)
+      await toggleStudentActive(selectedId, newStatus)
+      
+      setStudents(prev => prev.map(s => s.id === selectedId ? { ...s, status: newStatus } : s))
+      setLoading(false)
+      setMsg(newStatus === 'ativo' ? 'Aluno reativado!' : 'Aluno inativado.')
+  }
+
   const save = async () => {
     if (!selectedId) return
     const { data: { user } } = await supabase.auth.getUser()
@@ -808,7 +827,27 @@ export default function EditStudent() {
                 
                 {/* DADOS PESSOAIS */}
                 <div style={cardStyle}>
-                    <div style={sectionTitleStyle}>👤 Dados Pessoais</div>
+                    <div style={{ ...sectionTitleStyle, justifyContent: 'space-between' }}>
+                        <span>👤 Dados Pessoais</span>
+                        {selectedId && (
+                             <button 
+                                className="btn" 
+                                onClick={handleToggleStatus}
+                                style={{ 
+                                    padding: '4px 10px', 
+                                    fontSize: '0.8em', 
+                                    background: students.find(s => s.id === selectedId)?.status === 'inativo' ? '#dcfce7' : '#fee2e2', 
+                                    color: students.find(s => s.id === selectedId)?.status === 'inativo' ? '#166534' : '#991b1b',
+                                    border: '1px solid ' + (students.find(s => s.id === selectedId)?.status === 'inativo' ? '#bbf7d0' : '#fecaca'),
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    borderRadius: 6
+                                }}
+                            >
+                                {students.find(s => s.id === selectedId)?.status === 'inativo' ? 'Reativar Aluno' : 'Inativar Aluno'}
+                            </button>
+                        )}
+                    </div>
                     <div className="form-grid">
                         <label className="label">
                             Nome
