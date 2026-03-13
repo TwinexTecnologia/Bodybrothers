@@ -150,6 +150,7 @@ export async function addWorkout(w: Omit<WorkoutRecord, 'id' | 'status' | 'updat
       type: 'workout',
       title: w.name,
       status: 'active',
+      created_at: w.createdAt,
       // Mapeia data de validade para ends_at se quiser usar o campo nativo, mas vamos manter no JSON por compatibilidade
       data: {
         goal: w.goal,
@@ -179,6 +180,7 @@ export async function updateWorkout(id: string, patch: Partial<WorkoutRecord>): 
     updated_at: new Date().toISOString()
   }
   if (patch.name) updates.title = patch.name
+  if (patch.createdAt) updates.created_at = patch.createdAt
   if (patch.studentId !== undefined) updates.student_id = patch.studentId || null
   if (patch.status) updates.status = patch.status === 'ativo' ? 'active' : 'archived'
   

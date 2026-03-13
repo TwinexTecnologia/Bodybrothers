@@ -58,6 +58,22 @@ function getYouTubeId(url: string) {
     return (match && match[2].length === 11) ? match[2] : null
 }
 
+// Formata data local para YYYY-MM-DD sem problemas de fuso horário
+const formatDateToISO = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+// Adiciona dias a uma data
+const addDays = (dateStr: string, days: number) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr + 'T12:00:00'); // Força meio-dia para evitar virada de dia no fuso
+    date.setDate(date.getDate() + days);
+    return formatDateToISO(date);
+};
+
 export default function WorkoutCreate() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
@@ -71,8 +87,8 @@ export default function WorkoutCreate() {
   
   const [name, setName] = useState('')
   const [goal, setGoal] = useState('')
-  const [createdAt, setCreatedAt] = useState(new Date().toISOString().split('T')[0])
-  const [validUntil, setValidUntil] = useState('')
+  const [createdAt, setCreatedAt] = useState(formatDateToISO(new Date()))
+  const [validUntil, setValidUntil] = useState(addDays(formatDateToISO(new Date()), 60))
   const [notes, setNotes] = useState('')
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [msg, setMsg] = useState('')
@@ -137,6 +153,13 @@ export default function WorkoutCreate() {
     }
     load()
   }, [workoutId])
+
+  // Atualiza validade automaticamente para novos treinos
+  useEffect(() => {
+    if (createdAt && !editId) {
+        setValidUntil(addDays(createdAt, 60))
+    }
+  }, [createdAt, editId])
 
   const addExercise = () => setExercises([...exercises, {
       dndId: Math.random().toString(36).substr(2, 9),
@@ -387,7 +410,7 @@ export default function WorkoutCreate() {
                 </label>
                 <label className="label">
                     Validade
-                    <input className="input" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+                    <input className="input" type="date" min={createdAt} value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
                 </label>
             </div>
         </div>
