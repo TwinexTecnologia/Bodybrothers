@@ -101,7 +101,8 @@ export function useFinancialStatus() {
         if (!info.planStartDate || !planData) return []
         
         // SE O PREÇO FOR ZERO, NÃO GERA COBRANÇAS (GRATUITO)
-        if (planData.price <= 0) return []
+        const isFree = planData.price <= 0 || (planData.title && planData.title.toLowerCase().includes('permuta')) || (planData.title && planData.title.toLowerCase().includes('gratuito'))
+        if (isFree) return []
 
         let dateStr = info.planStartDate
         if (dateStr.includes('T')) dateStr = dateStr.split('T')[0]

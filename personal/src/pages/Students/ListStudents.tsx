@@ -15,6 +15,12 @@ import StudentAnamnesisModal from '../../components/StudentAnamnesisModal'
 const getFinancialStatus = (student: StudentRecord, plan: PlanRecord | undefined, payments: DebitRecord[]) => {
     if (!plan || !student.planStartDate) return { status: 'none', label: '—', color: '#9ca3af', bg: 'transparent', daysDiff: null }
     
+    // Verifica Gratuidade/Permuta
+    const isFree = plan.price <= 0 || plan.name.toLowerCase().includes('permuta') || plan.name.toLowerCase().includes('gratuito')
+    if (isFree) {
+        return { status: 'paid', label: 'ISENTO', color: '#10b981', bg: '#dcfce7', daysDiff: null }
+    }
+
     // 1. Pega último pagamento
     const myPayments = payments.filter(p => p.payerId === student.id).sort((a, b) => {
         const dateA = new Date(a.paidAt || a.dueDate || 0).getTime()

@@ -10,6 +10,7 @@ import Profile from './pages/Account/Profile'
 import Layout from './components/Layout'
 import { AuthProvider } from './auth/AuthContext'
 import PrivacyPolicy from './pages/PrivacyPolicy'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 import { useAuth } from './auth/useAuth'
 
@@ -51,9 +52,11 @@ function AppRoutes() {
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ErrorBoundary>
     </BrowserRouter>
   )
 }

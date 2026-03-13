@@ -3,8 +3,6 @@ import { useAuth } from '../../auth/useAuth'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { Dumbbell, Utensils, AlertCircle, CheckCircle, Clock, X, DollarSign, FileText } from 'lucide-react'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 
 export default function Overview() {
   const { user } = useAuth()
@@ -39,7 +37,7 @@ export default function Overview() {
         // 1. Perfil (Nome) e Dados JSON
         const { data: profile } = await supabase
             .from('profiles')
-            .select('full_name, data')
+            .select('full_name, data, plan_id')
             .eq('id', user?.id)
             .single()
         
@@ -137,16 +135,33 @@ export default function Overview() {
         }
 
         // Verifica Financeiro (Pendências)
-        const { data: pendences } = await supabase
-            .from('financial_charges')
-            .select('*')
-            .eq('student_id', user?.id)
-            .eq('status', 'pending')
-            .lt('due_date', new Date().toISOString())
-            .order('due_date', { ascending: true })
-            .limit(1)
+        let pendingFinancial = null
         
-        const pendingFinancial = pendences?.[0] || null
+        // Verifica se plano é pago antes de buscar pendências
+        const planId = profile?.plan_id || profile?.data?.planId
+        let isFreePlan = false
+        
+        if (planId) {
+             const { data: planData } = await supabase.from('plans').select('price, title').eq('id', planId).single()
+             if (planData) {
+                 if (planData.price <= 0 || (planData.title && planData.title.toLowerCase().includes('permuta')) || (planData.title && planData.title.toLowerCase().includes('gratuito'))) {
+                     isFreePlan = true
+                 }
+             }
+        }
+
+        if (!isFreePlan) {
+            const { data: pendences } = await supabase
+                .from('financial_charges')
+                .select('*')
+                .eq('student_id', user?.id)
+                .eq('status', 'pending')
+                .lt('due_date', new Date().toISOString())
+                .order('due_date', { ascending: true })
+                .limit(1)
+            
+            pendingFinancial = pendences?.[0] || null
+        }
 
         setStats({
             name: profile?.full_name || user?.email?.split('@')[0] || 'Aluno',
@@ -216,11 +231,14 @@ export default function Overview() {
           }
 
           const { data: workouts, error } = await query
-
           if (error || !workouts || workouts.length === 0) {
               alert('Nenhum treino encontrado para exportar.')
               return
           }
+
+          // Importação Dinâmica para evitar crash no mobile/build
+          const jsPDF = (await import('jspdf')).default
+          const autoTable = (await import('jspdf-autotable')).default
 
           const doc = new jsPDF()
           

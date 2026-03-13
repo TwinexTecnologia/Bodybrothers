@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image, Dimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+
+const { width } = Dimensions.get('window');
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleLogin() {
     if (!email || !password) return Alert.alert('Atenção', 'Preencha email e senha.');
     
     setLoading(true);
-    console.log('Tentando login com:', email); // Debug
 
     try {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -22,19 +25,12 @@ export default function Login() {
             password: password.trim(),
         });
 
-        if (error) {
-            console.error('Erro Supabase:', error);
-            throw error;
-        }
+        if (error) throw error;
 
-        console.log('Login sucesso:', data.user?.id);
-        
-        // Redirecionamento explícito
         if (data.user) {
             router.replace('/(tabs)/dashboard');
         }
     } catch (error: any) {
-        console.error('Catch erro:', error);
         Alert.alert('Erro no Login', error.message === 'Invalid login credentials' ? 'Email ou senha incorretos.' : error.message);
     } finally {
         setLoading(false);
@@ -64,88 +60,92 @@ export default function Login() {
     >
         <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, width: '100%' }}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            style={styles.keyboardView}
         >
-            <ScrollView 
-                contentContainerStyle={styles.scrollContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Logo */}
-                <Image
-                    source={{ uri: "https://cdtouwfxwuhnlzqhcagy.supabase.co/storage/v1/object/public/Imagens/ChatGPT%20Image%209%20de%20fev.%20de%202026%2C%2022_23_47.png" }}
-                    style={styles.logo}
-                    resizeMode="contain"
-                />
-
-                {/* Card de Login */}
-                <View style={styles.card}>
-                    <Text style={styles.title}>
-                        {isRecovering ? 'Recuperar Senha' : 'Bem-vindo de volta!'}
+            <View style={styles.content}>
+                
+                {/* Header / Logo */}
+                <View style={styles.header}>
+                    <Image 
+                        source={require('../../assets/icon.png')} 
+                        style={styles.logo}
+                        resizeMode="contain"
+                    />
+                    <Text style={styles.appName}>BODYBROTHERS</Text>
+                    <Text style={styles.subtitle}>
+                        {isRecovering ? 'Recupere sua senha' : 'Seu treino, sua evolução'}
                     </Text>
-
-                    <View style={styles.form}>
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Email</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="seuemail@exemplo.com"
-                                placeholderTextColor="#94a3b8"
-                                value={email}
-                                onChangeText={setEmail}
-                                autoCapitalize="none"
-                                keyboardType="email-address"
-                            />
-                        </View>
-
-                        {!isRecovering && (
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Senha</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Sua senha"
-                                    placeholderTextColor="#94a3b8"
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    secureTextEntry
-                                    autoCapitalize="none"
-                                />
-                                <TouchableOpacity onPress={() => setIsRecovering(true)} style={{ alignSelf: 'flex-end' }}>
-                                    <Text style={styles.forgotLink}>Esqueci minha senha</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-                        <TouchableOpacity 
-                            style={styles.button} 
-                            onPress={isRecovering ? handleRecovery : handleLogin}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <ActivityIndicator color="#fff" />
-                            ) : (
-                                <Text style={styles.buttonText}>
-                                    {isRecovering ? 'Enviar Link' : 'Acessar Painel'}
-                                </Text>
-                            )}
-                        </TouchableOpacity>
-
-                        {isRecovering && (
-                            <TouchableOpacity 
-                                style={styles.backButton}
-                                onPress={() => setIsRecovering(false)}
-                            >
-                                <Text style={styles.backButtonText}>Cancelar e voltar</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
                 </View>
 
-                <Text style={styles.footer}>
-                    © 2026 Twinex Tecnologia. Todos os direitos reservados.
-                </Text>
-            </ScrollView>
+                {/* Form */}
+                <View style={styles.form}>
+                    <View style={styles.inputContainer}>
+                        <Ionicons name="mail-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Email"
+                            placeholderTextColor="#64748b"
+                            value={email}
+                            onChangeText={setEmail}
+                            autoCapitalize="none"
+                            keyboardType="email-address"
+                        />
+                    </View>
+
+                    {!isRecovering && (
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="lock-closed-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Senha"
+                                placeholderTextColor="#64748b"
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry={!showPassword}
+                                autoCapitalize="none"
+                            />
+                            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#94a3b8" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {!isRecovering && (
+                        <TouchableOpacity onPress={() => setIsRecovering(true)} style={styles.forgotLink}>
+                            <Text style={styles.forgotText}>Esqueci minha senha</Text>
+                        </TouchableOpacity>
+                    )}
+
+                    <TouchableOpacity 
+                        style={styles.button} 
+                        onPress={isRecovering ? handleRecovery : handleLogin}
+                        disabled={loading}
+                        activeOpacity={0.8}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.buttonText}>
+                                {isRecovering ? 'ENVIAR LINK' : 'ENTRAR'}
+                            </Text>
+                        )}
+                    </TouchableOpacity>
+
+                    {isRecovering && (
+                        <TouchableOpacity 
+                            style={styles.backButton}
+                            onPress={() => setIsRecovering(false)}
+                        >
+                            <Text style={styles.backButtonText}>Voltar para Login</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                <View style={styles.footer}>
+                    <Text style={styles.footerText}>Versão 1.0.0</Text>
+                </View>
+
+            </View>
         </KeyboardAvoidingView>
     </LinearGradient>
   );
@@ -154,100 +154,106 @@ export default function Login() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  scrollContent: {
-    flexGrow: 1,
+  keyboardView: {
+    flex: 1,
     justifyContent: 'center',
+  },
+  content: {
+    padding: 32,
     alignItems: 'center',
-    padding: 20,
-    paddingBottom: 40
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 48,
   },
   logo: {
-    width: '100%',
-    height: 120, // Reduzido
-    marginBottom: 20,
-    zIndex: 1,
+    width: 80,
+    height: 80,
+    marginBottom: 16,
+    borderRadius: 20, // Suaviza cantos se for quadrado
   },
-  card: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20, // Reduzido padding
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 }, // Sombra mais sutil
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-    marginBottom: 20,
-    zIndex: 2,
+  appName: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 2,
+    marginBottom: 8,
   },
-  title: {
-    fontSize: 22, // Levemente menor
-    fontWeight: 'bold',
-    color: '#0f172a',
-    textAlign: 'center',
-    marginBottom: 20
+  subtitle: {
+    fontSize: 14,
+    color: '#94a3b8',
+    letterSpacing: 0.5,
   },
   form: {
-    gap: 12 // Menor gap
+    width: '100%',
+    gap: 16,
   },
-  inputGroup: {
-    gap: 6
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 16,
+    height: 56,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#475569'
+  inputIcon: {
+    marginRight: 12,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 45, // Altura padrão
-    textAlignVertical: 'center',
+    flex: 1,
+    color: '#fff',
     fontSize: 16,
-    color: '#0f172a',
-    backgroundColor: '#f8fafc' // Fundo mais leve
+    height: '100%',
   },
   forgotLink: {
+    alignSelf: 'flex-end',
+    paddingVertical: 4,
+  },
+  forgotText: {
+    color: '#3b82f6',
     fontSize: 13,
-    color: '#0ea5e9',
     fontWeight: '600',
-    marginTop: 4
   },
   button: {
-    backgroundColor: '#0ea5e9',
-    padding: 12, // Botão mais compacto
-    borderRadius: 8,
+    backgroundColor: '#3b82f6',
+    height: 56,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 8,
-    shadowColor: '#0ea5e9',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 16
+    fontSize: 15,
+    letterSpacing: 1,
   },
   backButton: {
     alignItems: 'center',
-    padding: 8
+    padding: 16,
   },
   backButtonText: {
-    color: '#64748b',
-    fontSize: 14
+    color: '#94a3b8',
+    fontSize: 14,
   },
   footer: {
-    color: '#94a3b8',
+    marginTop: 64,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#475569',
     fontSize: 12,
-    marginTop: 0,
-    textAlign: 'center'
-  }
+  },
 });

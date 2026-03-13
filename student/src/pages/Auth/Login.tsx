@@ -53,28 +53,29 @@ export default function Login() {
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        minHeight: '100vh',
+        minHeight: '100dvh', // Use dvh for mobile address bar
         background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
         fontFamily: 'Inter, sans-serif',
-        padding: '40px 20px',
+        padding: '20px',
         boxSizing: 'border-box'
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, width: '100%' }}>
         {/* Logo Centralizada */}
-        <div style={{ textAlign: 'center', marginBottom: 0, zIndex: 1 }}>
+        <div style={{ textAlign: 'center', marginBottom: 24, zIndex: 1, minHeight: 60 }}>
             <img 
                src="https://cdtouwfxwuhnlzqhcagy.supabase.co/storage/v1/object/public/Imagens/ChatGPT%20Image%209%20de%20fev.%20de%202026%2C%2022_23_47.png" 
                alt="Logo" 
                className="login-logo-img"
                style={{ 
                    width: '90%', 
+                   maxWidth: 320,
                    height: 'auto', 
                    filter: 'drop-shadow(0 0 25px rgba(56, 189, 248, 0.5))',
                    objectFit: 'contain'
                }} 
                onError={(e) => {
                    e.currentTarget.style.display = 'none'
-                   e.currentTarget.nextElementSibling?.removeAttribute('hidden')
+                   // Avoid accessing nextElementSibling directly to prevent crash
                }} 
             />
         </div>
@@ -179,6 +180,32 @@ export default function Login() {
                 )}
                 </form>
             )}
+            
+            {/* Botão de Download do App Mobile */}
+            <div style={{ marginTop: 24, textAlign: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
+                <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: '#64748b' }}>Prefere usar no celular?</p>
+                <a 
+                    href="https://github.com/TwinexTecnologia/Bodybrothers/releases/latest/download/app-release.apk" 
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ 
+                        display: 'inline-flex', alignItems: 'center', gap: 8,
+                        background: '#0f172a', color: '#fff', 
+                        padding: '10px 16px', borderRadius: 8, 
+                        textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600,
+                        transition: 'transform 0.2s',
+                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4M17 9l-5 5-5-5M12 12.8V2.5"/>
+                    </svg>
+                    Baixar Aplicativo Android
+                </a>
+            </div>
+
         </div>
         <div style={{ color: '#64748b', fontSize: '0.875rem', marginTop: 10 }}>
             &copy; {new Date().getFullYear()} Twinex Tecnologia. Todos os direitos reservados.
