@@ -9,10 +9,9 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  ScrollView,
   TextInput,
-  Dimensions,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,9 +27,7 @@ import {
   CheckCircle,
   Clock,
   StopCircle,
-  Video,
 } from "lucide-react-native";
-import { WebView } from "react-native-webview";
 
 type ExerciseSet = {
   type: "warmup" | "feeder" | "working" | "custom";
@@ -91,6 +88,8 @@ export default function Session() {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const player = useVideoPlayer("");
+  const { height: viewportHeight, width: viewportWidth } =
+    useWindowDimensions();
 
   useEffect(() => {
     if (sessionId) loadSession();
@@ -119,7 +118,15 @@ export default function Session() {
       }
     };
 
+    const pause = () => {
+      if (!videoUrl) {
+        player.pause();
+        player.replaceAsync(null);
+      }
+    };
+
     load();
+    pause();
   }, [videoUrl]);
 
   useEffect(() => {
@@ -131,7 +138,7 @@ export default function Session() {
     return () => sub.remove();
   }, [player]);
 
-  // 🧠 thumbnails
+  // thumbnails
   useEffect(() => {
     if (!workout) return;
 
@@ -271,12 +278,46 @@ export default function Session() {
   const youtubeEmbedUrl = youtubeId
     ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1`
     : null;
+  const headerMaxHeightPx = Math.round(viewportHeight * 0.25);
+  const headerMaxHeight = isWeb ? "25vh" : headerMaxHeightPx;
+  const headerPadding = Math.min(
+    24,
+    Math.max(12, Math.round(headerMaxHeightPx * 0.12)),
+  );
+  const headerPaddingBottom = Math.min(
+    32,
+    Math.max(16, Math.round(headerMaxHeightPx * 0.16)),
+  );
+  const timerFontSize = Math.min(
+    56,
+    Math.max(28, Math.round(headerMaxHeightPx * 0.42)),
+  );
+  const workoutTitleFontSize = Math.min(
+    24,
+    Math.max(16, Math.round(headerMaxHeightPx * 0.16)),
+  );
+  const isCompactHeader = viewportWidth <= 360 || viewportHeight <= 640;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header com Cronômetro Gigante (Estilo Site) */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
+      {/* Header com Cronômetro */}
+      <View
+        style={[
+          styles.header,
+          {
+            maxHeight: headerMaxHeight,
+            overflow: "hidden",
+            padding: headerPadding,
+            paddingBottom: headerPaddingBottom,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.headerTop,
+            isCompactHeader ? { marginBottom: 12 } : null,
+          ]}
+        >
           <View style={styles.badge}>
             <Text style={styles.badgeText}>TREINO EM ANDAMENTO</Text>
           </View>
@@ -289,257 +330,263 @@ export default function Session() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.workoutTitle} numberOfLines={1}>
+        <Text
+          style={[styles.workoutTitle, { fontSize: workoutTitleFontSize }]}
+          numberOfLines={1}
+        >
           {workout.title}
         </Text>
-        <Text style={styles.timerText}>{formatTime(elapsedSeconds)}</Text>
+        <Text
+          style={[
+            styles.timerText,
+            {
+              fontSize: timerFontSize,
+              lineHeight: timerFontSize,
+              letterSpacing: isCompactHeader ? -1 : -2,
+            },
+          ]}
+        >
+          {formatTime(elapsedSeconds)}
+        </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Observações Gerais do Treino */}
-        {workout.data.notes && (
-          <View style={styles.generalNotesBox}>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 4,
-              }}
-            >
-              <MessageSquare size={18} color="#f97316" />
-              <Text style={styles.generalNotesTitle}>OBSERVAÇÕES GERAIS</Text>
+      <FlatList
+        data={workout.data.exercises}
+        keyExtractor={(_, i) => String(i)}
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.content}
+        ListHeaderComponent={
+          workout.data.notes ? (
+            <View style={styles.generalNotesBox}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 4,
+                }}
+              >
+                <MessageSquare size={18} color="#f97316" />
+                <Text style={styles.generalNotesTitle}>OBSERVAÇÕES GERAIS</Text>
+              </View>
+              <Text style={styles.generalNotesText}>{workout.data.notes}</Text>
             </View>
-            <Text style={styles.generalNotesText}>{workout.data.notes}</Text>
-          </View>
-        )}
+          ) : null
+        }
+        ListFooterComponent={<View style={{ height: 40 }} />}
+        renderItem={({ item: ex, index: i }) => {
+          const video = ex.videoUrl || ex.video_url;
+          const thumb = thumbnails[i];
 
-        <FlatList
-          data={workout.data.exercises}
-          keyExtractor={(_, i) => String(i)}
-          contentContainerStyle={{ padding: 16 }}
-          renderItem={({ item: ex, index: i }) => {
-            const video = ex.videoUrl || ex.video_url;
-            const thumb = thumbnails[i];
-
-            return (
-              <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.indexBadge}>
-                    <Text style={styles.indexText}>{i + 1}</Text>
-                  </View>
-                  <Text style={styles.exerciseName}>{ex.name}</Text>
+          return (
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.indexBadge}>
+                  <Text style={styles.indexText}>{i + 1}</Text>
                 </View>
+                <Text style={styles.exerciseName}>{ex.name}</Text>
+              </View>
 
-                {/* Sets List */}
-                <View style={styles.setsContainer}>
-                  {(() => {
-                    let setsToRender: ExerciseSet[] = ex.sets || [];
-                    if (setsToRender.length === 0) {
-                      // Fallback legacy
-                      if (ex.warmupSeries || ex.warmupReps) {
-                        setsToRender.push({
-                          type: "warmup",
-                          series: ex.warmupSeries || "",
-                          reps: ex.warmupReps || "",
-                          load: ex.warmupLoad || "",
-                          rest: ex.warmupRest || "",
-                        });
-                      }
-                      if (ex.feederSeries || ex.feederReps) {
-                        setsToRender.push({
-                          type: "feeder",
-                          series: ex.feederSeries || "",
-                          reps: ex.feederReps || "",
-                          load: ex.feederLoad || "",
-                          rest: ex.feederRest || "",
-                        });
-                      }
-                      if (ex.series || ex.reps) {
-                        setsToRender.push({
-                          type: "working",
-                          series: ex.series || "",
-                          reps: ex.reps || "",
-                          load: ex.load || "",
-                          rest: ex.rest || "",
-                        });
-                      }
+              <View style={styles.setsContainer}>
+                {(() => {
+                  let setsToRender: ExerciseSet[] = ex.sets || [];
+                  if (setsToRender.length === 0) {
+                    if (ex.warmupSeries || ex.warmupReps) {
+                      setsToRender.push({
+                        type: "warmup",
+                        series: ex.warmupSeries || "",
+                        reps: ex.warmupReps || "",
+                        load: ex.warmupLoad || "",
+                        rest: ex.warmupRest || "",
+                      });
+                    }
+                    if (ex.feederSeries || ex.feederReps) {
+                      setsToRender.push({
+                        type: "feeder",
+                        series: ex.feederSeries || "",
+                        reps: ex.feederReps || "",
+                        load: ex.feederLoad || "",
+                        rest: ex.feederRest || "",
+                      });
+                    }
+                    if (ex.series || ex.reps) {
+                      setsToRender.push({
+                        type: "working",
+                        series: ex.series || "",
+                        reps: ex.reps || "",
+                        load: ex.load || "",
+                        rest: ex.rest || "",
+                      });
+                    }
+                  }
+
+                  return setsToRender.map((set, idx) => {
+                    let color = "#334155";
+                    let bg = "transparent";
+                    let borderColor = "transparent";
+                    let label = "";
+
+                    if (set.type === "warmup") {
+                      color = "#ea580c";
+                      bg = "#fff7ed";
+                      borderColor = "#ffedd5";
+                      label = "AQUECIMENTO";
+                    } else if (set.type === "working") {
+                      color = "#16a34a";
+                      bg = "#f0fdf4";
+                      borderColor = "#dcfce7";
+                      label = "TRABALHO";
+                    } else if (set.type === "feeder") {
+                      color = "#0284c7";
+                      bg = "#f0f9ff";
+                      borderColor = "#e0f2fe";
+                      label = "PREPARAÇÃO";
+                    } else if (set.type === "topset") {
+                      color = "#4f46e5";
+                      bg = "#eef2ff";
+                      borderColor = "#e0e7ff";
+                      label = "TOP SET";
+                    } else {
+                      color = "#475569";
+                      bg = "#f8fafc";
+                      borderColor = "#e2e8f0";
+                      label = set.customLabel || "OUTRO";
                     }
 
-                    return setsToRender.map((set, idx) => {
-                      let color = "#334155";
-                      let bg = "transparent";
-                      let borderColor = "transparent";
-                      let label = "";
-
-                      if (set.type === "warmup") {
-                        color = "#ea580c";
-                        bg = "#fff7ed";
-                        borderColor = "#ffedd5";
-                        label = "AQUECIMENTO";
-                      } else if (set.type === "working") {
-                        color = "#16a34a";
-                        bg = "#f0fdf4";
-                        borderColor = "#dcfce7";
-                        label = "TRABALHO";
-                      } else if (set.type === "feeder") {
-                        color = "#0284c7";
-                        bg = "#f0f9ff";
-                        borderColor = "#e0f2fe";
-                        label = "PREPARAÇÃO";
-                      } else if (set.type === "topset") {
-                        color = "#4f46e5";
-                        bg = "#eef2ff";
-                        borderColor = "#e0e7ff";
-                        label = "TOP SET";
-                      } else {
-                        color = "#475569";
-                        bg = "#f8fafc";
-                        borderColor = "#e2e8f0";
-                        label = set.customLabel || "OUTRO";
-                      }
-
-                      return (
+                    return (
+                      <View
+                        key={idx}
+                        style={{
+                          backgroundColor: bg,
+                          borderRadius: 12,
+                          padding: 12,
+                          borderWidth: 1,
+                          borderColor: borderColor,
+                          marginBottom: 4,
+                        }}
+                      >
                         <View
-                          key={idx}
                           style={{
-                            backgroundColor: bg,
-                            borderRadius: 12,
-                            padding: 12,
-                            borderWidth: 1,
-                            borderColor: borderColor,
-                            marginBottom: 4,
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: 6,
                           }}
                         >
                           <View
                             style={{
                               flexDirection: "row",
-                              justifyContent: "space-between",
                               alignItems: "center",
-                              marginBottom: 6,
+                              gap: 8,
                             }}
                           >
                             <View
                               style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                gap: 8,
+                                backgroundColor: "#fff",
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 6,
+                                shadowColor: color,
+                                shadowOpacity: 0.1,
+                                shadowOffset: { width: 0, height: 1 },
+                                elevation: 1,
                               }}
                             >
-                              <View
-                                style={{
-                                  backgroundColor: "#fff",
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                  borderRadius: 6,
-                                  shadowColor: color,
-                                  shadowOpacity: 0.1,
-                                  shadowOffset: { width: 0, height: 1 },
-                                  elevation: 1,
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    color: color,
-                                    fontSize: 11,
-                                    fontWeight: "900",
-                                    letterSpacing: 0.5,
-                                  }}
-                                >
-                                  {label}
-                                </Text>
-                              </View>
                               <Text
                                 style={{
-                                  fontWeight: "700",
-                                  color: "#1e293b",
-                                  fontSize: 15,
+                                  color: color,
+                                  fontSize: 11,
+                                  fontWeight: "900",
+                                  letterSpacing: 0.5,
                                 }}
                               >
-                                {set.series} x {set.reps}
+                                {label}
                               </Text>
                             </View>
-                            {set.load && (
-                              <Text
-                                style={{
-                                  fontSize: 13,
-                                  color: "#475569",
-                                  fontWeight: "700",
-                                  textTransform: "uppercase",
-                                }}
-                              >
-                                {set.load}
-                              </Text>
-                            )}
-                          </View>
-
-                          {set.rest && (
-                            <View
+                            <Text
                               style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                gap: 6,
+                                fontWeight: "700",
+                                color: "#1e293b",
+                                fontSize: 15,
                               }}
                             >
-                              <Clock size={14} color="#94a3b8" />
-                              <Text
-                                style={{
-                                  fontSize: 13,
-                                  color: "#64748b",
-                                  fontWeight: "500",
-                                }}
-                              >
-                                {set.rest}
-                              </Text>
-                            </View>
+                              {set.series} x {set.reps}
+                            </Text>
+                          </View>
+                          {set.load && (
+                            <Text
+                              style={{
+                                fontSize: 13,
+                                color: "#475569",
+                                fontWeight: "700",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              {set.load}
+                            </Text>
                           )}
                         </View>
-                      );
-                    });
-                  })()}
-                </View>
 
-                {/* Notas */}
-                {ex.notes && (
-                  <View style={styles.noteBox}>
-                    <MessageSquare
-                      size={16}
-                      color="#f97316"
-                      style={{ marginTop: 2 }}
-                    />
-                    <Text style={styles.noteText}>{ex.notes}</Text>
-                  </View>
-                )}
-
-                {/* Video Player Embutido */}
-
-                {video && (
-                  <TouchableOpacity
-                    style={styles.thumbBox}
-                    onPress={() => {
-                      setVideoUrl(video);
-                      setVideoLoading(true);
-                    }}
-                  >
-                    {thumb ? (
-                      <Image source={{ uri: thumb }} style={styles.thumb} />
-                    ) : (
-                      <ActivityIndicator color="#fff" />
-                    )}
-
-                    <View style={styles.playOverlay}>
-                      <Play size={40} color="#fff" />
-                    </View>
-                  </TouchableOpacity>
-                )}
+                        {set.rest && (
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <Clock size={14} color="#94a3b8" />
+                            <Text
+                              style={{
+                                fontSize: 13,
+                                color: "#64748b",
+                                fontWeight: "500",
+                              }}
+                            >
+                              {set.rest}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  });
+                })()}
               </View>
-            );
-          }}
-        />
 
-        {/* Espaço extra no final */}
-        <View style={{ height: 40 }} />
-      </ScrollView>
+              {ex.notes && (
+                <View style={styles.noteBox}>
+                  <MessageSquare
+                    size={16}
+                    color="#f97316"
+                    style={{ marginTop: 2 }}
+                  />
+                  <Text style={styles.noteText}>{ex.notes}</Text>
+                </View>
+              )}
+
+              {video && (
+                <TouchableOpacity
+                  style={styles.thumbBox}
+                  onPress={() => {
+                    setVideoUrl(video);
+                    setVideoLoading(true);
+                  }}
+                >
+                  {thumb ? (
+                    <Image source={{ uri: thumb }} style={styles.thumb} />
+                  ) : (
+                    <ActivityIndicator color="#fff" />
+                  )}
+
+                  <View style={styles.playOverlay}>
+                    <Play size={40} color="#fff" />
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        }}
+      />
 
       {/* Modal de Finalização */}
       <Modal visible={showFinishModal} transparent animationType="fade">
@@ -858,6 +905,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginTop: 16,
     backgroundColor: "#000",
+    position: "relative",
   },
 
   // Modal Finish
@@ -942,8 +990,14 @@ const styles = StyleSheet.create({
 
   playOverlay: {
     position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    display: "flex",
     justifyContent: "center",
     alignItems: "center",
+    pointerEvents: "none",
   },
 
   modal: { flex: 1, backgroundColor: "#000" },

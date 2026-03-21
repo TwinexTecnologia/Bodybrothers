@@ -17,7 +17,11 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.twinex.fitbodypro",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsArbitraryLoadsInMedia": true
+        }
       }
     },
     "android": {
@@ -43,7 +47,8 @@
           "photosPermission": "O aplicativo precisa acessar suas fotos para enviar imagens na anamnese e evolução.",
           "cameraPermission": "O aplicativo precisa acessar sua câmera para tirar fotos na anamnese e evolução."
         }
-      ]
+      ],
+      "expo-video"
     ],
     "extra": {
       "eas": {
