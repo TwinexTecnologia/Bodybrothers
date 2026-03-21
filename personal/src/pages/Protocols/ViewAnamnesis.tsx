@@ -333,6 +333,17 @@ export default function ViewAnamnesis() {
                                                     src={answer} 
                                                     alt="Resposta" 
                                                     style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 8, border: '1px solid #e2e8f0' }} 
+                                                    onError={(e) => {
+                                                        // Fallback se a imagem quebrar
+                                                        e.currentTarget.style.display = 'none';
+                                                        if (e.currentTarget.parentElement) {
+                                                            const span = document.createElement('span');
+                                                            span.style.color = '#ef4444';
+                                                            span.style.fontSize = '0.9rem';
+                                                            span.innerText = '⚠️ Imagem corrompida ou formato não suportado (.heic)';
+                                                            e.currentTarget.parentElement.appendChild(span);
+                                                        }
+                                                    }}
                                                 />
                                             </div>
                                         ) : (
@@ -377,6 +388,16 @@ export default function ViewAnamnesis() {
                                                 alt="Resposta Visual"
                                                 style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 8, border: '1px solid #e2e8f0', cursor: 'pointer' }}
                                                 onClick={() => window.open(value, '_blank')}
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = 'none';
+                                                    if (e.currentTarget.parentElement) {
+                                                        const span = document.createElement('span');
+                                                        span.style.color = '#ef4444';
+                                                        span.style.fontSize = '0.9rem';
+                                                        span.innerText = '⚠️ Imagem corrompida ou formato não suportado (.heic)';
+                                                        e.currentTarget.parentElement.appendChild(span);
+                                                    }
+                                                }}
                                             />
                                         </div>
                                     ) : (
