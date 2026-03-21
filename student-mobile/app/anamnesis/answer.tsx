@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Save, X, Camera, Upload, Check } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 type Question = {
   id: string
@@ -95,23 +96,31 @@ export default function AnamnesisAnswer() {
   const uploadPhoto = async (qId: string, asset: ImagePicker.ImagePickerAsset) => {
       try {
           setUploading(qId);
-          const fileExt = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
-          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+          // Converte para JPEG e comprime (resolve problema de HEIC do iPhone)
+          const manipResult = await ImageManipulator.manipulateAsync(
+              asset.uri,
+              [], // Nenhuma transformação de tamanho
+              { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+          );
+
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
           const filePath = `${user?.id}/${fileName}`;
 
           // Create FormData
           const formData = new FormData();
           formData.append('file', {
-              uri: asset.uri,
+              uri: manipResult.uri,
               name: fileName,
-              type: asset.mimeType || 'image/jpeg'
+              type: 'image/jpeg'
           } as any);
 
           const { error: uploadError } = await supabase.storage
                .from('anamnesis-files')
                .upload(filePath, formData, {
                    cacheControl: '3600',
-                   upsert: false
+                   upsert: false,
+                   contentType: 'image/jpeg' // Força o tipo correto no banco
                });
 
           if (uploadError) throw uploadError;
