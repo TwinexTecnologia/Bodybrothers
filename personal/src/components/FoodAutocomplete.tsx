@@ -47,6 +47,7 @@ export default function FoodAutocomplete({
         return () => document.removeEventListener("mousedown", handleClickOutside)
     }, [])
 
+    // Timeout maior para não metralhar a API enquanto digita a palavra inteira
     const timeoutRef = useRef<any>(null)
     const [errorMsg, setErrorMsg] = useState('')
 
@@ -54,6 +55,9 @@ export default function FoodAutocomplete({
 
     const searchWeb = async (text: string) => {
         setLoading(true)
+        // Limpa erro anterior ao tentar de novo
+        setErrorMsg('')
+        
         if (controllerRef.current) controllerRef.current.abort()
         controllerRef.current = new AbortController()
 
@@ -62,7 +66,12 @@ export default function FoodAutocomplete({
             // Vamos usar o OpenFoodFacts para a busca primária que é livre de CORS e tokens
             const offResponse = await fetch(
                 `https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=20`,
-                { signal: controllerRef.current.signal }
+                { 
+                    signal: controllerRef.current.signal,
+                    headers: {
+                        'User-Agent': 'GerencialBodybrothers - Web - 1.0' // Exigência da API para não dar block fácil
+                    }
+                }
             )
             
             if (!offResponse.ok) {
@@ -170,8 +179,9 @@ export default function FoodAutocomplete({
         setShowSuggestions(true)
 
         // OTIMIZAÇÃO: Não trava a busca da API só porque achou local. 
-        // Vamos sempre buscar na API se o usuário digitar algo novo.
-        timeoutRef.current = setTimeout(() => searchWeb(text), 600) 
+        // Aumentei o tempo para 800ms. Assim se você digitar "Iorgute" rápido, ele não tenta buscar
+        // "Ior", "Iorg", "Iorgu" e acabar sendo bloqueado.
+        timeoutRef.current = setTimeout(() => searchWeb(text), 800) 
     }
 
     const handleSelect = async (item: FoodSuggestion) => {
