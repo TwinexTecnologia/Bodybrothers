@@ -63,7 +63,7 @@ export default function FoodAutocomplete({
                 body: { 
                     method: 'foods.search',
                     search_expression: text,
-                    max_results: 15
+                    max_results: 50 // Mudado para 50
                 }
             })
 

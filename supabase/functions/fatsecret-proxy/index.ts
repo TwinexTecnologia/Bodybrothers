@@ -36,7 +36,7 @@ serve(async (req) => {
     if (method === 'foods.search') {
       if (!search_expression) throw new Error('search_expression required')
       params.search_expression = search_expression
-      params.max_results = '10'
+      params.max_results = '50' // Aumentado para 50 para retornar mais resultados
     } else if (method === 'food.get') {
       if (!food_id) throw new Error('food_id required')
       params.food_id = food_id
