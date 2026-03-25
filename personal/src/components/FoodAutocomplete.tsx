@@ -103,7 +103,11 @@ export default function FoodAutocomplete({
                     }))
                     .slice(0, 10)
 
-                return [...validLocals, ...apiMatches]
+                // Filtra duplicatas (remove da API os que já temos localmente)
+                const localNames = new Set(validLocals.map(l => l.food_name.toLowerCase()))
+                const filteredApi = apiMatches.filter(a => !localNames.has(a.food_name.toLowerCase()))
+
+                return [...validLocals, ...filteredApi]
             })
         } catch (err: any) {
             if (err.name === 'AbortError') return 
@@ -150,12 +154,8 @@ export default function FoodAutocomplete({
         setSuggestions(localMatches)
         setShowSuggestions(true)
 
-        // OTIMIZAÇÃO: Se já encontrou muitos resultados locais (>= 5), não busca na API automaticamente
-        if (localMatches.length >= 5) {
-            setLoading(false)
-            return
-        }
-
+        // OTIMIZAÇÃO: Não trava a busca da API só porque achou local. 
+        // Vamos sempre buscar na API se o usuário digitar algo novo.
         timeoutRef.current = setTimeout(() => searchWeb(text), 600) 
     }
 
