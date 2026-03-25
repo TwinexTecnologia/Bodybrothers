@@ -71,17 +71,17 @@ serve(async (req) => {
     params.oauth_signature = signatureBase64
 
     // Execute Request
-    const bodyParams = new URLSearchParams()
-    for (const [key, value] of Object.entries(params)) {
-      bodyParams.append(key, value)
-    }
+    // IMPORTANT: Send the body with the EXACT same encoding used for the signature
+    const bodyParamsStr = Object.keys(params)
+      .map(key => `${percentEncode(key)}=${percentEncode(params[key])}`)
+      .join('&')
 
     const response = await fetch('https://platform.fatsecret.com/rest/server.api', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: bodyParams
+      body: bodyParamsStr
     })
 
     const data = await response.json()
