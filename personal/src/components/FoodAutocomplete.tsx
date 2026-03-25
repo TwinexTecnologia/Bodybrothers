@@ -74,7 +74,7 @@ export default function FoodAutocomplete({
             // Nova API: Open Food Facts + Backup (FatSecret aberto)
             // Vamos usar o OpenFoodFacts para a busca primária que é livre de CORS e tokens
             const offResponse = await fetch(
-                `https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=20`,
+                `https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&action=process&json=1&page_size=24`,
                 { 
                     signal: controllerRef.current.signal,
                     headers: {
