@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { addModel, updateModel, getModelById, deleteModel, type AnamnesisQuestion } from '../../store/anamnesis'
+import { ArrowLeft } from 'lucide-react'
 
 export default function AnamnesisModelCreate() {
   const { id } = useParams()
@@ -102,7 +103,23 @@ export default function AnamnesisModelCreate() {
 
   return (
     <div style={{ maxWidth: 860 }}>
-      <h1>Protocolos • {editId ? 'Editar Modelo de Anamnese' : 'Criar Modelo de Anamnese'}</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <button 
+              onClick={() => navigate(-1)} 
+              style={{ 
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: '#f1f5f9', border: 'none', cursor: 'pointer',
+                  color: '#64748b', width: 36, height: 36, borderRadius: '50%',
+                  transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+              onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
+              title="Voltar"
+          >
+              <ArrowLeft size={20} />
+          </button>
+          <h1 style={{ margin: 0 }}>Protocolos • {editId ? 'Editar Modelo de Anamnese' : 'Criar Modelo de Anamnese'}</h1>
+      </div>
       
       <div className="form-card">
         <div className="form-title">Dados do Modelo</div>

@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import FoodAutocomplete from '../../components/FoodAutocomplete'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
-import { Copy, GripVertical } from 'lucide-react'
+import { Copy, GripVertical, ArrowLeft } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 
 const safeUUID = () => {
@@ -514,7 +514,23 @@ export default function DietCreate() {
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', paddingBottom: 100 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h1 style={{ margin: 0 }}>{editId ? 'Editar Dieta' : 'Criar Dieta'}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button 
+                  onClick={() => navigate(-1)} 
+                  style={{ 
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: '#f1f5f9', border: 'none', cursor: 'pointer',
+                      color: '#64748b', width: 36, height: 36, borderRadius: '50%',
+                      transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
+                  title="Voltar"
+              >
+                  <ArrowLeft size={20} />
+              </button>
+              <h1 style={{ margin: 0 }}>{editId ? 'Editar Dieta' : 'Criar Dieta'}</h1>
+          </div>
           <div style={{ display: 'flex', gap: 10 }}>
             {editId && studentId && (
                 <button

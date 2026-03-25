@@ -4,7 +4,7 @@ import { listExercises, createExercise, type Exercise as LibraryExercise } from 
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
-import { X, BookOpen, Search, Video, GripVertical, Copy } from 'lucide-react'
+import { X, BookOpen, Search, Video, GripVertical, Copy, ArrowLeft } from 'lucide-react'
 
 type ExerciseSetType = 'warmup' | 'feeder' | 'working' | 'custom';
 
@@ -385,7 +385,23 @@ export default function WorkoutCreate() {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', paddingBottom: 100 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h1 style={{ margin: 0 }}>{editId ? 'Editar Treino' : 'Novo Treino'}</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button 
+                onClick={() => navigate(-1)} 
+                style={{ 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: '#f1f5f9', border: 'none', cursor: 'pointer',
+                    color: '#64748b', width: 36, height: 36, borderRadius: '50%',
+                    transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+                onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
+                title="Voltar"
+            >
+                <ArrowLeft size={20} />
+            </button>
+            <h1 style={{ margin: 0 }}>{editId ? 'Editar Treino' : 'Novo Treino'}</h1>
+        </div>
         <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn" onClick={addExercise} style={{ background: '#0f172a' }}>+ Adicionar Exercício</button>
             <button className="btn" onClick={save} style={{ background: 'var(--personal-primary)' }}>Salvar</button>

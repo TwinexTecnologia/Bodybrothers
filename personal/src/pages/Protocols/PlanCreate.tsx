@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { addPlan, type PlanFrequency } from '../../store/plans'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 
 export default function PlanCreate() {
   const navigate = useNavigate()
@@ -42,14 +43,23 @@ export default function PlanCreate() {
   return (
     <div style={{ maxWidth: 600, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Criar Plano</h1>
-        <button 
-            className="btn" 
-            style={{ background: '#fff', color: '#64748b', border: '1px solid #cbd5e1' }}
-            onClick={() => navigate('/protocols/plans')}
-        >
-            Cancelar
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button 
+                onClick={() => navigate('/protocols/plans')} 
+                style={{ 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: '#f1f5f9', border: 'none', cursor: 'pointer',
+                    color: '#64748b', width: 36, height: 36, borderRadius: '50%',
+                    transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+                onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
+                title="Voltar"
+            >
+                <ArrowLeft size={20} />
+            </button>
+            <h1 style={{ margin: 0 }}>Criar Plano</h1>
+        </div>
       </div>
 
       <div className="form-card" style={{ padding: 32 }}>
