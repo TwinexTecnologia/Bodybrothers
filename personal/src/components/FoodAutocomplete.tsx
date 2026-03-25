@@ -69,6 +69,11 @@ export default function FoodAutocomplete({
 
             if (error) throw error
 
+            // Se for erro interno da API mas retornou 200 (ex: limite de requisições excedido)
+            if (data?.error) {
+                 throw new Error(data.error.message || 'Falha na busca')
+            }
+
             // O FatSecret pode retornar um objeto único se houver só 1 resultado, ou nada se não achar
             if (!data.foods || !data.foods.food) {
                 setSuggestions([])
@@ -232,7 +237,8 @@ export default function FoodAutocomplete({
         if (e.key === 'Enter') {
             e.preventDefault()
             setShowSuggestions(false)
-            // Se apertar Enter sem selecionar nada, o valor digitado fica
+            // Se apertar Enter sem selecionar nada, o valor digitado fica e fecha a busca
+            // Mostramos o erro como aviso se a API falhar, mas deixamos usar o texto livre
         }
         if (e.key === 'Escape') {
             setShowSuggestions(false)
@@ -258,7 +264,10 @@ export default function FoodAutocomplete({
                     {loading && <div style={{ padding: 10, color: '#64748b' }}>Buscando...</div>}
                     
                     {!loading && errorMsg && (
-                         <div style={{ padding: 10, color: '#ef4444', fontSize: '0.9em' }}>{errorMsg}</div>
+                         <div style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.9em', fontStyle: 'italic', background: '#f8fafc' }}>
+                            ℹ️ {errorMsg}
+                            <div style={{ marginTop: 4, fontSize: '0.85em', color: '#94a3b8' }}>Você pode continuar digitando e preencher os macros manualmente.</div>
+                         </div>
                     )}
 
                     {!loading && !errorMsg && Array.isArray(suggestions) && suggestions.map((s) => (
