@@ -221,6 +221,17 @@ export default function FoodAutocomplete({
         }
     }
 
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            setShowSuggestions(false)
+            // Se apertar Enter sem selecionar nada, o valor digitado fica
+        }
+        if (e.key === 'Escape') {
+            setShowSuggestions(false)
+        }
+    }
+
     return (
         <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
             <input
@@ -228,6 +239,7 @@ export default function FoodAutocomplete({
                 style={style}
                 value={value}
                 onChange={(e) => handleSearch(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder={placeholder}
             />
             {showSuggestions && (

@@ -350,10 +350,23 @@ export default function DietCreate() {
     const next = meals.slice()
     const foods = next[mi].foods.slice()
     
+    // Se o nome foi alterado manualmente (não via onSelect do Autocomplete)
+    // E não estamos apenas atualizando a quantidade/unidade
+    if (patch.name !== undefined && patch.food_id === undefined) {
+        // Limpa o vínculo com a base de dados, pois é um alimento "aberto"
+        patch.food_id = undefined
+        patch.base_calories_100g = undefined
+        patch.base_protein_100g = undefined
+        patch.base_carbs_100g = undefined
+        patch.base_fat_100g = undefined
+        patch.base_sodium_100g = undefined
+        patch.base_unit_weight = undefined
+    }
+
     let updatedFood = { ...foods[fi], ...patch }
     
-    // Recalcula macros se quantidade, unidade ou base mudar
-    if (patch.quantity !== undefined || patch.base_calories_100g !== undefined || patch.unit !== undefined) {
+    // Recalcula macros se quantidade, unidade ou base mudar E tiver base
+    if ((patch.quantity !== undefined || patch.base_calories_100g !== undefined || patch.unit !== undefined) && updatedFood.base_calories_100g) {
         updatedFood = recalculateMacros(updatedFood)
     }
     
@@ -825,12 +838,12 @@ export default function DietCreate() {
                                                     <option value="scoop">scoop</option>
                                                 </select>
                                                 
-                                                {/* Macros Readonly */}
-                                                <input className="input" style={{ background: '#f8fafc', color: '#64748b', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.calories || '-'} />
-                                                <input className="input" style={{ background: '#f0fdf4', color: '#166534', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.protein || '-'} />
-                                                <input className="input" style={{ background: '#eff6ff', color: '#1e40af', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.carbs || '-'} />
-                                                <input className="input" style={{ background: '#fff7ed', color: '#9a3412', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.fat || '-'} />
-                                                <input className="input" style={{ background: '#f5f5f5', color: '#555', fontSize: '0.85em', padding: 4, textAlign: 'center', cursor: 'default' }} readOnly value={f.sodium || '-'} />
+                                                {/* Macros Livres para edição */}
+                                                <input className="input" style={{ background: '#f8fafc', color: '#64748b', fontSize: '0.85em', padding: 4, textAlign: 'center' }} value={f.calories || ''} onChange={(e) => updateFood(mi, fi, { calories: e.target.value })} placeholder="-" />
+                                                <input className="input" style={{ background: '#f0fdf4', color: '#166534', fontSize: '0.85em', padding: 4, textAlign: 'center' }} value={f.protein || ''} onChange={(e) => updateFood(mi, fi, { protein: e.target.value })} placeholder="-" />
+                                                <input className="input" style={{ background: '#eff6ff', color: '#1e40af', fontSize: '0.85em', padding: 4, textAlign: 'center' }} value={f.carbs || ''} onChange={(e) => updateFood(mi, fi, { carbs: e.target.value })} placeholder="-" />
+                                                <input className="input" style={{ background: '#fff7ed', color: '#9a3412', fontSize: '0.85em', padding: 4, textAlign: 'center' }} value={f.fat || ''} onChange={(e) => updateFood(mi, fi, { fat: e.target.value })} placeholder="-" />
+                                                <input className="input" style={{ background: '#f5f5f5', color: '#555', fontSize: '0.85em', padding: 4, textAlign: 'center' }} value={f.sodium || ''} onChange={(e) => updateFood(mi, fi, { sodium: e.target.value })} placeholder="-" />
 
                                                 <button onClick={() => removeFood(mi, fi)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
                                             </div>
