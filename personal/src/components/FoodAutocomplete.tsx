@@ -54,87 +54,49 @@ export default function FoodAutocomplete({
 
     const searchWeb = async (text: string) => {
         setLoading(true)
-        // Cancela requisição anterior se houver
         if (controllerRef.current) controllerRef.current.abort()
         controllerRef.current = new AbortController()
-        const signal = controllerRef.current.signal
 
         try {
-                // TENTATIVA: OpenFoodFacts OTIMIZADO
-                // Filtra apenas campos necessários: code,product_name,nutriments,brands,serving_quantity
-                // Isso reduz drasticamente o tamanho do JSON e acelera a resposta
-                
-                const fields = 'code,product_name,nutriments,brands,serving_quantity'
-                const response = await fetch(`https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=1000&fields=${fields}`, { signal })
-                
-                if (!response.ok) throw new Error('Erro na API OpenFoodFacts')
-                
-                const data = await response.json()
-                let products = Array.isArray(data.products) ? data.products : []
-                
-                let apiMatches: any[] = []
-
-                if (products.length > 0) {
-                    try {
-                        // Ordenação customizada API
-                        products.sort((a: any, b: any) => {
-                            const nameA = a?.product_name || ''
-                            const nameB = b?.product_name || ''
-                            
-                            // 1. Termo exato (match perfeito)
-                            const exactA = nameA.toLowerCase() === text.toLowerCase()
-                            const exactB = nameB.toLowerCase() === text.toLowerCase()
-                            if (exactA && !exactB) return -1
-                            if (!exactA && exactB) return 1
-
-                            // 2. Começa com o termo
-                            const startsA = nameA.toLowerCase().startsWith(text.toLowerCase())
-                            const startsB = nameB.toLowerCase().startsWith(text.toLowerCase())
-                            if (startsA && !startsB) return -1
-                            if (!startsA && startsB) return 1
-                            
-                            // 3. Contém o termo completo (frase)
-                            const containsA = nameA.toLowerCase().includes(text.toLowerCase())
-                            const containsB = nameB.toLowerCase().includes(text.toLowerCase())
-                            if (containsA && !containsB) return -1
-                            if (!containsA && containsB) return 1
-
-                            // 4. Se ambos começam (ou não), ordena por tamanho (menor primeiro = mais "puro")
-                            return nameA.length - nameB.length
-                        })
-
-                        apiMatches = products.map((p: any) => ({
-                            food_id: p.code || Math.random().toString(), 
-                            food_name: p.product_name || 'Desconhecido',
-                            food_description: p.brands ? `${p.brands}` : '',
-                            _raw: p 
-                        }))
-                    } catch (e) {
-                        console.error('Erro ao processar produtos:', e)
-                    }
+            // Nova API: FatSecret via Supabase Edge Function
+            const { data, error } = await supabase.functions.invoke('fatsecret-proxy', {
+                body: { 
+                    method: 'foods.search',
+                    search_expression: text,
+                    max_results: 15
                 }
+            })
 
-                setSuggestions(prev => {
-                    // Substitui resultados da API pelos novos, mantendo apenas os locais que ainda dão match
-                    // Isso evita o crescimento infinito da lista que causava lentidão
-                    const term = text.toLowerCase()
-                    
-                    // Recalcula locais para garantir que ainda batem com o texto atual
-                    const validLocals = commonFoods
-                        .filter(f => f.name.toLowerCase().includes(term))
-                        .map(f => ({
-                            food_id: f.id,
-                            food_name: f.name,
-                            food_description: 'Alimento Natural / Básico',
-                            _local: f
-                        }))
-                        .slice(0, 10) // Limita locais para não poluir
+            if (error) throw error
 
-                    return [...validLocals, ...apiMatches]
-                })
+            const response = data.foods?.food || []
+            // O FatSecret pode retornar um objeto único se houver só 1 resultado
+            const products = Array.isArray(response) ? response : (response ? [response] : [])
+            
+            let apiMatches = products.map((p: any) => ({
+                food_id: p.food_id,
+                food_name: p.food_name,
+                food_description: p.food_description || '',
+                _raw: p 
+            }))
+
+            setSuggestions(prev => {
+                const term = text.toLowerCase()
+                const validLocals = commonFoods
+                    .filter(f => f.name.toLowerCase().includes(term))
+                    .map(f => ({
+                        food_id: f.id,
+                        food_name: f.name,
+                        food_description: 'Alimento Natural / Básico',
+                        _local: f
+                    }))
+                    .slice(0, 10)
+
+                return [...validLocals, ...apiMatches]
+            })
         } catch (err: any) {
             if (err.name === 'AbortError') return 
-            console.error(err)
+            console.error('Erro na busca FatSecret:', err)
             setErrorMsg('Erro na busca web')
         } finally {
             setLoading(false)
@@ -207,36 +169,47 @@ export default function FoodAutocomplete({
                 return
             }
 
-            // B. Se é OpenFoodFacts
+            // B. Se é FatSecret (Web)
             if ((item as any)._raw) {
-                const p = (item as any)._raw
-                const nutriments = p.nutriments || {}
-                
-                // Tenta estimar peso unitário (ex: "serving_quantity": 30)
-                let unitWeight: number | undefined = undefined
-                if (p.serving_quantity) {
-                    unitWeight = Number(p.serving_quantity)
-                }
+                // Precisamos fazer uma segunda chamada para pegar os macros detalhados do alimento selecionado
+                const { data: detailData, error } = await supabase.functions.invoke('fatsecret-proxy', {
+                    body: { 
+                        method: 'food.get',
+                        food_id: item.food_id
+                    }
+                })
 
-                // Sódio (sodium_100g vem em gramas na API, converter para mg)
-                // Se não tiver sodium, tenta salt (sodium = salt / 2.5)
-                let sodiumMg = 0
-                if (nutriments.sodium_100g) {
-                    sodiumMg = Number(nutriments.sodium_100g) * 1000
-                } else if (nutriments.salt_100g) {
-                    sodiumMg = (Number(nutriments.salt_100g) / 2.5) * 1000
-                }
+                if (error || !detailData?.food?.servings?.serving) throw new Error('Falha ao obter detalhes do FatSecret')
+
+                const servings = detailData.food.servings.serving
+                // Se for array, pega o primeiro, senão pega o objeto direto
+                const serving = Array.isArray(servings) ? servings[0] : servings
+
+                // Converte os valores (FatSecret retorna strings como "10.5")
+                const calories = parseFloat(serving.calories || '0')
+                const protein = parseFloat(serving.protein || '0')
+                const carbs = parseFloat(serving.carbohydrate || '0')
+                const fat = parseFloat(serving.fat || '0')
+                const sodiumMg = parseFloat(serving.sodium || '0') // FatSecret já retorna em mg
+                
+                // Tenta achar peso da porção para padronizar para 100g se necessário, 
+                // mas vamos enviar o valor base que o FatSecret deu e deixar o usuário ajustar.
+                // O ideal seria pegar a porção de 100g se existir, mas vamos simplificar pegando a primeira disponível
+                let metricQty = parseFloat(serving.metric_serving_amount || '100')
+                
+                // Normaliza para 100g
+                const ratio = 100 / metricQty
 
                 const macros = {
                     food_id: item.food_id,
                     name: item.food_name,
-                    calories_100g: Number(nutriments['energy-kcal_100g'] || nutriments['energy-kcal'] || 0),
-                    protein_100g: Number(nutriments.proteins_100g || nutriments.proteins || 0),
-                    carbs_100g: Number(nutriments.carbohydrates_100g || nutriments.carbohydrates || 0),
-                    fat_100g: Number(nutriments.fat_100g || nutriments.fat || 0),
-                    sodium_100g: sodiumMg,
-                    source: 'openfoodfacts',
-                    unit_weight: unitWeight
+                    calories_100g: Number((calories * ratio).toFixed(1)),
+                    protein_100g: Number((protein * ratio).toFixed(1)),
+                    carbs_100g: Number((carbs * ratio).toFixed(1)),
+                    fat_100g: Number((fat * ratio).toFixed(1)),
+                    sodium_100g: Number((sodiumMg * ratio).toFixed(1)),
+                    source: 'fatsecret',
+                    unit_weight: metricQty
                 }
                 onSelect(macros)
                 return
