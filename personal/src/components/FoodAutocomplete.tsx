@@ -60,15 +60,27 @@ export default function FoodAutocomplete({
         try {
             // Nova API: Open Food Facts + Backup (FatSecret aberto)
             // Vamos usar o OpenFoodFacts para a busca primária que é livre de CORS e tokens
-            const offResponse = await fetch(`https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=20`)
+            const offResponse = await fetch(
+                `https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=20`,
+                { signal: controllerRef.current.signal }
+            )
             
-            if (!offResponse.ok) throw new Error('Falha na busca web')
+            if (!offResponse.ok) {
+                if (offResponse.status === 429) {
+                    throw new Error('Rate limit atingido')
+                }
+                throw new Error(`Erro na API: ${offResponse.status}`)
+            }
 
             const data = await offResponse.json()
 
             if (!data.products || data.products.length === 0) {
-                setSuggestions([])
-                setErrorMsg('Nenhum alimento encontrado na Web para este termo.')
+                setSuggestions(prev => {
+                    if (prev.length === 0) {
+                        setErrorMsg('Nenhum alimento encontrado na Web para este termo.')
+                    }
+                    return prev // Mantém os locais se houver
+                })
                 return
             }
 
@@ -102,9 +114,21 @@ export default function FoodAutocomplete({
             })
         } catch (err: any) {
             if (err.name === 'AbortError') return 
-            console.error('Erro na busca FatSecret:', err)
-            // Se for erro real da API, mostra algo amigável.
-            setErrorMsg('Não foi possível conectar ao banco de alimentos no momento.')
+            console.error('Erro na busca OpenFoodFacts:', err)
+            
+            // Só mostra erro se não tiver nenhuma sugestão local na tela
+            setSuggestions(prev => {
+                if (prev.length === 0) {
+                    if (err.message === 'Rate limit atingido') {
+                        setErrorMsg('Muitas buscas seguidas. Aguarde alguns segundos...')
+                    } else if (err instanceof TypeError) {
+                        setErrorMsg('Não foi possível conectar. Verifique sua conexão com a internet.')
+                    } else {
+                        setErrorMsg('Não foi possível conectar ao banco de alimentos no momento.')
+                    }
+                }
+                return prev
+            })
         } finally {
             setLoading(false)
         }
