@@ -49,6 +49,7 @@ serve(async (req) => {
     // 2. Construct parameter string
     // RFC 3986 encoding needed
     const percentEncode = (str: string) => {
+      if (str === null || str === undefined) return '';
       return encodeURIComponent(str).replace(/[!'()*]/g, (c) => {
         return '%' + c.charCodeAt(0).toString(16).toUpperCase();
       });
