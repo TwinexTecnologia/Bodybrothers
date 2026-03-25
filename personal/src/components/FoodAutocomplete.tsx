@@ -69,9 +69,15 @@ export default function FoodAutocomplete({
 
             if (error) throw error
 
-            const response = data.foods?.food || []
-            // O FatSecret pode retornar um objeto único se houver só 1 resultado
-            const products = Array.isArray(response) ? response : (response ? [response] : [])
+            // O FatSecret pode retornar um objeto único se houver só 1 resultado, ou nada se não achar
+            if (!data.foods || !data.foods.food) {
+                setSuggestions([])
+                setErrorMsg('Nenhum alimento encontrado na Web para este termo.')
+                return
+            }
+
+            const response = data.foods.food
+            const products = Array.isArray(response) ? response : [response]
             
             let apiMatches = products.map((p: any) => ({
                 food_id: p.food_id,
@@ -97,7 +103,8 @@ export default function FoodAutocomplete({
         } catch (err: any) {
             if (err.name === 'AbortError') return 
             console.error('Erro na busca FatSecret:', err)
-            setErrorMsg('Erro na busca web')
+            // Se for erro real da API, mostra algo amigável.
+            setErrorMsg('Não foi possível conectar ao banco de alimentos no momento.')
         } finally {
             setLoading(false)
         }
