@@ -21,6 +21,15 @@ interface FoodDetails {
     unit_weight?: number
 }
 
+// Cache global para não perder resultados da API enquanto o usuário digita
+const globalApiCache = new Map<string, any>()
+
+// Função para remover acentos e facilitar a busca
+function normalizeText(text: string) {
+    if (!text) return ''
+    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+}
+
 export default function FoodAutocomplete({ 
     value, onChange, onSelect, className, style, placeholder 
 }: { 
@@ -93,6 +102,14 @@ export default function FoodAutocomplete({
                 return
             }
 
+            // Salva no cache global
+            data.products.forEach((p: any) => {
+                const id = p._id || p.code
+                if (id) {
+                    globalApiCache.set(id, p)
+                }
+            })
+
             let apiMatches = data.products.map((p: any) => ({
                 food_id: p._id || p.code,
                 food_name: p.product_name_pt || p.product_name || 'Produto Sem Nome',
@@ -104,22 +121,58 @@ export default function FoodAutocomplete({
             apiMatches = apiMatches.filter((m: any) => m.food_name && m.food_name !== 'Produto Sem Nome')
 
             setSuggestions(prev => {
-                const term = text.toLowerCase()
+                const term = normalizeText(text)
+                
+                // Refaz a busca local para garantir
                 const validLocals = commonFoods
-                    .filter(f => f.name.toLowerCase().includes(term))
+                    .filter(f => {
+                        const nName = normalizeText(f.name)
+                        const nAliases = (f as any).aliases ? (f as any).aliases.map((a: string) => normalizeText(a)) : []
+                        return nName.includes(term) || nAliases.some((a: string) => a.includes(term))
+                    })
                     .map(f => ({
                         food_id: f.id,
                         food_name: f.name,
                         food_description: 'Alimento Natural / Básico',
                         _local: f
                     }))
-                    .slice(0, 10)
 
-                // Filtra duplicatas (remove da API os que já temos localmente)
-                const localNames = new Set(validLocals.map(l => l.food_name.toLowerCase()))
-                const filteredApi = apiMatches.filter(a => !localNames.has(a.food_name.toLowerCase()))
+                // Pega do cache (pode ter resultados anteriores que ainda combinam)
+                const cachedApiMatches = Array.from(globalApiCache.values())
+                    .filter(p => {
+                        const nName = normalizeText(p.product_name_pt || p.product_name || '')
+                        return nName.includes(term)
+                    })
+                    .map(p => ({
+                        food_id: p._id || p.code,
+                        food_name: p.product_name_pt || p.product_name,
+                        food_description: p.brands ? `Marca: ${p.brands}` : 'Produto Industrializado',
+                        _raw: p
+                    }))
 
-                return [...validLocals, ...filteredApi]
+                // Junta tudo: local + cache + novos da API
+                const allMatches = [...validLocals, ...cachedApiMatches, ...apiMatches]
+                const uniqueMatches: FoodSuggestion[] = []
+                const seenNames = new Set()
+
+                allMatches.forEach(match => {
+                    const nName = normalizeText(match.food_name)
+                    if (!seenNames.has(nName)) {
+                        seenNames.add(nName)
+                        uniqueMatches.push(match)
+                    }
+                })
+
+                // Ordena
+                uniqueMatches.sort((a, b) => {
+                    const startsA = normalizeText(a.food_name).startsWith(term)
+                    const startsB = normalizeText(b.food_name).startsWith(term)
+                    if (startsA && !startsB) return -1
+                    if (!startsA && startsB) return 1
+                    return a.food_name.length - b.food_name.length
+                })
+
+                return uniqueMatches.slice(0, 30)
             })
         } catch (err: any) {
             if (err.name === 'AbortError') return 
@@ -155,27 +208,60 @@ export default function FoodAutocomplete({
             return
         }
 
-        // 1. Busca Local (Síncrona e Instantânea)
-        const term = text.toLowerCase()
+        // 1. Busca Local + Cache da API (Síncrona e Instantânea)
+        const term = normalizeText(text)
+        
+        // A. Filtra alimentos locais (incluindo aliases)
         const localMatches = commonFoods
-            .filter(f => f.name.toLowerCase().includes(term))
+            .filter(f => {
+                const nName = normalizeText(f.name)
+                const nAliases = (f as any).aliases ? (f as any).aliases.map((a: string) => normalizeText(a)) : []
+                return nName.includes(term) || nAliases.some((a: string) => a.includes(term))
+            })
             .map(f => ({
                 food_id: f.id,
                 food_name: f.name,
                 food_description: 'Alimento Natural / Básico',
                 _local: f // Flag para identificar que é local
             }))
-            // Ordena: Começa com termo > Nome menor
-            .sort((a, b) => {
-                const startsA = a.food_name.toLowerCase().startsWith(term)
-                const startsB = b.food_name.toLowerCase().startsWith(term)
-                if (startsA && !startsB) return -1
-                if (!startsA && startsB) return 1
-                return a.food_name.length - b.food_name.length
-            })
 
-        // Mostra resultados locais imediatamente enquanto busca na API
-        setSuggestions(localMatches)
+        // B. Filtra cache da API (alimentos que já buscamos na web nesta sessão)
+        const cachedApiMatches = Array.from(globalApiCache.values())
+            .filter(p => {
+                const nName = normalizeText(p.product_name_pt || p.product_name || '')
+                return nName.includes(term)
+            })
+            .map(p => ({
+                food_id: p._id || p.code,
+                food_name: p.product_name_pt || p.product_name,
+                food_description: p.brands ? `Marca: ${p.brands}` : 'Produto Industrializado',
+                _raw: p
+            }))
+
+        // Junta tudo e remove duplicatas pelo nome
+        const allMatches = [...localMatches, ...cachedApiMatches]
+        const uniqueMatches: FoodSuggestion[] = []
+        const seenNames = new Set()
+
+        allMatches.forEach(match => {
+            const nName = normalizeText(match.food_name)
+            if (!seenNames.has(nName)) {
+                seenNames.add(nName)
+                uniqueMatches.push(match)
+            }
+        })
+
+        // Ordena: Começa com termo > Nome menor
+        uniqueMatches.sort((a, b) => {
+            const startsA = normalizeText(a.food_name).startsWith(term)
+            const startsB = normalizeText(b.food_name).startsWith(term)
+            if (startsA && !startsB) return -1
+            if (!startsA && startsB) return 1
+            return a.food_name.length - b.food_name.length
+        })
+
+        // Mostra resultados locais/cache imediatamente enquanto busca na API
+        setSuggestions(uniqueMatches.slice(0, 30))
         setShowSuggestions(true)
 
         // OTIMIZAÇÃO: Não trava a busca da API só porque achou local. 

@@ -61,10 +61,10 @@ export const commonFoods = [
     // Laticínios e Outros
     { id: 'local_leite_integral', name: 'Leite Integral', calories: 60, protein: 3.0, carbs: 4.5, fat: 3.0, unit_weight: 200, sodium: 50 },
     { id: 'local_leite_desnatado', name: 'Leite Desnatado', calories: 35, protein: 3.0, carbs: 4.5, fat: 0.0, unit_weight: 200, sodium: 52 },
-    { id: 'local_iogurte_natural', name: 'Iogurte Natural', calories: 61, protein: 4.1, carbs: 5.6, fat: 3.0, unit_weight: 170, sodium: 50 },
-    { id: 'local_iogurte_desnatado', name: 'Iogurte Natural Desnatado', calories: 45, protein: 4.5, carbs: 6.0, fat: 0.1, unit_weight: 170, sodium: 55 },
-    { id: 'local_iogurte_grego', name: 'Iogurte Grego Tradicional', calories: 110, protein: 4.0, carbs: 13.0, fat: 4.0, unit_weight: 100, sodium: 40 },
-    { id: 'local_queijo_minas', name: 'Queijo Minas Frescal', calories: 264, protein: 17.4, carbs: 3.2, fat: 20.2, unit_weight: 30, sodium: 300 }, // Queijos variam muito
+    { id: 'local_iogurte_natural', name: 'Iogurte Natural', aliases: ['iorgute', 'yogurt'], calories: 61, protein: 4.1, carbs: 5.6, fat: 3.0, unit_weight: 170, sodium: 50 },
+    { id: 'local_iogurte_desnatado', name: 'Iogurte Natural Desnatado', aliases: ['iorgute', 'yogurt'], calories: 45, protein: 4.5, carbs: 6.0, fat: 0.1, unit_weight: 170, sodium: 55 },
+    { id: 'local_iogurte_grego', name: 'Iogurte Grego Tradicional', aliases: ['iorgute', 'yogurt'], calories: 110, protein: 4.0, carbs: 13.0, fat: 4.0, unit_weight: 100, sodium: 40 },
+    { id: 'local_queijo_minas', name: 'Queijo Minas Frescal', aliases: ['queijo', 'mussarela', 'mozarela'], calories: 264, protein: 17.4, carbs: 3.2, fat: 20.2, unit_weight: 30, sodium: 300 }, // Queijos variam muito
     { id: 'local_requeijao', name: 'Requeijão Cremoso Tradicional', calories: 280, protein: 9.0, carbs: 2.0, fat: 27.0, unit_weight: 30, sodium: 600 },
     { id: 'local_requeijao_light', name: 'Requeijão Light', calories: 180, protein: 10.0, carbs: 4.0, fat: 14.0, unit_weight: 30, sodium: 500 },
     { id: 'local_doce_leite', name: 'Doce de Leite (Tradicional)', calories: 315, protein: 6.0, carbs: 55.0, fat: 7.0, unit_weight: 20, sodium: 130 },
