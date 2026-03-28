@@ -22,66 +22,45 @@ serve(async (req) => {
     
     if (!method) throw new Error('Method required')
 
-    // OAuth 1.0 Parameters
-    const params: Record<string, string> = {
-      format: 'json',
-      method: method,
-      oauth_consumer_key: CLIENT_ID,
-      oauth_nonce: Math.random().toString(36).substring(2),
-      oauth_signature_method: 'HMAC-SHA1',
-      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-      oauth_version: '1.0',
+    // OAuth 2.0 Client Credentials Grant
+    const basicAuth = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)
+    
+    const tokenResponse = await fetch('https://oauth.fatsecret.com/connect/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: 'grant_type=client_credentials&scope=basic'
+    })
+
+    if (!tokenResponse.ok) {
+        const errData = await tokenResponse.text()
+        throw new Error(`FatSecret Token Auth Error: ${errData}`)
     }
 
+    const tokenData = await tokenResponse.json()
+    const accessToken = tokenData.access_token
+
+    // Parâmetros da chamada da API
+    const apiParams = new URLSearchParams()
+    apiParams.append('method', method)
+    apiParams.append('format', 'json')
+    
     if (method === 'foods.search') {
-      if (!search_expression) throw new Error('search_expression required')
-      params.search_expression = search_expression
-      params.max_results = '50' // Aumentado para 50 para retornar mais resultados
+      apiParams.append('search_expression', search_expression)
+      apiParams.append('max_results', '50')
     } else if (method === 'food.get') {
-      if (!food_id) throw new Error('food_id required')
-      params.food_id = food_id
-    }
-
-    // Signature Generation
-    // 1. Sort keys
-    const sortedKeys = Object.keys(params).sort()
-    
-    // 2. Construct parameter string
-    // RFC 3986 encoding needed
-    const percentEncode = (str: string) => {
-      return encodeURIComponent(str).replace(/[!'()*]/g, (c) => {
-        return '%' + c.charCodeAt(0).toString(16).toUpperCase();
-      });
-    }
-
-    const paramString = sortedKeys.map(k => `${percentEncode(k)}=${percentEncode(params[k])}`).join('&')
-    
-    // 3. Construct base string
-    const baseString = `POST&${percentEncode('https://platform.fatsecret.com/rest/server.api')}&${percentEncode(paramString)}`
-    
-    // 4. Signing Key
-    const signingKey = `${percentEncode(CLIENT_SECRET)}&`
-
-    // 5. HMAC-SHA1
-    const keyData = new TextEncoder().encode(signingKey)
-    const key = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
-    const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(baseString))
-    const signatureBase64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-
-    params.oauth_signature = signatureBase64
-
-    // Execute Request
-    const bodyParams = new URLSearchParams()
-    for (const [key, value] of Object.entries(params)) {
-      bodyParams.append(key, value)
+      apiParams.append('food_id', food_id)
     }
 
     const response = await fetch('https://platform.fatsecret.com/rest/server.api', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: bodyParams
+      body: apiParams.toString()
     })
 
     const data = await response.json()

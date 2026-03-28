@@ -21,6 +21,15 @@ interface FoodDetails {
     unit_weight?: number
 }
 
+// Cache global para não perder resultados da API enquanto o usuário digita
+const globalApiCache = new Map<string, any>()
+
+// Função para remover acentos e facilitar a busca
+function normalizeText(text: string) {
+    if (!text) return ''
+    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+}
+
 export default function FoodAutocomplete({ 
     value, onChange, onSelect, className, style, placeholder 
 }: { 
@@ -47,6 +56,7 @@ export default function FoodAutocomplete({
         return () => document.removeEventListener("mousedown", handleClickOutside)
     }, [])
 
+    // Timeout maior para não metralhar a API enquanto digita a palavra inteira
     const timeoutRef = useRef<any>(null)
     const [errorMsg, setErrorMsg] = useState('')
 
@@ -54,62 +64,133 @@ export default function FoodAutocomplete({
 
     const searchWeb = async (text: string) => {
         setLoading(true)
+        // Limpa erro anterior ao tentar de novo
+        setErrorMsg('')
+        
         if (controllerRef.current) controllerRef.current.abort()
         controllerRef.current = new AbortController()
 
         try {
-            // Nova API: FatSecret via Supabase Edge Function
-            const { data, error } = await supabase.functions.invoke('fatsecret-proxy', {
-                body: { 
-                    method: 'foods.search',
-                    search_expression: text,
-                    max_results: 50 // Mudado para 50
+            // Nova API: Open Food Facts + Backup (FatSecret aberto)
+            // Vamos usar o OpenFoodFacts para a busca primária que é livre de CORS e tokens
+            const offResponse = await fetch(
+                `https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&action=process&json=1&page_size=24`,
+                { 
+                    signal: controllerRef.current.signal,
+                    headers: {
+                        'User-Agent': 'GerencialBodybrothers - Web - 1.0' // Exigência da API para não dar block fácil
+                    }
                 }
-            })
-
-            if (error) throw error
-
-            // Se for erro interno da API mas retornou 200 (ex: limite de requisições excedido)
-            if (data?.error) {
-                 throw new Error(data.error.message || 'Falha na busca')
+            )
+            
+            if (!offResponse.ok) {
+                if (offResponse.status === 429) {
+                    throw new Error('Rate limit atingido')
+                }
+                throw new Error(`Erro na API: ${offResponse.status}`)
             }
 
-            // O FatSecret pode retornar um objeto único se houver só 1 resultado, ou nada se não achar
-            if (!data.foods || !data.foods.food) {
-                setSuggestions([])
-                setErrorMsg('Nenhum alimento encontrado na Web para este termo.')
+            const data = await offResponse.json()
+
+            if (!data.products || data.products.length === 0) {
+                setSuggestions(prev => {
+                    if (prev.length === 0) {
+                        setErrorMsg('Nenhum alimento encontrado na Web para este termo.')
+                    }
+                    return prev // Mantém os locais se houver
+                })
                 return
             }
 
-            const response = data.foods.food
-            const products = Array.isArray(response) ? response : [response]
-            
-            let apiMatches = products.map((p: any) => ({
-                food_id: p.food_id,
-                food_name: p.food_name,
-                food_description: p.food_description || '',
-                _raw: p 
+            // Salva no cache global
+            data.products.forEach((p: any) => {
+                const id = p._id || p.code
+                if (id) {
+                    globalApiCache.set(id, p)
+                }
+            })
+
+            let apiMatches = data.products.map((p: any) => ({
+                food_id: p._id || p.code,
+                food_name: p.product_name_pt || p.product_name || 'Produto Sem Nome',
+                food_description: p.brands ? `Marca: ${p.brands}` : 'Produto Industrializado',
+                _raw: p // Usado para extrair macros depois
             }))
 
+            // Filtra os que não tem nome
+            apiMatches = apiMatches.filter((m: any) => m.food_name && m.food_name !== 'Produto Sem Nome')
+
             setSuggestions(prev => {
-                const term = text.toLowerCase()
+                const term = normalizeText(text)
+                
+                // Refaz a busca local para garantir
                 const validLocals = commonFoods
-                    .filter(f => f.name.toLowerCase().includes(term))
+                    .filter(f => {
+                        const nName = normalizeText(f.name)
+                        const nAliases = (f as any).aliases ? (f as any).aliases.map((a: string) => normalizeText(a)) : []
+                        return nName.includes(term) || nAliases.some((a: string) => a.includes(term))
+                    })
                     .map(f => ({
                         food_id: f.id,
                         food_name: f.name,
                         food_description: 'Alimento Natural / Básico',
                         _local: f
                     }))
-                    .slice(0, 10)
 
-                return [...validLocals, ...apiMatches]
+                // Pega do cache (pode ter resultados anteriores que ainda combinam)
+                const cachedApiMatches = Array.from(globalApiCache.values())
+                    .filter(p => {
+                        const nName = normalizeText(p.product_name_pt || p.product_name || '')
+                        return nName.includes(term)
+                    })
+                    .map(p => ({
+                        food_id: p._id || p.code,
+                        food_name: p.product_name_pt || p.product_name,
+                        food_description: p.brands ? `Marca: ${p.brands}` : 'Produto Industrializado',
+                        _raw: p
+                    }))
+
+                // Junta tudo: local + cache + novos da API
+                const allMatches = [...validLocals, ...cachedApiMatches, ...apiMatches]
+                const uniqueMatches: FoodSuggestion[] = []
+                const seenNames = new Set()
+
+                allMatches.forEach(match => {
+                    const nName = normalizeText(match.food_name)
+                    if (!seenNames.has(nName)) {
+                        seenNames.add(nName)
+                        uniqueMatches.push(match)
+                    }
+                })
+
+                // Ordena
+                uniqueMatches.sort((a, b) => {
+                    const startsA = normalizeText(a.food_name).startsWith(term)
+                    const startsB = normalizeText(b.food_name).startsWith(term)
+                    if (startsA && !startsB) return -1
+                    if (!startsA && startsB) return 1
+                    return a.food_name.length - b.food_name.length
+                })
+
+                return uniqueMatches.slice(0, 30)
             })
         } catch (err: any) {
             if (err.name === 'AbortError') return 
-            console.error('Erro na busca FatSecret:', err)
-            // Se for erro real da API, mostra algo amigável.
-            setErrorMsg('Não foi possível conectar ao banco de alimentos no momento.')
+            console.error('Erro na busca OpenFoodFacts:', err)
+            
+            // Só mostra erro se não tiver nenhuma sugestão local na tela
+            setSuggestions(prev => {
+                if (prev.length === 0) {
+                    if (err.message === 'Rate limit atingido') {
+                        setErrorMsg('Muitas buscas seguidas. Aguarde alguns segundos...')
+                    } else if (err instanceof TypeError) {
+                        setErrorMsg('Não foi possível conectar. Verifique sua conexão com a internet.')
+                    } else {
+                        setErrorMsg('Não foi possível conectar ao banco de alimentos no momento.')
+                    }
+                }
+                return prev
+            })
         } finally {
             setLoading(false)
         }
@@ -127,36 +208,66 @@ export default function FoodAutocomplete({
             return
         }
 
-        // 1. Busca Local (Síncrona e Instantânea)
-        const term = text.toLowerCase()
+        // 1. Busca Local + Cache da API (Síncrona e Instantânea)
+        const term = normalizeText(text)
+        
+        // A. Filtra alimentos locais (incluindo aliases)
         const localMatches = commonFoods
-            .filter(f => f.name.toLowerCase().includes(term))
+            .filter(f => {
+                const nName = normalizeText(f.name)
+                const nAliases = (f as any).aliases ? (f as any).aliases.map((a: string) => normalizeText(a)) : []
+                return nName.includes(term) || nAliases.some((a: string) => a.includes(term))
+            })
             .map(f => ({
                 food_id: f.id,
                 food_name: f.name,
                 food_description: 'Alimento Natural / Básico',
                 _local: f // Flag para identificar que é local
             }))
-            // Ordena: Começa com termo > Nome menor
-            .sort((a, b) => {
-                const startsA = a.food_name.toLowerCase().startsWith(term)
-                const startsB = b.food_name.toLowerCase().startsWith(term)
-                if (startsA && !startsB) return -1
-                if (!startsA && startsB) return 1
-                return a.food_name.length - b.food_name.length
-            })
 
-        // Mostra resultados locais imediatamente enquanto busca na API
-        setSuggestions(localMatches)
+        // B. Filtra cache da API (alimentos que já buscamos na web nesta sessão)
+        const cachedApiMatches = Array.from(globalApiCache.values())
+            .filter(p => {
+                const nName = normalizeText(p.product_name_pt || p.product_name || '')
+                return nName.includes(term)
+            })
+            .map(p => ({
+                food_id: p._id || p.code,
+                food_name: p.product_name_pt || p.product_name,
+                food_description: p.brands ? `Marca: ${p.brands}` : 'Produto Industrializado',
+                _raw: p
+            }))
+
+        // Junta tudo e remove duplicatas pelo nome
+        const allMatches = [...localMatches, ...cachedApiMatches]
+        const uniqueMatches: FoodSuggestion[] = []
+        const seenNames = new Set()
+
+        allMatches.forEach(match => {
+            const nName = normalizeText(match.food_name)
+            if (!seenNames.has(nName)) {
+                seenNames.add(nName)
+                uniqueMatches.push(match)
+            }
+        })
+
+        // Ordena: Começa com termo > Nome menor
+        uniqueMatches.sort((a, b) => {
+            const startsA = normalizeText(a.food_name).startsWith(term)
+            const startsB = normalizeText(b.food_name).startsWith(term)
+            if (startsA && !startsB) return -1
+            if (!startsA && startsB) return 1
+            return a.food_name.length - b.food_name.length
+        })
+
+        // Mostra resultados locais/cache imediatamente enquanto busca na API
+        setSuggestions(uniqueMatches.slice(0, 30))
         setShowSuggestions(true)
 
-        // OTIMIZAÇÃO: Se já encontrou muitos resultados locais (>= 5), não busca na API automaticamente
-        if (localMatches.length >= 5) {
-            setLoading(false)
-            return
-        }
-
-        timeoutRef.current = setTimeout(() => searchWeb(text), 600) 
+        // OTIMIZAÇÃO: Não trava a busca da API só porque achou local. 
+        // Aumentei o tempo para 800ms. Assim se você digitar "Iorgute" rápido, ele não tenta buscar
+        // "Ior", "Iorg", "Iorgu" e acabar sendo bloqueado.
+        timeoutRef.current = setTimeout(() => searchWeb(text), 800) 
     }
 
     const handleSelect = async (item: FoodSuggestion) => {
@@ -181,48 +292,37 @@ export default function FoodAutocomplete({
                 return
             }
 
-            // B. Se é FatSecret (Web)
+            // B. Se é Web (Open Food Facts)
             if ((item as any)._raw) {
-                // Precisamos fazer uma segunda chamada para pegar os macros detalhados do alimento selecionado
-                const { data: detailData, error } = await supabase.functions.invoke('fatsecret-proxy', {
-                    body: { 
-                        method: 'food.get',
-                        food_id: item.food_id
-                    }
-                })
-
-                if (error || !detailData?.food?.servings?.serving) throw new Error('Falha ao obter detalhes do FatSecret')
-
-                const servings = detailData.food.servings.serving
-                // Se for array, pega o primeiro, senão pega o objeto direto
-                const serving = Array.isArray(servings) ? servings[0] : servings
-
-                // Converte os valores (FatSecret retorna strings como "10.5")
-                const calories = parseFloat(serving.calories || '0')
-                const protein = parseFloat(serving.protein || '0')
-                const carbs = parseFloat(serving.carbohydrate || '0')
-                const fat = parseFloat(serving.fat || '0')
-                const sodiumMg = parseFloat(serving.sodium || '0') // FatSecret já retorna em mg
+                const p = (item as any)._raw;
+                const nut = p.nutriments || {};
                 
-                // Tenta achar peso da porção para padronizar para 100g se necessário, 
-                // mas vamos enviar o valor base que o FatSecret deu e deixar o usuário ajustar.
-                // O ideal seria pegar a porção de 100g se existir, mas vamos simplificar pegando a primeira disponível
-                let metricQty = parseFloat(serving.metric_serving_amount || '100')
+                // Pega os valores por 100g, se não tiver, usa o valor da porção, se não tiver, usa 0
+                const calories = nut['energy-kcal_100g'] || nut['energy-kcal_serving'] || nut['energy-kcal_value'] || 0;
+                const protein = nut.proteins_100g || nut.proteins_serving || nut.proteins_value || 0;
+                const carbs = nut.carbohydrates_100g || nut.carbohydrates_serving || nut.carbohydrates_value || 0;
+                const fat = nut.fat_100g || nut.fat_serving || nut.fat_value || 0;
                 
-                // Normaliza para 100g
-                const ratio = 100 / metricQty
+                // Sódio no OFF geralmente vem em gramas ou miligramas. Se vier salt, divide por 2.5
+                let sodiumMg = 0;
+                if (nut.sodium_100g !== undefined) {
+                    sodiumMg = nut.sodium_100g * 1000; // de gramas para mg
+                } else if (nut.salt_100g !== undefined) {
+                    sodiumMg = (nut.salt_100g / 2.5) * 1000;
+                }
 
                 const macros = {
                     food_id: item.food_id,
                     name: item.food_name,
-                    calories_100g: Number((calories * ratio).toFixed(1)),
-                    protein_100g: Number((protein * ratio).toFixed(1)),
-                    carbs_100g: Number((carbs * ratio).toFixed(1)),
-                    fat_100g: Number((fat * ratio).toFixed(1)),
-                    sodium_100g: Number((sodiumMg * ratio).toFixed(1)),
-                    source: 'fatsecret',
-                    unit_weight: metricQty
+                    calories_100g: Number(calories.toFixed(1)),
+                    protein_100g: Number(protein.toFixed(1)),
+                    carbs_100g: Number(carbs.toFixed(1)),
+                    fat_100g: Number(fat.toFixed(1)),
+                    sodium_100g: Number(sodiumMg.toFixed(1)),
+                    source: 'openfoodfacts',
+                    unit_weight: 100
                 }
+                
                 onSelect(macros)
                 return
             }
