@@ -16,7 +16,8 @@ import {
 import { useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../lib/supabase";
-import { finishSession } from "../lib/history";
+import { finishSession, getSessionById } from "../lib/history";
+import { useTrainingSession } from "../lib/trainingSession";
 import { VideoView, useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import YoutubePlayer from "react-native-youtube-iframe";
@@ -30,7 +31,7 @@ import {
 } from "lucide-react-native";
 
 type ExerciseSet = {
-  type: "warmup" | "feeder" | "working" | "custom";
+  type: "warmup" | "feeder" | "working" | "custom" | "topset";
   customLabel?: string;
   series: string;
   reps: string;
@@ -67,7 +68,37 @@ type Workout = {
   };
 };
 
-export default function Session() {
+export default function SessionRedirect() {
+  const { sessionId } = useLocalSearchParams<{ sessionId?: string }>();
+  const { setActiveSessionFromDbSession } = useTrainingSession();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!sessionId) {
+          router.replace("/(tabs)/workouts");
+          return;
+        }
+        const session = await getSessionById(sessionId);
+        await setActiveSessionFromDbSession(session);
+        router.replace({ pathname: "/(tabs)/workouts", params: { openActive: "1" } });
+      } catch {
+        Alert.alert("Erro", "Não foi possível abrir o treino. Tente novamente.");
+        router.replace("/(tabs)/workouts");
+      }
+    })();
+  }, [sessionId, setActiveSessionFromDbSession]);
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function LegacySession() {
   const { sessionId } = useLocalSearchParams();
 
   const [workout, setWorkout] = useState<Workout | null>(null);
@@ -82,9 +113,9 @@ export default function Session() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(true);
 
-  const [thumbnails, setThumbnails] = useState({});
-  const thumbnailsCache = useRef({});
-  const processing = useRef({});
+  const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
+  const thumbnailsCache = useRef<Record<number, string>>({});
+  const processing = useRef<Record<number, boolean>>({});
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const player = useVideoPlayer("");
@@ -279,7 +310,7 @@ export default function Session() {
     ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1`
     : null;
   const headerMaxHeightPx = Math.round(viewportHeight * 0.25);
-  const headerMaxHeight = isWeb ? "25vh" : headerMaxHeightPx;
+  const headerMaxHeight = headerMaxHeightPx;
   const headerPadding = Math.min(
     24,
     Math.max(12, Math.round(headerMaxHeightPx * 0.12)),

@@ -15,7 +15,7 @@ import {
 import { supabase } from "../../lib/supabase";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
 
 const { width } = Dimensions.get("window");
 
@@ -98,12 +98,7 @@ export default function Login() {
           {/* Form */}
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Ionicons
-                name="mail-outline"
-                size={20}
-                color="#94a3b8"
-                style={styles.inputIcon}
-              />
+              <Mail size={20} color="#94a3b8" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Email"
@@ -117,12 +112,7 @@ export default function Login() {
 
             {!isRecovering && (
               <View style={styles.inputContainer}>
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={20}
-                  color="#94a3b8"
-                  style={styles.inputIcon}
-                />
+                <Lock size={20} color="#94a3b8" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Senha"
@@ -135,11 +125,11 @@ export default function Login() {
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
                 >
-                  <Ionicons
-                    name={showPassword ? "eye-off-outline" : "eye-outline"}
-                    size={20}
-                    color="#94a3b8"
-                  />
+                  {showPassword ? (
+                    <EyeOff size={20} color="#94a3b8" />
+                  ) : (
+                    <Eye size={20} color="#94a3b8" />
+                  )}
                 </TouchableOpacity>
               </View>
             )}

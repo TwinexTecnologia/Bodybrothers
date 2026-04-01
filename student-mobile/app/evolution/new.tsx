@@ -39,8 +39,9 @@ export default function NewEvolution() {
               .single();
 
           // Prioridade: Config no perfil do aluno (propagada pelo personal)
-          if (myself?.data?.config?.evolutionFields?.length > 0) {
-              setFields(myself.data.config.evolutionFields);
+          const ownFields = myself?.data?.config?.evolutionFields;
+          if (Array.isArray(ownFields) && ownFields.length > 0) {
+              setFields(ownFields);
               return;
           }
 
@@ -52,8 +53,9 @@ export default function NewEvolution() {
                   .eq('id', myself.personal_id)
                   .single();
               
-              if (personal?.data?.config?.evolutionFields?.length > 0) {
-                  setFields(personal.data.config.evolutionFields);
+              const personalFields = personal?.data?.config?.evolutionFields;
+              if (Array.isArray(personalFields) && personalFields.length > 0) {
+                  setFields(personalFields);
               }
           }
       } catch (err) {

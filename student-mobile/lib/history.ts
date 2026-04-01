@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase } from "./supabase";
 
 export type WorkoutSession = {
   id: string;
@@ -11,9 +11,13 @@ export type WorkoutSession = {
   notes?: string;
 };
 
-export async function startSession(workoutId: string, workoutTitle: string, studentId: string) {
+export async function startSession(
+  workoutId: string,
+  workoutTitle: string,
+  studentId: string,
+) {
   const { data, error } = await supabase
-    .from('workout_history')
+    .from("workout_history")
     .insert({
       student_id: studentId,
       workout_id: workoutId,
@@ -27,58 +31,74 @@ export async function startSession(workoutId: string, workoutTitle: string, stud
   return mapFromDb(data);
 }
 
-export async function finishSession(id: string, durationSeconds: number, notes?: string) {
+export async function finishSession(
+  id: string,
+  durationSeconds: number,
+  notes?: string,
+) {
   const { data, error } = await supabase
-    .from('workout_history')
+    .from("workout_history")
     .update({
       finished_at: new Date().toISOString(),
       duration_seconds: durationSeconds,
       notes: notes,
     })
-    .eq('id', id)
+    .eq("id", id)
     .select()
     .single();
 
   if (error) throw error;
 
-  // Notificação para o Personal (Sem await para não travar a UI)
-  supabase
-    .from('profiles')
-    .select('personal_id, full_name')
-    .eq('id', data.student_id)
-    .single()
-    .then(({ data: profile }) => {
-        if (profile?.personal_id) {
-            if (!notes || notes.trim().length === 0) return;
+  (async () => {
+    try {
+      if (!notes || notes.trim().length === 0) return;
 
-            console.log('Enviando notificação com notes:', notes)
-            supabase.from('notifications').insert({
-                user_id: profile.personal_id,
-                title: 'Treino Concluído',
-                message: notes 
-                    ? `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}". Feedback: "${notes}"`
-                    : `${profile.full_name || 'Aluno'} finalizou "${data.workout_title}"`,
-                type: 'feedback',
-                link: `/students/details/${data.student_id}`,
-            }).then(() => console.log('Notificação enviada'))
-              .catch(err => console.warn('Erro notificação:', err));
-        }
-    })
-    .catch(err => console.warn('Erro profile notificação:', err));
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("personal_id, full_name")
+        .eq("id", data.student_id)
+        .single();
 
+      if (!profile?.personal_id) return;
+
+      await supabase.from("notifications").insert({
+        user_id: profile.personal_id,
+        title: "Treino Concluído",
+        message: `${profile.full_name || "Aluno"} finalizou "${data.workout_title}". Feedback: "${notes}"`,
+        type: "feedback",
+        link: `/students/details/${data.student_id}`,
+      });
+    } catch (err) {
+      console.warn("Erro notificação:", err);
+    }
+  })();
+
+  return mapFromDb(data);
+}
+
+export async function getSessionById(id: string): Promise<WorkoutSession> {
+  const { data, error } = await supabase
+    .from("workout_history")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) throw error || new Error("Sessão não encontrada");
   return mapFromDb(data);
 }
 
 export async function getWeeklyFrequency(studentId: string): Promise<number> {
   const today = new Date();
-  const firstDay = new Date(today.setDate(today.getDate() - today.getDay())).toISOString();
+  const firstDay = new Date(
+    today.setDate(today.getDate() - today.getDay()),
+  ).toISOString();
 
   const { count, error } = await supabase
-    .from('workout_history')
-    .select('*', { count: 'exact', head: true })
-    .eq('student_id', studentId)
-    .gte('started_at', firstDay)
-    .not('finished_at', 'is', null);
+    .from("workout_history")
+    .select("*", { count: "exact", head: true })
+    .eq("student_id", studentId)
+    .gte("started_at", firstDay)
+    .not("finished_at", "is", null);
 
   if (error) return 0;
   return count || 0;
@@ -91,11 +111,11 @@ export async function getWeeklyActivity(studentId: string): Promise<number[]> {
   firstDay.setHours(0, 0, 0, 0);
 
   const { data, error } = await supabase
-    .from('workout_history')
-    .select('started_at')
-    .eq('student_id', studentId)
-    .gte('started_at', firstDay.toISOString())
-    .not('finished_at', 'is', null);
+    .from("workout_history")
+    .select("started_at")
+    .eq("student_id", studentId)
+    .gte("started_at", firstDay.toISOString())
+    .not("finished_at", "is", null);
 
   if (error || !data) return [];
 
@@ -107,6 +127,21 @@ export async function getWeeklyActivity(studentId: string): Promise<number[]> {
     .filter((d) => d >= 0);
 
   return [...new Set(activeDays)];
+}
+
+export async function getActiveSession(
+  studentId: string,
+): Promise<WorkoutSession | null> {
+  const { data, error } = await supabase
+    .from("workout_history")
+    .select("*")
+    .eq("student_id", studentId)
+    .is("finished_at", null)
+    .order("started_at", { ascending: false })
+    .limit(1);
+
+  if (error || !data || data.length === 0) return null;
+  return mapFromDb(data[0]);
 }
 
 function mapFromDb(d: any): WorkoutSession {

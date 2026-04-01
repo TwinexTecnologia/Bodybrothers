@@ -98,14 +98,14 @@ export default function Evolution() {
               return images;
           };
 
-          const processed = (data || []).map(item => {
+          const processed: PhotoRecord[] = (data || []).map((item: any) => {
               const rawData = item.content || item.data || {};
               const photos = extractImages(rawData);
               return {
                   id: item.id,
                   date: item.created_at,
                   photos,
-                  origin: item.type === 'photos' ? 'standalone' : 'anamnesis'
+                  origin: (item.type === 'photos' ? 'standalone' : 'anamnesis') as PhotoRecord['origin']
               };
           }).filter(item => item.photos.length > 0);
 
