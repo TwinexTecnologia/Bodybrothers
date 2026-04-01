@@ -37,6 +37,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { startSession, getWeeklyActivity } from "../../lib/history";
 import { LinearGradient } from "expo-linear-gradient";
 import ActiveTrainingModal from "../../components/ActiveTrainingModal";
+import ExerciseSetCard from "../../components/ExerciseSetCard";
 import {
   formatElapsedTime,
   useTrainingSession,
@@ -681,105 +682,19 @@ export default function Workouts() {
                           }
 
                           return (
-                            <View
+                            <ExerciseSetCard
                               key={`${i}-${idx}`}
-                              style={{
-                                backgroundColor: bg,
-                                borderRadius: 12,
-                                padding: 12,
-                                borderWidth: 1,
-                                borderColor: borderColor,
-                              }}
-                            >
-                              <View
-                                style={{
-                                  flexDirection: "row",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  gap: 10,
-                                }}
-                              >
-                                <View
-                                  style={{
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    gap: 8,
-                                    minWidth: 0,
-                                    flex: 1,
-                                  }}
-                                >
-                                  <View
-                                    style={{
-                                      backgroundColor: "#fff",
-                                      paddingHorizontal: 8,
-                                      paddingVertical: 4,
-                                      borderRadius: 6,
-                                    }}
-                                  >
-                                    <Text
-                                      style={{
-                                        color: color,
-                                        fontSize: 11,
-                                        fontWeight: "900",
-                                        letterSpacing: 0.5,
-                                      }}
-                                    >
-                                      {label}
-                                    </Text>
-                                  </View>
-                                  <Text
-                                    style={{
-                                      fontWeight: "800",
-                                      color: "#1e293b",
-                                      fontSize: 14,
-                                      flexShrink: 1,
-                                    }}
-                                    numberOfLines={1}
-                                  >
-                                    {set.series} x {set.reps}
-                                  </Text>
-                                </View>
-
-                                {!!set.load && (
-                                  <Text
-                                    style={{
-                                      fontSize: 12,
-                                      color: "#475569",
-                                      fontWeight: "800",
-                                      textTransform: "uppercase",
-                                      maxWidth: 90,
-                                      textAlign: "right",
-                                      flexShrink: 1,
-                                    }}
-                                    numberOfLines={1}
-                                  >
-                                    {set.load}
-                                  </Text>
-                                )}
-                              </View>
-
-                              {!!set.rest && (
-                                <View
-                                  style={{
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    gap: 6,
-                                    marginTop: 8,
-                                  }}
-                                >
-                                  <Clock size={14} color="#94a3b8" />
-                                  <Text
-                                    style={{
-                                      fontSize: 12,
-                                      color: "#64748b",
-                                      fontWeight: "700",
-                                    }}
-                                  >
-                                    {set.rest}
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
+                              variant={video ? "stacked" : "horizontal"}
+                              label={label}
+                              accentColor={color}
+                              backgroundColor={bg}
+                              borderColor={borderColor}
+                              series={set.series}
+                              reps={set.reps}
+                              load={set.load}
+                              rest={set.rest}
+                              testIDPrefix={`workouts-exercise-${i}-set-${idx}`}
+                            />
                           );
                         })}
                       </View>
