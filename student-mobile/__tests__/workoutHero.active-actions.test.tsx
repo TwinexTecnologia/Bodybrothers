@@ -14,12 +14,10 @@ import ActiveWorkoutHeroActions from "../components/ActiveWorkoutHeroActions";
 
 describe("ActiveWorkoutHeroActions", () => {
   beforeEach(() => {
-    jest.useFakeTimers();
     jest.spyOn(Alert, "alert").mockImplementation(() => {});
   });
 
   afterEach(() => {
-    jest.useRealTimers();
     (Alert.alert as any).mockRestore?.();
     jest.clearAllMocks();
   });
@@ -69,11 +67,9 @@ describe("ActiveWorkoutHeroActions", () => {
       expect(onRequestRefreshDays).toHaveBeenCalled();
     });
 
-    act(() => {
-      jest.advanceTimersByTime(260);
+    await waitFor(() => {
+      expect(queryByText("Treino finalizado!")).toBeTruthy();
     });
-
-    expect(queryByText("Treino finalizado!")).toBeTruthy();
 
     fireEvent.press(getByTestId("finish-success-back"));
     expect(onCloseParentModal).toHaveBeenCalled();

@@ -12,6 +12,15 @@ import {
 import { CheckCircle, Clock, Pause, StopCircle, XCircle } from "lucide-react-native";
 import { cancelSession, finishSession } from "../lib/history";
 
+const DEBUG_WORKOUTS =
+  __DEV__ && process.env.EXPO_PUBLIC_DEBUG_WORKOUTS === "1";
+
+function debugWorkouts(message: string, data?: Record<string, unknown>) {
+  if (!DEBUG_WORKOUTS) return;
+  if (data) console.log(`[workouts] ${message}`, data);
+  else console.log(`[workouts] ${message}`);
+}
+
 type ActiveTrainingSession = {
   id: string;
   studentId: string;
@@ -52,24 +61,38 @@ export default function ActiveWorkoutHeroActions({
   const [isCanceling, setIsCanceling] = useState(false);
 
   const handleFinish = useCallback(async () => {
+    if (isFinishing) return;
     setIsFinishing(true);
     try {
+      debugWorkouts("finish:request", {
+        sessionId: session.id,
+        elapsedSeconds,
+        notesLength: sessionNotes.trim().length,
+      });
       await finishSession(session.id, elapsedSeconds, sessionNotes);
-      setShowFinishModal(false);
-      setIsFinishing(false);
       await onFinished();
       await onRequestRefreshDays();
-      setTimeout(() => setShowSuccessModal(true), 250);
-    } catch {
       setShowFinishModal(false);
-      setIsFinishing(false);
+      setShowSuccessModal(true);
+    } catch {
+      debugWorkouts("finish:error", { sessionId: session.id });
       Alert.alert(
         "Erro",
         "Não foi possível finalizar o treino, mas tentamos salvar.",
       );
       await onFinished();
+      setShowFinishModal(false);
+    } finally {
+      setIsFinishing(false);
     }
-  }, [elapsedSeconds, onFinished, onRequestRefreshDays, session.id, sessionNotes]);
+  }, [
+    elapsedSeconds,
+    isFinishing,
+    onFinished,
+    onRequestRefreshDays,
+    session.id,
+    sessionNotes,
+  ]);
 
   const handleCancel = useCallback(() => {
     Alert.alert(
@@ -83,6 +106,7 @@ export default function ActiveWorkoutHeroActions({
           onPress: async () => {
             setIsCanceling(true);
             try {
+              debugWorkouts("cancel:confirm", { sessionId: session.id });
               await cancelSession(session.id);
               await onFinished();
               await onRequestRefreshDays();
@@ -350,4 +374,3 @@ const styles = StyleSheet.create({
   },
   finishSuccessButtonText: { color: "#fff", fontWeight: "900" },
 });
-

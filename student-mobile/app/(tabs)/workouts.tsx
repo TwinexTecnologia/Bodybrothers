@@ -42,6 +42,11 @@ import {
   formatElapsedTime,
   useTrainingSession,
 } from "../../lib/trainingSession";
+import {
+  getYoutubeId,
+  isMp4Url,
+  useMp4PreviewVideo,
+} from "../../lib/workoutsPreviewVideo";
 import { useLocalSearchParams } from "expo-router";
 import { VideoView, useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
@@ -88,6 +93,15 @@ type Workout = {
   };
 };
 
+const DEBUG_WORKOUTS =
+  __DEV__ && process.env.EXPO_PUBLIC_DEBUG_WORKOUTS === "1";
+
+function debugWorkouts(message: string, data?: Record<string, unknown>) {
+  if (!DEBUG_WORKOUTS) return;
+  if (data) console.log(`[workouts] ${message}`, data);
+  else console.log(`[workouts] ${message}`);
+}
+
 const DAYS_MAP: Record<string, string> = {
   seg: "Segunda-feira",
   ter: "Terça-feira",
@@ -133,17 +147,8 @@ export default function Workouts() {
 
   const isWide = viewportWidth >= 720;
 
-  const isMp4 = (url?: string) =>
-    !!url && (url.includes(".mp4") || url.includes("video"));
-
-  const getYoutubeId = (url: string) => {
-    const match = url.match(
-      /^.*(youtu.be\/|watch\?v=|embed\/|shorts\/)([^#&?]*).*/,
-    );
-    return match?.[2];
-  };
-
   const closeWorkoutModal = useCallback(() => {
+    debugWorkouts("closeWorkoutModal");
     setSelectedWorkout(null);
     setPreviewActiveVideoIndex(null);
     setPreviewFullscreenIndex(null);
@@ -153,6 +158,11 @@ export default function Workouts() {
   }, [previewPlayer]);
 
   const openActiveWorkout = useCallback(async () => {
+    debugWorkouts("openActiveWorkout:request", {
+      hasActiveSession: !!activeSession,
+      activeWorkoutId: activeSession?.workoutId,
+      selectedWorkoutId: selectedWorkout?.id,
+    });
     if (!activeSession) return;
     if (!activeSession.workoutId) {
       Alert.alert("Erro", "Não foi possível abrir o treino ativo.");
@@ -243,6 +253,13 @@ export default function Workouts() {
     try {
       if (!user) return;
 
+      debugWorkouts("handleStartSession:request", {
+        workoutId: w.id,
+        workoutTitle: w.title,
+        hasActiveSession: !!activeSession,
+        todayIndex: new Date().getDay(),
+      });
+
       const todayIndex = new Date().getDay();
       const blockReason = getStartWorkoutBlockReason({
         activeDays,
@@ -250,10 +267,12 @@ export default function Workouts() {
         hasActiveSession: !!activeSession,
       });
       if (blockReason === "already_trained_today") {
+        debugWorkouts("handleStartSession:blocked", { reason: blockReason });
         Alert.alert("Descanso", "Você já treinou hoje! Volte amanhã. 💪");
         return;
       }
       if (blockReason === "active_session") {
+        debugWorkouts("handleStartSession:blocked", { reason: blockReason });
         Alert.alert(
           "Treino em andamento",
           "Você já tem um treino ativo. Finalize o treino atual para iniciar outro.",
@@ -271,7 +290,9 @@ export default function Workouts() {
       const session = await startSession(w.id, w.title, user.id);
       await setActiveSessionFromDbSession(session);
       setSelectedWorkout(w);
+      debugWorkouts("handleStartSession:started", { sessionId: session.id });
     } catch (error) {
+      debugWorkouts("handleStartSession:error");
       Alert.alert("Erro", "Não foi possível iniciar o treino.");
     }
   };
@@ -294,11 +315,11 @@ export default function Workouts() {
     return !days || !Array.isArray(days) || days.length === 0;
   });
 
-  const getYoutubeThumbnail = (url?: string) => {
+  const getYoutubeThumbnail = useCallback((url?: string) => {
     if (!url) return null;
     const id = getYoutubeId(url);
     return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
-  };
+  }, []);
 
   const ensurePreviewThumbnail = useCallback(
     async (index: number, video: string) => {
@@ -307,7 +328,7 @@ export default function Workouts() {
       previewThumbProcessing.current[index] = true;
       try {
         let uri: string | null = null;
-        if (isMp4(video)) {
+        if (isMp4Url(video)) {
           try {
             const result = await VideoThumbnails.getThumbnailAsync(video, {
               time: 1000,
@@ -324,7 +345,7 @@ export default function Workouts() {
         previewThumbProcessing.current[index] = false;
       }
     },
-    [isMp4],
+    [getYoutubeThumbnail],
   );
 
   const previewViewabilityConfig = useMemo(
@@ -366,30 +387,29 @@ export default function Workouts() {
     return () => sub.remove();
   }, [previewPlayer]);
 
-  useEffect(() => {
-    const load = async () => {
-      if (!selectedWorkout || previewActiveVideoIndex == null) {
-        previewPlayer.pause();
-        await previewPlayer.replaceAsync(null);
-        return;
-      }
-      const ex = selectedWorkout.data.exercises[previewActiveVideoIndex];
-      const video = ex?.videoUrl || ex?.video_url;
-      if (!video || !isMp4(video)) {
-        previewPlayer.pause();
-        await previewPlayer.replaceAsync(null);
-        return;
-      }
-      try {
-        setPreviewVideoLoading(true);
-        await previewPlayer.replaceAsync({ uri: video });
-        previewPlayer.play();
-      } catch {
-        setPreviewVideoLoading(false);
-      }
-    };
-    load();
-  }, [isMp4, previewActiveVideoIndex, previewPlayer, selectedWorkout]);
+  const previewVideoUrl = useMemo(() => {
+    if (!selectedWorkout || previewActiveVideoIndex == null) return null;
+    const ex = selectedWorkout.data.exercises[previewActiveVideoIndex];
+    return ex?.videoUrl || ex?.video_url || null;
+  }, [previewActiveVideoIndex, selectedWorkout]);
+
+  const previewMp4Url = useMemo(() => {
+    if (!previewVideoUrl) return null;
+    return isMp4Url(previewVideoUrl) ? previewVideoUrl : null;
+  }, [previewVideoUrl]);
+
+  useMp4PreviewVideo({
+    player: previewPlayer as any,
+    mp4Url: previewMp4Url,
+    setLoading: setPreviewVideoLoading,
+    debug: (message, data) =>
+      debugWorkouts(message, {
+        ...data,
+        workoutId: selectedWorkout?.id,
+        index: previewActiveVideoIndex,
+        hasVideo: !!previewVideoUrl,
+      }),
+  });
 
   useEffect(() => {
     if (openActive !== "1") return;
@@ -758,6 +778,7 @@ export default function Workouts() {
                           ]}
                           onPress={() => setPreviewActiveVideoIndex(i)}
                           activeOpacity={0.9}
+                          testID={`workouts-video-thumb-${i}`}
                         >
                           {thumb ? (
                             <Image
@@ -798,6 +819,7 @@ export default function Workouts() {
                             <TouchableOpacity
                               style={styles.inlineThumbButton}
                               onPress={() => setPreviewFullscreenIndex(i)}
+                              testID={`workouts-video-fullscreen-${i}`}
                             >
                               <Text style={styles.inlineThumbButtonText}>
                                 Tela cheia
@@ -812,6 +834,7 @@ export default function Workouts() {
                                 previewPlayer.pause();
                                 void previewPlayer.replaceAsync(null);
                               }}
+                              testID={`workouts-video-close-${i}`}
                             >
                               <Text style={styles.inlineThumbButtonText}>
                                 Fechar
@@ -826,7 +849,7 @@ export default function Workouts() {
                               </View>
                             )}
 
-                            {isMp4(video) ? (
+                            {isMp4Url(video) ? (
                               <VideoView
                                 player={previewPlayer}
                                 style={styles.inlineThumbVideo}
@@ -895,9 +918,9 @@ export default function Workouts() {
               const ex = selectedWorkout.data.exercises[previewFullscreenIndex];
               const video = ex?.videoUrl || ex?.video_url;
               if (!video) return null;
-              const youtubeId = !isMp4(video) ? getYoutubeId(video) : null;
+              const youtubeId = !isMp4Url(video) ? getYoutubeId(video) : null;
 
-              if (isMp4(video)) {
+              if (isMp4Url(video)) {
                 return (
                   <VideoView
                     player={previewPlayer}
