@@ -605,6 +605,16 @@ export default function Workouts() {
                 const thumb = previewThumbnails[i];
                 const playing = previewActiveVideoIndex === i;
                 const youtubeId = video ? getYoutubeId(video) : null;
+                const videoBoxWidth = Math.min(
+                  170,
+                  Math.max(120, Math.round(viewportWidth * 0.34)),
+                );
+                const videoBoxHeight = Math.round((videoBoxWidth * 16) / 9);
+                const videoHeaderHeight = 34;
+                const videoBodyHeight = Math.max(
+                  1,
+                  videoBoxHeight - videoHeaderHeight,
+                );
 
                 const setsToRender: ExerciseSet[] = (() => {
                   const base: ExerciseSet[] = ex.sets ? [...ex.sets] : [];
@@ -641,173 +651,187 @@ export default function Workouts() {
                 })();
 
                 return (
-                  <View style={styles.exerciseCard}>
-                    <View style={{ flex: 1, paddingRight: 12, minWidth: 0 }}>
-                      <Text style={styles.exerciseName} numberOfLines={2}>
-                        {ex.name}
-                      </Text>
+                  <View>
+                    <Text style={styles.exerciseName} numberOfLines={2}>
+                      {ex.name}
+                    </Text>
+                    <View style={styles.exerciseCard}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <View style={{ gap: 8 }}>
+                          {setsToRender.map((set, idx) => {
+                            let color = "#334155";
+                            let bg = "transparent";
+                            let borderColor = "transparent";
+                            let label = "";
 
-                      <View style={{ gap: 8 }}>
-                        {setsToRender.map((set, idx) => {
-                          let color = "#334155";
-                          let bg = "transparent";
-                          let borderColor = "transparent";
-                          let label = "";
+                            if (set.type === "warmup") {
+                              color = "#ea580c";
+                              bg = "#fff7ed";
+                              borderColor = "#ffedd5";
+                              label = "AQUECIMENTO";
+                            } else if (set.type === "working") {
+                              color = "#16a34a";
+                              bg = "#f0fdf4";
+                              borderColor = "#dcfce7";
+                              label = "TRABALHO";
+                            } else if (set.type === "feeder") {
+                              color = "#0284c7";
+                              bg = "#f0f9ff";
+                              borderColor = "#e0f2fe";
+                              label = "PREPARAÇÃO";
+                            } else if (set.type === "topset") {
+                              color = "#4f46e5";
+                              bg = "#eef2ff";
+                              borderColor = "#e0e7ff";
+                              label = "TOP SET";
+                            } else {
+                              color = "#475569";
+                              bg = "#f8fafc";
+                              borderColor = "#e2e8f0";
+                              label = set.customLabel || "OUTRO";
+                            }
 
-                          if (set.type === "warmup") {
-                            color = "#ea580c";
-                            bg = "#fff7ed";
-                            borderColor = "#ffedd5";
-                            label = "AQUECIMENTO";
-                          } else if (set.type === "working") {
-                            color = "#16a34a";
-                            bg = "#f0fdf4";
-                            borderColor = "#dcfce7";
-                            label = "TRABALHO";
-                          } else if (set.type === "feeder") {
-                            color = "#0284c7";
-                            bg = "#f0f9ff";
-                            borderColor = "#e0f2fe";
-                            label = "PREPARAÇÃO";
-                          } else if (set.type === "topset") {
-                            color = "#4f46e5";
-                            bg = "#eef2ff";
-                            borderColor = "#e0e7ff";
-                            label = "TOP SET";
-                          } else {
-                            color = "#475569";
-                            bg = "#f8fafc";
-                            borderColor = "#e2e8f0";
-                            label = set.customLabel || "OUTRO";
-                          }
-
-                          return (
-                            <ExerciseSetCard
-                              key={`${i}-${idx}`}
-                              variant={video ? "stacked" : "horizontal"}
-                              label={label}
-                              accentColor={color}
-                              backgroundColor={bg}
-                              borderColor={borderColor}
-                              series={set.series}
-                              reps={set.reps}
-                              load={set.load}
-                              rest={set.rest}
-                              testIDPrefix={`workouts-exercise-${i}-set-${idx}`}
-                            />
-                          );
-                        })}
-                      </View>
-
-                      {ex.notes && (
-                        <View style={styles.exNoteSimple}>
-                          <Text style={styles.exNoteText}>{ex.notes}</Text>
+                            return (
+                              <ExerciseSetCard
+                                key={`${i}-${idx}`}
+                                variant={video ? "stacked" : "horizontal"}
+                                label={label}
+                                accentColor={color}
+                                backgroundColor={bg}
+                                borderColor={borderColor}
+                                series={set.series}
+                                reps={set.reps}
+                                load={set.load}
+                                rest={set.rest}
+                                testIDPrefix={`workouts-exercise-${i}-set-${idx}`}
+                              />
+                            );
+                          })}
                         </View>
-                      )}
-                    </View>
 
-                    {!!video && !playing && (
-                      <TouchableOpacity
-                        style={styles.thumbBoxSmall}
-                        onPress={() => setPreviewActiveVideoIndex(i)}
-                        activeOpacity={0.9}
-                      >
-                        {thumb ? (
-                          <Image
-                            source={{ uri: thumb }}
-                            style={{ width: "100%", height: "100%" }}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <View
-                            style={{
-                              flex: 1,
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <ActivityIndicator color="#fff" />
+                        {ex.notes && (
+                          <View style={styles.exNoteSimple}>
+                            <Text style={styles.exNoteText}>{ex.notes}</Text>
                           </View>
                         )}
-                        <View style={styles.playOverlaySmall}>
-                          <Play size={24} fill="#fff" color="#fff" />
-                        </View>
-                      </TouchableOpacity>
-                    )}
+                      </View>
 
-                    {!!video && playing && (
-                      <View style={styles.inlineThumbBox}>
-                        <View style={styles.inlineThumbHeader}>
-                          <TouchableOpacity
-                            style={styles.inlineThumbButton}
-                            onPress={() => setPreviewFullscreenIndex(i)}
-                          >
-                            <Text style={styles.inlineThumbButtonText}>
-                              Tela cheia
-                            </Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.inlineThumbButton}
-                            onPress={() => {
-                              setPreviewActiveVideoIndex(null);
-                              setPreviewFullscreenIndex(null);
-                              setPreviewVideoLoading(false);
-                              previewPlayer.pause();
-                              void previewPlayer.replaceAsync(null);
-                            }}
-                          >
-                            <Text style={styles.inlineThumbButtonText}>
-                              Fechar
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.inlineThumbBody}>
-                          {previewVideoLoading && (
-                            <View style={styles.inlineThumbLoading}>
+                      {!!video && !playing && (
+                        <TouchableOpacity
+                          style={[
+                            styles.thumbBoxSmall,
+                            { width: videoBoxWidth, height: videoBoxHeight },
+                          ]}
+                          onPress={() => setPreviewActiveVideoIndex(i)}
+                          activeOpacity={0.9}
+                        >
+                          {thumb ? (
+                            <Image
+                              source={{ uri: thumb }}
+                              style={{ width: "100%", height: "100%" }}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View
+                              style={{
+                                flex: 1,
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
                               <ActivityIndicator color="#fff" />
                             </View>
                           )}
+                          <View style={styles.playOverlaySmall}>
+                            <Play size={24} fill="#fff" color="#fff" />
+                          </View>
+                        </TouchableOpacity>
+                      )}
 
-                          {isMp4(video) ? (
-                            <VideoView
-                              player={previewPlayer}
-                              style={styles.inlineThumbVideo}
-                              allowsFullscreen={false}
-                              nativeControls
-                            />
-                          ) : (
-                            <>
-                              {Platform.OS === "web" && youtubeId ? (
-                                <iframe
-                                  src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1`}
-                                  style={{
-                                    width: "100%",
-                                    height: "100%",
-                                    border: "none",
-                                  }}
-                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                  allowFullScreen
-                                />
-                              ) : (
-                                <YoutubePlayer
-                                  height={
-                                    styles.inlineThumbVideo.height as number
-                                  }
-                                  width={
-                                    styles.inlineThumbVideo.width as number
-                                  }
-                                  play
-                                  videoId={youtubeId || undefined}
-                                  onReady={() => setPreviewVideoLoading(false)}
-                                  onError={() => setPreviewVideoLoading(false)}
-                                />
-                              )}
-                            </>
-                          )}
+                      {!!video && playing && (
+                        <View
+                          style={[
+                            styles.inlineThumbBox,
+                            { width: videoBoxWidth, height: videoBoxHeight },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.inlineThumbHeader,
+                              { height: videoHeaderHeight },
+                            ]}
+                          >
+                            <TouchableOpacity
+                              style={styles.inlineThumbButton}
+                              onPress={() => setPreviewFullscreenIndex(i)}
+                            >
+                              <Text style={styles.inlineThumbButtonText}>
+                                Tela cheia
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.inlineThumbButton}
+                              onPress={() => {
+                                setPreviewActiveVideoIndex(null);
+                                setPreviewFullscreenIndex(null);
+                                setPreviewVideoLoading(false);
+                                previewPlayer.pause();
+                                void previewPlayer.replaceAsync(null);
+                              }}
+                            >
+                              <Text style={styles.inlineThumbButtonText}>
+                                Fechar
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          <View style={styles.inlineThumbBody}>
+                            {previewVideoLoading && (
+                              <View style={styles.inlineThumbLoading}>
+                                <ActivityIndicator color="#fff" />
+                              </View>
+                            )}
+
+                            {isMp4(video) ? (
+                              <VideoView
+                                player={previewPlayer}
+                                style={styles.inlineThumbVideo}
+                                allowsFullscreen={false}
+                                nativeControls
+                              />
+                            ) : (
+                              <>
+                                {Platform.OS === "web" && youtubeId ? (
+                                  <iframe
+                                    src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1`}
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      border: "none",
+                                    }}
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                  />
+                                ) : (
+                                  <YoutubePlayer
+                                    height={videoBodyHeight}
+                                    width={videoBoxWidth}
+                                    play
+                                    videoId={youtubeId || undefined}
+                                    onReady={() =>
+                                      setPreviewVideoLoading(false)
+                                    }
+                                    onError={() =>
+                                      setPreviewVideoLoading(false)
+                                    }
+                                  />
+                                )}
+                              </>
+                            )}
+                          </View>
                         </View>
-                      </View>
-                    )}
+                      )}
+                    </View>
                   </View>
                 );
               }}
@@ -1138,12 +1162,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.02,
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
-    alignItems: "center",
+    alignItems: "stretch",
   },
   // Thumb Pequena Direita
   thumbBoxSmall: {
-    width: 100,
-    height: 100,
+    width: 120,
+    height: 214,
     borderRadius: 12,
     overflow: "hidden",
     position: "relative",
@@ -1160,7 +1184,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   inlineThumbBox: {
-    width: 100,
+    width: 120,
+    height: 214,
     backgroundColor: "#000",
     borderRadius: 12,
     overflow: "hidden",
@@ -1169,7 +1194,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 6,
-    paddingVertical: 6,
+    paddingVertical: 0,
+    alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.06)",
   },
   inlineThumbButton: {
@@ -1180,8 +1206,8 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.18)",
   },
   inlineThumbButtonText: { color: "#fff", fontWeight: "800", fontSize: 10 },
-  inlineThumbBody: { width: 100, height: 100, position: "relative" },
-  inlineThumbVideo: { width: 100, height: 100 },
+  inlineThumbBody: { flex: 1, position: "relative" },
+  inlineThumbVideo: { width: "100%", height: "100%" },
   inlineThumbLoading: {
     position: "absolute",
     top: 0,

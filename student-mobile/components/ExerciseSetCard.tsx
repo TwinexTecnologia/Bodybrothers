@@ -43,11 +43,19 @@ export default function ExerciseSetCard({
               {label}
             </Text>
           </View>
-          <Text style={styles.setsText} numberOfLines={1} testID={`${prefix}-line-sets`}>
+          <Text
+            style={styles.setsText}
+            numberOfLines={1}
+            testID={`${prefix}-line-sets`}
+          >
             {series} x {reps}
           </Text>
           {!!load && (
-            <Text style={styles.loadTextStacked} numberOfLines={1} testID={`${prefix}-line-load`}>
+            <Text
+              style={styles.loadTextStacked}
+              numberOfLines={1}
+              testID={`${prefix}-line-load`}
+            >
               {load}
             </Text>
           )}
