@@ -145,14 +145,18 @@ function LegacySession() {
         } catch {}
       } else {
         player.pause();
-        await player.replaceAsync(null);
+        try {
+          await player.replaceAsync(null);
+        } catch {}
       }
     };
 
     const pause = () => {
       if (!videoUrl) {
         player.pause();
-        player.replaceAsync(null);
+        try {
+          player.replaceAsync(null);
+        } catch {}
       }
     };
 

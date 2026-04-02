@@ -38,6 +38,7 @@ import { startSession, getWeeklyActivity } from "../../lib/history";
 import { LinearGradient } from "expo-linear-gradient";
 import ActiveWorkoutHeroActions from "../../components/ActiveWorkoutHeroActions";
 import ExerciseSetCard from "../../components/ExerciseSetCard";
+import WorkoutInlineVideo from "../../components/WorkoutInlineVideo";
 import {
   formatElapsedTime,
   useTrainingSession,
@@ -47,6 +48,7 @@ import {
   isMp4Url,
   useMp4PreviewVideo,
 } from "../../lib/workoutsPreviewVideo";
+import { useVideoStrings } from "../../lib/videoStrings";
 import { useLocalSearchParams } from "expo-router";
 import { VideoView, useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
@@ -116,7 +118,9 @@ const DAYS_ORDER = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"];
 export default function Workouts() {
   const { user } = useAuth();
   const { openActive } = useLocalSearchParams<{ openActive?: string }>();
-  const { width: viewportWidth } = useWindowDimensions();
+  const { width: viewportWidth, height: viewportHeight } =
+    useWindowDimensions();
+  const { t: tVideo } = useVideoStrings();
   const {
     activeSession,
     elapsedSeconds,
@@ -144,6 +148,25 @@ export default function Workouts() {
   const previewThumbnailsCache = useRef<Record<number, string>>({});
   const previewThumbProcessing = useRef<Record<number, boolean>>({});
   const previewPlayer = useVideoPlayer("");
+  const previewNativeFullscreenRef = useRef(false);
+  const previewPendingClearRef = useRef(false);
+
+  const clearPreviewPlayer = useCallback(async () => {
+    previewPlayer.pause();
+    try {
+      await previewPlayer.replaceAsync(null);
+    } catch {}
+  }, [previewPlayer]);
+
+  const requestClearPreviewPlayer = useCallback(() => {
+    if (previewNativeFullscreenRef.current) {
+      previewPendingClearRef.current = true;
+      previewPlayer.pause();
+      return;
+    }
+    previewPendingClearRef.current = false;
+    void clearPreviewPlayer();
+  }, [clearPreviewPlayer, previewPlayer]);
 
   const isWide = viewportWidth >= 720;
 
@@ -153,9 +176,8 @@ export default function Workouts() {
     setPreviewActiveVideoIndex(null);
     setPreviewFullscreenIndex(null);
     setPreviewVideoLoading(false);
-    previewPlayer.pause();
-    void previewPlayer.replaceAsync(null);
-  }, [previewPlayer]);
+    requestClearPreviewPlayer();
+  }, [requestClearPreviewPlayer]);
 
   const openActiveWorkout = useCallback(async () => {
     debugWorkouts("openActiveWorkout:request", {
@@ -374,9 +396,8 @@ export default function Workouts() {
     setPreviewThumbnails({});
     previewThumbnailsCache.current = {};
     previewThumbProcessing.current = {};
-    previewPlayer.pause();
-    void previewPlayer.replaceAsync(null);
-  }, [previewPlayer, selectedWorkout?.id]);
+    requestClearPreviewPlayer();
+  }, [requestClearPreviewPlayer, selectedWorkout?.id]);
 
   useEffect(() => {
     const sub = previewPlayer.addListener("statusChange", (status) => {
@@ -659,16 +680,12 @@ export default function Workouts() {
                 const thumb = previewThumbnails[i];
                 const playing = previewActiveVideoIndex === i;
                 const youtubeId = video ? getYoutubeId(video) : null;
+                const suppressInlineVideo = previewFullscreenIndex === i;
                 const videoBoxWidth = Math.max(
                   140,
                   Math.round(viewportWidth * 0.5),
                 );
                 const videoBoxHeight = Math.round((videoBoxWidth * 16) / 9);
-                const videoHeaderHeight = 34;
-                const videoBodyHeight = Math.max(
-                  1,
-                  videoBoxHeight - videoHeaderHeight,
-                );
 
                 const setsToRender: ExerciseSet[] = (() => {
                   const base: ExerciseSet[] = ex.sets ? [...ex.sets] : [];
@@ -810,82 +827,53 @@ export default function Workouts() {
                             { width: videoBoxWidth, height: videoBoxHeight },
                           ]}
                         >
-                          <View
-                            style={[
-                              styles.inlineThumbHeader,
-                              { height: videoHeaderHeight },
-                            ]}
-                          >
-                            <TouchableOpacity
-                              style={styles.inlineThumbButton}
-                              onPress={() => setPreviewFullscreenIndex(i)}
-                              testID={`workouts-video-fullscreen-${i}`}
-                            >
-                              <Text style={styles.inlineThumbButtonText}>
-                                Tela cheia
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.inlineThumbButton}
-                              onPress={() => {
+                          {previewVideoLoading && (
+                            <View style={styles.inlineThumbLoading}>
+                              <ActivityIndicator color="#fff" />
+                            </View>
+                          )}
+
+                          {!suppressInlineVideo ? (
+                            <WorkoutInlineVideo
+                              width={videoBoxWidth}
+                              height={videoBoxHeight}
+                              isMp4={isMp4Url(video)}
+                              mp4Player={previewPlayer as any}
+                              mp4Url={isMp4Url(video) ? video : null}
+                              youtubeId={youtubeId}
+                              onRequestClose={() => {
                                 setPreviewActiveVideoIndex(null);
                                 setPreviewFullscreenIndex(null);
                                 setPreviewVideoLoading(false);
-                                previewPlayer.pause();
-                                void previewPlayer.replaceAsync(null);
+                                requestClearPreviewPlayer();
                               }}
-                              testID={`workouts-video-close-${i}`}
-                            >
-                              <Text style={styles.inlineThumbButtonText}>
-                                Fechar
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-
-                          <View style={styles.inlineThumbBody}>
-                            {previewVideoLoading && (
-                              <View style={styles.inlineThumbLoading}>
-                                <ActivityIndicator color="#fff" />
-                              </View>
-                            )}
-
-                            {isMp4Url(video) ? (
-                              <VideoView
-                                player={previewPlayer}
-                                style={styles.inlineThumbVideo}
-                                allowsFullscreen={false}
-                                nativeControls
-                              />
-                            ) : (
-                              <>
-                                {Platform.OS === "web" && youtubeId ? (
-                                  <iframe
-                                    src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1`}
-                                    style={{
-                                      width: "100%",
-                                      height: "100%",
-                                      border: "none",
-                                    }}
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowFullScreen
-                                  />
-                                ) : (
-                                  <YoutubePlayer
-                                    height={videoBodyHeight}
-                                    width={videoBoxWidth}
-                                    play
-                                    videoId={youtubeId || undefined}
-                                    onReady={() =>
-                                      setPreviewVideoLoading(false)
-                                    }
-                                    onError={() =>
-                                      setPreviewVideoLoading(false)
-                                    }
-                                  />
-                                )}
-                              </>
-                            )}
-                          </View>
+                              onRequestFullscreen={() => {
+                                debugWorkouts(
+                                  "previewVideo:fullscreen_request",
+                                  {
+                                    index: i,
+                                    isMp4: isMp4Url(video),
+                                    platform: Platform.OS,
+                                  },
+                                );
+                                setPreviewFullscreenIndex(i);
+                              }}
+                              onNativeFullscreenChange={(isFullscreen) => {
+                                previewNativeFullscreenRef.current =
+                                  isFullscreen;
+                                if (
+                                  !isFullscreen &&
+                                  previewPendingClearRef.current
+                                ) {
+                                  previewPendingClearRef.current = false;
+                                  void clearPreviewPlayer();
+                                }
+                              }}
+                              testIDPrefix={`workouts-video-${i}`}
+                            />
+                          ) : (
+                            <View style={styles.inlineThumbBody} />
+                          )}
                         </View>
                       )}
                     </View>
@@ -907,7 +895,9 @@ export default function Workouts() {
             <Text style={{ color: "#fff", fontWeight: "bold" }}>Vídeo</Text>
             <TouchableOpacity
               onPress={() => setPreviewFullscreenIndex(null)}
-              style={{ padding: 8 }}
+              style={styles.videoHeaderClose}
+              accessibilityRole="button"
+              accessibilityLabel={tVideo("close")}
             >
               <X color="#fff" size={24} />
             </TouchableOpacity>
@@ -925,7 +915,7 @@ export default function Workouts() {
                   <VideoView
                     player={previewPlayer}
                     style={{ flex: 1 }}
-                    allowsFullscreen={false}
+                    fullscreenOptions={{ enable: true, orientation: "default" }}
                     nativeControls
                   />
                 );
@@ -951,10 +941,20 @@ export default function Workouts() {
                   }}
                 >
                   <YoutubePlayer
-                    height={360}
+                    height={Math.max(
+                      200,
+                      Math.min(
+                        viewportHeight - 72,
+                        Math.round((Math.min(viewportWidth, 960) * 9) / 16),
+                      ),
+                    )}
                     width={Math.min(viewportWidth, 960)}
                     play
                     videoId={youtubeId || undefined}
+                    initialPlayerParams={{
+                      controls: true,
+                      preventFullScreen: true,
+                    }}
                     onReady={() => setPreviewVideoLoading(false)}
                     onError={() => setPreviewVideoLoading(false)}
                   />
@@ -1296,5 +1296,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  videoHeaderClose: {
+    minWidth: 44,
+    minHeight: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

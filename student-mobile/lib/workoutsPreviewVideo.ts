@@ -40,7 +40,11 @@ export function useMp4PreviewVideo({
         }
         lastLoadedUriRef.current = null;
         player.pause();
-        await player.replaceAsync(null);
+        try {
+          await player.replaceAsync(null);
+        } catch {
+          setLoading(false);
+        }
         return;
       }
 
@@ -65,4 +69,3 @@ export function useMp4PreviewVideo({
 
   return { reset };
 }
-
