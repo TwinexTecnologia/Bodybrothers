@@ -113,47 +113,47 @@ export default function ExerciseSetCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 8,
+    padding: 8,
     borderWidth: 1,
   },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: 10,
+    gap: 6,
   },
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     minWidth: 0,
     flex: 1,
   },
   stackedLayout: {
-    gap: 6,
+    gap: 4,
     minWidth: 0,
   },
   badge: {
     backgroundColor: "#fff",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
     alignSelf: "flex-start",
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.5,
   },
   setsText: {
     fontWeight: "800",
     color: "#1e293b",
-    fontSize: 14,
+    fontSize: 13,
     flexShrink: 1,
   },
   loadTextHorizontal: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#475569",
     fontWeight: "800",
     textTransform: "uppercase",
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   loadTextStacked: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#475569",
     fontWeight: "800",
     textTransform: "uppercase",
@@ -171,12 +171,12 @@ const styles = StyleSheet.create({
   restRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginTop: 8,
+    gap: 4,
+    marginTop: 4,
     minWidth: 0,
   },
   restText: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#64748b",
     fontWeight: "700",
     flexShrink: 1,

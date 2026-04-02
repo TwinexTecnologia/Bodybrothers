@@ -605,9 +605,9 @@ export default function Workouts() {
                 const thumb = previewThumbnails[i];
                 const playing = previewActiveVideoIndex === i;
                 const youtubeId = video ? getYoutubeId(video) : null;
-                const videoBoxWidth = Math.min(
-                  170,
-                  Math.max(120, Math.round(viewportWidth * 0.34)),
+                const videoBoxWidth = Math.max(
+                  140,
+                  Math.round(viewportWidth * 0.5),
                 );
                 const videoBoxHeight = Math.round((videoBoxWidth * 16) / 9);
                 const videoHeaderHeight = 34;
@@ -656,8 +656,8 @@ export default function Workouts() {
                       {ex.name}
                     </Text>
                     <View style={styles.exerciseCard}>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <View style={{ gap: 8 }}>
+                      <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
+                        <View style={{ gap: 6 }}>
                           {setsToRender.map((set, idx) => {
                             let color = "#334155";
                             let bg = "transparent";
@@ -1151,11 +1151,11 @@ const styles = StyleSheet.create({
 
   exerciseCard: {
     backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
     flexDirection: "row",
-    gap: 12,
+    gap: 8,
     borderWidth: 1,
     borderColor: "#f1f5f9",
     shadowColor: "#000",
