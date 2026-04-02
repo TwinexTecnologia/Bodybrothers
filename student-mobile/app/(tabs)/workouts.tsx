@@ -36,7 +36,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { startSession, getWeeklyActivity } from "../../lib/history";
 import { LinearGradient } from "expo-linear-gradient";
-import ActiveTrainingModal from "../../components/ActiveTrainingModal";
+import ActiveWorkoutHeroActions from "../../components/ActiveWorkoutHeroActions";
 import ExerciseSetCard from "../../components/ExerciseSetCard";
 import {
   formatElapsedTime,
@@ -107,7 +107,6 @@ export default function Workouts() {
     activeSession,
     elapsedSeconds,
     loading: trainingLoading,
-    resumeToken,
     setActiveSessionFromDbSession,
     clearActiveSession,
   } = useTrainingSession();
@@ -117,7 +116,6 @@ export default function Workouts() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
-  const [showActiveTraining, setShowActiveTraining] = useState(false);
 
   const [previewActiveVideoIndex, setPreviewActiveVideoIndex] = useState<
     number | null
@@ -153,6 +151,33 @@ export default function Workouts() {
     previewPlayer.pause();
     void previewPlayer.replaceAsync(null);
   }, [previewPlayer]);
+
+  const openActiveWorkout = useCallback(async () => {
+    if (!activeSession) return;
+    if (!activeSession.workoutId) {
+      Alert.alert("Erro", "Não foi possível abrir o treino ativo.");
+      return;
+    }
+    if (selectedWorkout?.id === activeSession.workoutId) return;
+
+    const local = workouts.find((w) => w.id === activeSession.workoutId);
+    if (local) {
+      setSelectedWorkout(local);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("protocols")
+        .select("*")
+        .eq("id", activeSession.workoutId)
+        .single();
+      if (error || !data) throw error || new Error("workout_not_found");
+      setSelectedWorkout(data);
+    } catch {
+      Alert.alert("Erro", "Não foi possível abrir o treino ativo.");
+    }
+  }, [activeSession, selectedWorkout?.id, workouts]);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -236,7 +261,7 @@ export default function Workouts() {
             { text: "Cancelar", style: "cancel" },
             {
               text: "Abrir treino ativo",
-              onPress: () => setShowActiveTraining(true),
+              onPress: () => void openActiveWorkout(),
             },
           ],
         );
@@ -244,9 +269,8 @@ export default function Workouts() {
       }
 
       const session = await startSession(w.id, w.title, user.id);
-      setSelectedWorkout(null);
       await setActiveSessionFromDbSession(session);
-      setShowActiveTraining(true);
+      setSelectedWorkout(w);
     } catch (error) {
       Alert.alert("Erro", "Não foi possível iniciar o treino.");
     }
@@ -368,17 +392,11 @@ export default function Workouts() {
   }, [isMp4, previewActiveVideoIndex, previewPlayer, selectedWorkout]);
 
   useEffect(() => {
-    if (!activeSession) return;
-    if (trainingLoading) return;
-    setShowActiveTraining(true);
-  }, [activeSession, resumeToken, trainingLoading]);
-
-  useEffect(() => {
     if (openActive !== "1") return;
     if (!activeSession) return;
     if (trainingLoading) return;
-    setShowActiveTraining(true);
-  }, [activeSession, openActive, trainingLoading]);
+    void openActiveWorkout();
+  }, [activeSession, openActive, openActiveWorkout, trainingLoading]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -411,7 +429,7 @@ export default function Workouts() {
             </View>
             <TouchableOpacity
               style={styles.activeBannerButton}
-              onPress={() => setShowActiveTraining(true)}
+              onPress={() => void openActiveWorkout()}
             >
               <Text style={styles.activeBannerButtonText}>Abrir</Text>
             </TouchableOpacity>
@@ -549,8 +567,24 @@ export default function Workouts() {
                     <CheckCircle size={20} color="#16a34a" />
                     <Text style={styles.doneText}>TREINO REALIZADO</Text>
                   </View>
+                ) : activeSession &&
+                  activeSession.workoutId === selectedWorkout.id ? (
+                  <ActiveWorkoutHeroActions
+                    session={activeSession}
+                    elapsedSeconds={elapsedSeconds}
+                    onFinished={async () => {
+                      await clearActiveSession();
+                    }}
+                    onRequestRefreshDays={async () => {
+                      if (!user) return;
+                      const days = await getWeeklyActivity(user.id);
+                      setActiveDays(days);
+                    }}
+                    onPause={() => setSelectedWorkout(null)}
+                    onCloseParentModal={() => setSelectedWorkout(null)}
+                  />
                 ) : activeSession ? (
-                  <TouchableOpacity onPress={() => setShowActiveTraining(true)}>
+                  <TouchableOpacity onPress={() => void openActiveWorkout()}>
                     <LinearGradient
                       colors={["#0ea5e9", "#0284c7"]}
                       style={styles.startButton}
@@ -909,24 +943,6 @@ export default function Workouts() {
           )}
         </View>
       </Modal>
-
-      {!!activeSession && (
-        <ActiveTrainingModal
-          visible={showActiveTraining}
-          session={activeSession}
-          elapsedSeconds={elapsedSeconds}
-          onClose={() => setShowActiveTraining(false)}
-          onFinished={async () => {
-            await clearActiveSession();
-            setShowActiveTraining(false);
-          }}
-          onRequestRefreshDays={async () => {
-            if (!user) return;
-            const days = await getWeeklyActivity(user.id);
-            setActiveDays(days);
-          }}
-        />
-      )}
     </SafeAreaView>
   );
 }

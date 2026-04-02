@@ -76,6 +76,11 @@ export async function finishSession(
   return mapFromDb(data);
 }
 
+export async function cancelSession(id: string) {
+  const { error } = await supabase.from("workout_history").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function getSessionById(id: string): Promise<WorkoutSession> {
   const { data, error } = await supabase
     .from("workout_history")
