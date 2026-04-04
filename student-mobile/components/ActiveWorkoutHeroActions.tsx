@@ -9,8 +9,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { CheckCircle, Clock, Pause, StopCircle, XCircle } from "lucide-react-native";
+import {
+  CheckCircle,
+  Clock,
+  Pause,
+  Play,
+  StopCircle,
+  XCircle,
+} from "lucide-react-native";
 import { cancelSession, finishSession } from "../lib/history";
+import { showTrainingFinishedNotification } from "../lib/trainingNotifications";
+import type { ActiveTrainingSession } from "../lib/trainingSessionTypes";
+import { formatElapsedTime } from "../lib/trainingSessionTypes";
 
 const DEBUG_WORKOUTS =
   __DEV__ && process.env.EXPO_PUBLIC_DEBUG_WORKOUTS === "1";
@@ -21,37 +31,23 @@ function debugWorkouts(message: string, data?: Record<string, unknown>) {
   else console.log(`[workouts] ${message}`);
 }
 
-type ActiveTrainingSession = {
-  id: string;
-  studentId: string;
-  workoutId: string;
-  workoutTitle: string;
-  startedAt: string;
-  notificationId?: string;
-};
-
-function formatElapsedTime(seconds: number) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return h > 0
-    ? `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
-    : `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-}
-
 export default function ActiveWorkoutHeroActions({
   session,
   elapsedSeconds,
+  isPaused,
   onFinished,
   onRequestRefreshDays,
   onPause,
+  onResume,
   onCloseParentModal,
 }: {
   session: ActiveTrainingSession;
   elapsedSeconds: number;
+  isPaused: boolean;
   onFinished: () => Promise<void>;
   onRequestRefreshDays: () => Promise<void>;
   onPause: () => void;
+  onResume: () => void;
   onCloseParentModal: () => void;
 }) {
   const [showFinishModal, setShowFinishModal] = useState(false);
@@ -72,6 +68,7 @@ export default function ActiveWorkoutHeroActions({
       await finishSession(session.id, elapsedSeconds, sessionNotes);
       await onFinished();
       await onRequestRefreshDays();
+      void showTrainingFinishedNotification(session.workoutTitle);
       setShowFinishModal(false);
       setShowSuccessModal(true);
     } catch {
@@ -145,13 +142,17 @@ export default function ActiveWorkoutHeroActions({
 
         <TouchableOpacity
           style={[styles.activeHeroActionButton, styles.activeHeroPauseButton]}
-          onPress={onPause}
+          onPress={isPaused ? onResume : onPause}
           disabled={isFinishing || isCanceling}
-          testID="active-hero-pause"
+          testID={isPaused ? "active-hero-resume" : "active-hero-pause"}
         >
-          <Pause color="#0f172a" size={18} />
+          {isPaused ? (
+            <Play color="#0f172a" size={18} fill="#0f172a" />
+          ) : (
+            <Pause color="#0f172a" size={18} />
+          )}
           <Text style={[styles.activeHeroActionText, styles.activeHeroPauseText]}>
-            Pausar
+            {isPaused ? "Retomar" : "Pausar"}
           </Text>
         </TouchableOpacity>
 

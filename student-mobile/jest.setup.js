@@ -30,12 +30,26 @@ jest.mock("react-native-webview", () => ({
 }));
 
 jest.mock("expo-notifications", () => ({
-  AndroidImportance: { LOW: 2 },
+  AndroidImportance: {
+    LOW: 2,
+    HIGH: 6,
+    MAX: 7,
+  },
   AndroidNotificationVisibility: { PUBLIC: 1 },
+  SchedulableTriggerInputTypes: { TIME_INTERVAL: "timeInterval" },
   getPermissionsAsync: jest.fn(async () => ({ granted: true })),
   requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
   setNotificationChannelAsync: jest.fn(async () => {}),
+  setNotificationCategoryAsync: jest.fn(async () => {}),
+  setNotificationHandler: jest.fn(),
   scheduleNotificationAsync: jest.fn(async () => "notif://id"),
   dismissNotificationAsync: jest.fn(async () => {}),
   cancelScheduledNotificationAsync: jest.fn(async () => {}),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  registerTaskAsync: jest.fn(async () => null),
+  getPresentedNotificationsAsync: jest.fn(async () => []),
+}));
+
+jest.mock("expo-task-manager", () => ({
+  defineTask: jest.fn(),
 }));

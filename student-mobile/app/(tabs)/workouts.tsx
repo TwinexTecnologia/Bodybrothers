@@ -104,6 +104,22 @@ function debugWorkouts(message: string, data?: Record<string, unknown>) {
   else console.log(`[workouts] ${message}`);
 }
 
+function getPrimaryExerciseTypeLabel(ex: Exercise): string {
+  const sets = ex.sets;
+  if (sets && sets.length > 0) {
+    const t = sets[0].type;
+    if (t === "warmup") return "Aquecimento";
+    if (t === "working") return "Série principal";
+    if (t === "feeder") return "Feeder";
+    if (t === "topset") return "Top set";
+    if (t === "custom")
+      return sets[0].customLabel?.trim() || "Personalizado";
+  }
+  if (ex.warmupSeries || ex.warmupReps) return "Aquecimento";
+  if (ex.feederSeries || ex.feederReps) return "Feeder";
+  return "Série principal";
+}
+
 const DAYS_MAP: Record<string, string> = {
   seg: "Segunda-feira",
   ter: "Terça-feira",
@@ -127,6 +143,10 @@ export default function Workouts() {
     loading: trainingLoading,
     setActiveSessionFromDbSession,
     clearActiveSession,
+    isPaused,
+    pauseTraining,
+    resumeTraining,
+    updateCurrentExercise,
   } = useTrainingSession();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [schedule, setSchedule] = useState<Record<string, string[]>>({});
@@ -374,11 +394,15 @@ export default function Workouts() {
     () => ({ itemVisiblePercentThreshold: 35 }),
     [],
   );
-  const onPreviewViewableItemsChanged = useRef(
+  const onPreviewViewableItemsChanged = useCallback(
     ({
       viewableItems,
     }: {
-      viewableItems: Array<{ index: number | null; item: Exercise }>;
+      viewableItems: Array<{
+        index: number | null;
+        item: Exercise;
+        isViewable?: boolean;
+      }>;
     }) => {
       viewableItems.forEach((v) => {
         if (v.index == null) return;
@@ -386,7 +410,30 @@ export default function Workouts() {
         if (!video) return;
         void ensurePreviewThumbnail(v.index, video);
       });
+
+      if (
+        !activeSession ||
+        !selectedWorkout ||
+        activeSession.workoutId !== selectedWorkout.id
+      ) {
+        return;
+      }
+      const visible = viewableItems.filter(
+        (v) =>
+          v.index != null &&
+          (v.isViewable === undefined || v.isViewable === true),
+      );
+      const top = visible[0];
+      if (!top?.item || top.index == null) return;
+      const label = getPrimaryExerciseTypeLabel(top.item);
+      void updateCurrentExercise(top.item.name, label);
     },
+    [
+      activeSession,
+      selectedWorkout,
+      ensurePreviewThumbnail,
+      updateCurrentExercise,
+    ],
   );
 
   useEffect(() => {
@@ -463,7 +510,8 @@ export default function Workouts() {
               <Text style={styles.activeBannerTitle} numberOfLines={1}>
                 Treino em andamento
               </Text>
-              <Text style={styles.activeBannerSubtitle} numberOfLines={1}>
+              <Text style={styles.activeBannerSubtitle} numberOfLines={2}>
+                {isPaused ? "Pausado · " : ""}
                 {activeSession.workoutTitle} •{" "}
                 {formatElapsedTime(elapsedSeconds)}
               </Text>
@@ -613,6 +661,7 @@ export default function Workouts() {
                   <ActiveWorkoutHeroActions
                     session={activeSession}
                     elapsedSeconds={elapsedSeconds}
+                    isPaused={isPaused}
                     onFinished={async () => {
                       await clearActiveSession();
                     }}
@@ -621,7 +670,11 @@ export default function Workouts() {
                       const days = await getWeeklyActivity(user.id);
                       setActiveDays(days);
                     }}
-                    onPause={() => setSelectedWorkout(null)}
+                    onPause={() => {
+                      void pauseTraining();
+                      setSelectedWorkout(null);
+                    }}
+                    onResume={() => void resumeTraining()}
                     onCloseParentModal={() => setSelectedWorkout(null)}
                   />
                 ) : activeSession ? (
@@ -657,7 +710,7 @@ export default function Workouts() {
               keyExtractor={(_, i) => String(i)}
               contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
               viewabilityConfig={previewViewabilityConfig}
-              onViewableItemsChanged={onPreviewViewableItemsChanged.current}
+              onViewableItemsChanged={onPreviewViewableItemsChanged}
               ListHeaderComponent={
                 selectedWorkout.data.notes ? (
                   <View style={styles.notesBox}>

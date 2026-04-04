@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
   useCallback,
@@ -16,66 +15,48 @@ import {
   dismissTrainingNotification,
   showTrainingNotification,
 } from "./trainingNotifications";
+import { loadActiveSession, saveActiveSession } from "./trainingSessionStorage";
+import {
+  computeElapsedSeconds,
+  formatElapsedTime,
+  type ActiveTrainingSession,
+} from "./trainingSessionTypes";
 
-export type ActiveTrainingSession = {
-  id: string;
-  studentId: string;
-  workoutId: string;
-  workoutTitle: string;
-  startedAt: string;
-  notificationId?: string;
-};
+export type {
+  ActiveTrainingSession,
+} from "./trainingSessionTypes";
+
+export { formatElapsedTime } from "./trainingSessionTypes";
 
 type TrainingSessionContextValue = {
   loading: boolean;
   activeSession: ActiveTrainingSession | null;
   elapsedSeconds: number;
   resumeToken: number;
+  isPaused: boolean;
   setActiveSessionFromDbSession: (session: WorkoutSession) => Promise<void>;
   clearActiveSession: () => Promise<void>;
   syncWithServer: () => Promise<void>;
   setNotificationId: (notificationId: string | undefined) => Promise<void>;
+  pauseTraining: () => Promise<void>;
+  resumeTraining: () => Promise<void>;
+  updateCurrentExercise: (name: string, typeLabel: string) => Promise<void>;
 };
-
-const STORAGE_KEY = "@fitbody:active_training_session_v1";
 
 const TrainingSessionContext = createContext<TrainingSessionContextValue>({
   loading: true,
   activeSession: null,
   elapsedSeconds: 0,
   resumeToken: 0,
+  isPaused: false,
   setActiveSessionFromDbSession: async () => {},
   clearActiveSession: async () => {},
   syncWithServer: async () => {},
   setNotificationId: async () => {},
+  pauseTraining: async () => {},
+  resumeTraining: async () => {},
+  updateCurrentExercise: async () => {},
 });
-
-function safeParseSession(raw: string | null): ActiveTrainingSession | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-    if (
-      typeof parsed.id !== "string" ||
-      typeof parsed.studentId !== "string" ||
-      typeof parsed.workoutId !== "string" ||
-      typeof parsed.workoutTitle !== "string" ||
-      typeof parsed.startedAt !== "string"
-    ) {
-      return null;
-    }
-    return parsed as ActiveTrainingSession;
-  } catch {
-    return null;
-  }
-}
-
-function computeElapsedSeconds(startedAtIso: string, nowMs: number) {
-  const startMs = new Date(startedAtIso).getTime();
-  if (!Number.isFinite(startMs)) return 0;
-  const diffSec = Math.floor((nowMs - startMs) / 1000);
-  return diffSec > 0 ? diffSec : 0;
-}
 
 export function TrainingSessionProvider({
   children,
@@ -89,16 +70,51 @@ export function TrainingSessionProvider({
   );
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [resumeToken, setResumeToken] = useState(0);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateRef = useRef(AppState.currentState);
+  const sessionRef = useRef<ActiveTrainingSession | null>(null);
+  sessionRef.current = activeSession;
+
+  const isPaused = Boolean(activeSession?.pauseStartedAt);
 
   const persist = useCallback(async (value: ActiveTrainingSession | null) => {
-    if (!value) {
-      await AsyncStorage.removeItem(STORAGE_KEY);
-      return;
-    }
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    await saveActiveSession(value);
   }, []);
+
+  const setActiveSessionFromDbSession = useCallback(
+    async (session: WorkoutSession) => {
+      const next: ActiveTrainingSession = {
+        id: session.id,
+        studentId: session.studentId,
+        workoutId: session.workoutId || "",
+        workoutTitle: session.workoutTitle,
+        startedAt: session.startedAt,
+        totalPausedSeconds: 0,
+        pauseStartedAt: null,
+      };
+      setActiveSession((prev) => {
+        let result: ActiveTrainingSession;
+        if (prev && prev.id === next.id) {
+          result = {
+            ...next,
+            notificationId: prev.notificationId,
+            totalPausedSeconds: prev.totalPausedSeconds ?? 0,
+            pauseStartedAt: prev.pauseStartedAt ?? null,
+            currentExerciseName: prev.currentExerciseName,
+            currentExerciseTypeLabel: prev.currentExerciseTypeLabel,
+          };
+        } else {
+          result = { ...next, totalPausedSeconds: 0, pauseStartedAt: null };
+        }
+        void persist(result);
+        queueMicrotask(() =>
+          setElapsedSeconds(computeElapsedSeconds(result, Date.now())),
+        );
+        return result;
+      });
+    },
+    [persist],
+  );
 
   const syncWithServer = useCallback(async () => {
     if (!user) return;
@@ -114,31 +130,13 @@ export function TrainingSessionProvider({
       }
       await setActiveSessionFromDbSession(serverActive);
     } catch {}
-  }, [activeSession?.studentId, persist, user]);
-
-  const setActiveSessionFromDbSession = useCallback(
-    async (session: WorkoutSession) => {
-      const next: ActiveTrainingSession = {
-        id: session.id,
-        studentId: session.studentId,
-        workoutId: session.workoutId || "",
-        workoutTitle: session.workoutTitle,
-        startedAt: session.startedAt,
-      };
-      setActiveSession((prev) => ({
-        ...next,
-        notificationId: prev?.notificationId,
-      }));
-      setElapsedSeconds(computeElapsedSeconds(next.startedAt, Date.now()));
-      await persist({
-        ...next,
-        notificationId: activeSession?.notificationId,
-      });
-    },
-    [activeSession?.notificationId, persist],
-  );
+  }, [activeSession?.studentId, persist, setActiveSessionFromDbSession, user]);
 
   const clearActiveSession = useCallback(async () => {
+    const prev = sessionRef.current;
+    if (prev?.notificationId) {
+      await dismissTrainingNotification(prev.notificationId);
+    }
     setActiveSession(null);
     setElapsedSeconds(0);
     await persist(null);
@@ -148,31 +146,75 @@ export function TrainingSessionProvider({
     async (notificationId: string | undefined) => {
       setActiveSession((prev) => {
         if (!prev) return prev;
-        return { ...prev, notificationId };
+        const updated = { ...prev, notificationId };
+        void saveActiveSession(updated);
+        return updated;
       });
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
-      const existing = safeParseSession(raw);
-      if (!existing) return;
-      await persist({ ...existing, notificationId });
     },
-    [persist],
+    [],
+  );
+
+  const pauseTraining = useCallback(async () => {
+    setActiveSession((prev) => {
+      if (!prev || prev.pauseStartedAt) return prev;
+      const next: ActiveTrainingSession = {
+        ...prev,
+        pauseStartedAt: new Date().toISOString(),
+      };
+      void saveActiveSession(next);
+      return next;
+    });
+  }, []);
+
+  const resumeTraining = useCallback(async () => {
+    setActiveSession((prev) => {
+      if (!prev?.pauseStartedAt) return prev;
+      const p = new Date(prev.pauseStartedAt).getTime();
+      const add = Math.max(0, Math.floor((Date.now() - p) / 1000));
+      const next: ActiveTrainingSession = {
+        ...prev,
+        pauseStartedAt: null,
+        totalPausedSeconds: (prev.totalPausedSeconds ?? 0) + add,
+      };
+      void saveActiveSession(next);
+      return next;
+    });
+  }, []);
+
+  const updateCurrentExercise = useCallback(
+    async (name: string, typeLabel: string) => {
+      setActiveSession((prev) => {
+        if (!prev) return prev;
+        const next: ActiveTrainingSession = {
+          ...prev,
+          currentExerciseName: name,
+          currentExerciseTypeLabel: typeLabel,
+        };
+        void saveActiveSession(next);
+        return next;
+      });
+    },
+    [],
   );
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        const stored = safeParseSession(raw);
+        const stored = await loadActiveSession();
         if (!mounted) return;
 
         if (stored && user && stored.studentId !== user.id) {
-          await AsyncStorage.removeItem(STORAGE_KEY);
+          await saveActiveSession(null);
           setActiveSession(null);
           setElapsedSeconds(0);
         } else {
           setActiveSession(stored);
-          setElapsedSeconds(stored ? computeElapsedSeconds(stored.startedAt, Date.now()) : 0);
+          setElapsedSeconds(
+            stored
+              ? computeElapsedSeconds(stored, Date.now())
+              : 0,
+          );
         }
 
         if (user) {
@@ -193,7 +235,9 @@ export function TrainingSessionProvider({
     if (appStateRef.current !== "active") return;
 
     intervalRef.current = setInterval(() => {
-      setElapsedSeconds(computeElapsedSeconds(activeSession.startedAt, Date.now()));
+      const s = sessionRef.current;
+      if (!s) return;
+      setElapsedSeconds(computeElapsedSeconds(s, Date.now()));
     }, 1000);
 
     return () => {
@@ -207,14 +251,22 @@ export function TrainingSessionProvider({
       appStateRef.current = nextState;
 
       if (nextState === "active") {
+        if (user) {
+          const latest = await loadActiveSession();
+          if (latest && latest.studentId === user.id) {
+            setActiveSession(latest);
+            setElapsedSeconds(computeElapsedSeconds(latest, Date.now()));
+          }
+        }
         setResumeToken((t) => t + 1);
-        if (activeSession) {
-          setElapsedSeconds(computeElapsedSeconds(activeSession.startedAt, Date.now()));
+        const s = sessionRef.current;
+        if (s) {
+          setElapsedSeconds(computeElapsedSeconds(s, Date.now()));
           if (prev !== "active") {
             router.replace("/(tabs)/workouts");
           }
-          if (activeSession.notificationId) {
-            await dismissTrainingNotification(activeSession.notificationId);
+          if (s.notificationId) {
+            await dismissTrainingNotification(s.notificationId);
             await setNotificationId(undefined);
           }
         }
@@ -222,15 +274,20 @@ export function TrainingSessionProvider({
       }
 
       if (prev === "active" && nextState !== "active") {
-        if (activeSession) {
-          const seconds = computeElapsedSeconds(activeSession.startedAt, Date.now());
+        const s = sessionRef.current;
+        if (s) {
+          const seconds = computeElapsedSeconds(s, Date.now());
           setElapsedSeconds(seconds);
-          if (activeSession.notificationId) {
-            await dismissTrainingNotification(activeSession.notificationId);
+          if (s.notificationId) {
+            await dismissTrainingNotification(s.notificationId);
           }
           const id = await showTrainingNotification({
-            workoutTitle: activeSession.workoutTitle,
+            workoutTitle: s.workoutTitle,
             elapsedSeconds: seconds,
+            exerciseName: s.currentExerciseName,
+            exerciseTypeLabel: s.currentExerciseTypeLabel,
+            state: s.pauseStartedAt ? "paused" : "active",
+            sessionId: s.id,
           });
           if (id) {
             await setNotificationId(id);
@@ -240,7 +297,7 @@ export function TrainingSessionProvider({
     });
 
     return () => sub.remove();
-  }, [activeSession, syncWithServer]);
+  }, [setNotificationId, syncWithServer, user]);
 
   const value = useMemo<TrainingSessionContextValue>(
     () => ({
@@ -248,20 +305,28 @@ export function TrainingSessionProvider({
       activeSession,
       elapsedSeconds,
       resumeToken,
+      isPaused,
       setActiveSessionFromDbSession,
       clearActiveSession,
       syncWithServer,
       setNotificationId,
+      pauseTraining,
+      resumeTraining,
+      updateCurrentExercise,
     }),
     [
       activeSession,
       clearActiveSession,
       elapsedSeconds,
+      isPaused,
       loading,
+      pauseTraining,
+      resumeTraining,
       resumeToken,
       setActiveSessionFromDbSession,
       setNotificationId,
       syncWithServer,
+      updateCurrentExercise,
     ],
   );
 
@@ -274,13 +339,4 @@ export function TrainingSessionProvider({
 
 export function useTrainingSession() {
   return useContext(TrainingSessionContext);
-}
-
-export function formatElapsedTime(seconds: number) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return h > 0
-    ? `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
-    : `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }

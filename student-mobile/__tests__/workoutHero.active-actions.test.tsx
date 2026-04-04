@@ -9,6 +9,10 @@ jest.mock("../lib/history", () => ({
   cancelSession: jest.fn(async () => {}),
 }));
 
+jest.mock("../lib/trainingNotifications", () => ({
+  showTrainingFinishedNotification: jest.fn(async () => {}),
+}));
+
 import { finishSession, cancelSession } from "../lib/history";
 import ActiveWorkoutHeroActions from "../components/ActiveWorkoutHeroActions";
 
@@ -34,15 +38,19 @@ describe("ActiveWorkoutHeroActions", () => {
       workoutId: "workout-1",
       workoutTitle: "Treino A",
       startedAt: new Date("2026-03-31T12:00:00.000Z").toISOString(),
+      totalPausedSeconds: 0,
+      pauseStartedAt: null,
     };
 
     const { getByTestId, getByText, queryByText, getByPlaceholderText } = render(
       <ActiveWorkoutHeroActions
         session={session as any}
         elapsedSeconds={90}
+        isPaused={false}
         onFinished={onFinished}
         onRequestRefreshDays={onRequestRefreshDays}
         onPause={onPause}
+        onResume={jest.fn()}
         onCloseParentModal={onCloseParentModal}
       />,
     );
@@ -86,12 +94,16 @@ describe("ActiveWorkoutHeroActions", () => {
             workoutId: "workout-1",
             workoutTitle: "Treino A",
             startedAt: new Date().toISOString(),
+            totalPausedSeconds: 0,
+            pauseStartedAt: null,
           } as any
         }
         elapsedSeconds={10}
+        isPaused={false}
         onFinished={async () => {}}
         onRequestRefreshDays={async () => {}}
         onPause={onPause}
+        onResume={jest.fn()}
         onCloseParentModal={() => {}}
       />,
     );
@@ -116,12 +128,16 @@ describe("ActiveWorkoutHeroActions", () => {
             workoutId: "workout-1",
             workoutTitle: "Treino A",
             startedAt: new Date().toISOString(),
+            totalPausedSeconds: 0,
+            pauseStartedAt: null,
           } as any
         }
         elapsedSeconds={10}
+        isPaused={false}
         onFinished={onFinished}
         onRequestRefreshDays={onRequestRefreshDays}
         onPause={() => {}}
+        onResume={jest.fn()}
         onCloseParentModal={onCloseParentModal}
       />,
     );
