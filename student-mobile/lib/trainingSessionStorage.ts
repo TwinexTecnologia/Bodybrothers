@@ -43,6 +43,12 @@ function safeParseV2(raw: string | null): ActiveTrainingSession | null {
         typeof parsed.notificationId === "string"
           ? parsed.notificationId
           : undefined,
+      lastInteractionAt:
+        typeof parsed.lastInteractionAt === "string"
+          ? parsed.lastInteractionAt
+          : typeof parsed.startedAt === "string"
+            ? parsed.startedAt
+            : new Date().toISOString(),
     } as ActiveTrainingSession;
   } catch {
     return null;
@@ -67,6 +73,7 @@ function safeParseLegacy(raw: string | null): ActiveTrainingSession | null {
       ...parsed,
       totalPausedSeconds: 0,
       pauseStartedAt: null,
+      lastInteractionAt: parsed.startedAt,
     } as ActiveTrainingSession;
   } catch {
     return null;

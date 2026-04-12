@@ -218,6 +218,32 @@ export async function showTrainingNotification(
   return id;
 }
 
+export async function showTrainingInactiveAutoClosedNotification(
+  workoutTitle: string,
+): Promise<void> {
+  if (Platform.OS === "web") return;
+  const granted = await ensureTrainingNotificationPermission();
+  if (!granted) return;
+  await ensureTrainingNotificationSetup();
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Treino encerrado",
+      body: `O treino "${workoutTitle}" foi encerrado por inatividade.`,
+      sound: true,
+      color: NOTIFICATION_COLOR_FINISHED,
+      ...(Platform.OS === "android"
+        ? { priority: Notifications.AndroidNotificationPriority.HIGH }
+        : {}),
+      data: { kind: "training_inactive_auto_closed" },
+      ...(Platform.OS === "android"
+        ? { channelId: CHANNEL_FINISHED }
+        : { interruptionLevel: "active" as const }),
+    },
+    trigger: null,
+  });
+}
+
 export async function showTrainingFinishedNotification(
   workoutTitle: string,
 ): Promise<void> {
