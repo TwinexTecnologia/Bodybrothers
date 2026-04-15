@@ -47,7 +47,7 @@ function safeParseV2(raw: string | null): ActiveTrainingSession | null {
           ? parsed.lastInteractionAt
           : typeof parsed.startedAt === "string"
             ? parsed.startedAt
-            : null,
+            : new Date().toISOString(),
     } as ActiveTrainingSession;
   } catch {
     return null;
