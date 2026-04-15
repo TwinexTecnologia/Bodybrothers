@@ -17,7 +17,7 @@ import {
   Alert,
   Image,
   Platform,
-  FlatList,
+  Animated,
   useWindowDimensions,
 } from "react-native";
 import { useAuth } from "../../lib/auth";
@@ -33,7 +33,10 @@ import {
   MessageSquare,
   ChevronLeft,
 } from "lucide-react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import {
   startSession,
   getWeeklyActivity,
@@ -140,6 +143,7 @@ export default function Workouts() {
   const { openActive } = useLocalSearchParams<{ openActive?: string }>();
   const { width: viewportWidth, height: viewportHeight } =
     useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { t: tVideo } = useVideoStrings();
   const {
     activeSession,
@@ -195,6 +199,38 @@ export default function Workouts() {
   }, [clearPreviewPlayer, previewPlayer]);
 
   const isWide = viewportWidth >= 720;
+  const workoutModalScrollY = useRef(new Animated.Value(0)).current;
+  const workoutModalHeaderCollapsedHeight = insets.top + 64;
+  const workoutModalHeaderExpandedHeight = useMemo(() => {
+    const maxAllowed = Math.round(viewportHeight * 0.28);
+    return Math.min(
+      260,
+      Math.max(workoutModalHeaderCollapsedHeight + 96, maxAllowed),
+    );
+  }, [viewportHeight, workoutModalHeaderCollapsedHeight]);
+  const workoutModalHeaderCollapseRange =
+    workoutModalHeaderExpandedHeight - workoutModalHeaderCollapsedHeight;
+  const workoutModalHeaderHeight = workoutModalScrollY.interpolate({
+    inputRange: [0, workoutModalHeaderCollapseRange],
+    outputRange: [
+      workoutModalHeaderExpandedHeight,
+      workoutModalHeaderCollapsedHeight,
+    ],
+    extrapolate: "clamp",
+  });
+  const workoutModalHeaderExpandedOpacity = workoutModalScrollY.interpolate({
+    inputRange: [0, workoutModalHeaderCollapseRange * 0.6],
+    outputRange: [1, 0],
+    extrapolate: "clamp",
+  });
+  const workoutModalHeaderCollapsedOpacity = workoutModalScrollY.interpolate({
+    inputRange: [
+      workoutModalHeaderCollapseRange * 0.35,
+      workoutModalHeaderCollapseRange,
+    ],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
 
   const closeWorkoutModal = useCallback(() => {
     debugWorkouts("closeWorkoutModal");
@@ -637,122 +673,293 @@ export default function Workouts() {
         presentationStyle="pageSheet"
       >
         {selectedWorkout && (
-          <View style={{ flex: 1, backgroundColor: "#f8fafc" }}>
-            {/* Header Azul Escuro */}
-            <LinearGradient
-              colors={["#1e3a8a", "#172554"]}
-              style={styles.modalHeader}
+          <SafeAreaView
+            style={{ flex: 1, backgroundColor: "#f8fafc" }}
+            edges={["bottom"]}
+          >
+            <Animated.View
+              style={[
+                styles.workoutModalHeaderContainer,
+                { height: workoutModalHeaderHeight },
+              ]}
             >
-              <TouchableOpacity
-                onPress={closeWorkoutModal}
-                style={styles.backButton}
+              <LinearGradient
+                colors={["#1e3a8a", "#172554"]}
+                style={StyleSheet.absoluteFill}
+              />
+
+              <View
+                style={[
+                  styles.workoutModalHeaderInner,
+                  { paddingTop: insets.top + 10 },
+                ]}
               >
-                <ChevronLeft size={16} color="#fff" />
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                  Voltar
-                </Text>
-              </TouchableOpacity>
+                <Animated.View
+                  style={[
+                    styles.workoutModalHeaderCollapsed,
+                    { opacity: workoutModalHeaderCollapsedOpacity },
+                  ]}
+                  pointerEvents="box-none"
+                >
+                  <View style={styles.workoutModalHeaderRow}>
+                    <TouchableOpacity
+                      onPress={closeWorkoutModal}
+                      style={styles.workoutModalBackIconButton}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      testID="workouts-modal-back-collapsed"
+                    >
+                      <ChevronLeft size={18} color="#fff" />
+                    </TouchableOpacity>
 
-              <Text style={styles.modalTitle}>{selectedWorkout.title}</Text>
-
-              <View style={styles.modalTags}>
-                {selectedWorkout.data.goal && (
-                  <View style={styles.tag}>
-                    <Text style={styles.tagText}>
-                      {selectedWorkout.data.goal}
+                    <Text
+                      style={styles.workoutModalCollapsedTitle}
+                      numberOfLines={1}
+                    >
+                      {selectedWorkout.title}
                     </Text>
+
+                    {workoutLoading ? (
+                      <View style={styles.workoutModalCompactAction}>
+                        <ActivityIndicator color="#fff" />
+                      </View>
+                    ) : isTraningFinished ? (
+                      <View
+                        style={[
+                          styles.workoutModalCompactAction,
+                          styles.workoutModalCompactActionDone,
+                        ]}
+                      >
+                        <CheckCircle size={18} color="#16a34a" />
+                      </View>
+                    ) : activeSession &&
+                      activeSession.workoutId === selectedWorkout.id ? (
+                      <TouchableOpacity
+                        onPress={
+                          isPaused
+                            ? () => void resumeTraining()
+                            : () => {
+                                void pauseTraining();
+                                setSelectedWorkout(null);
+                              }
+                        }
+                        testID={
+                          isPaused
+                            ? "workouts-modal-resume"
+                            : "workouts-modal-pause"
+                        }
+                      >
+                        <LinearGradient
+                          colors={
+                            isPaused
+                              ? ["#10b981", "#059669"]
+                              : ["#0ea5e9", "#0284c7"]
+                          }
+                          style={styles.workoutModalCompactAction}
+                        >
+                          {isPaused ? (
+                            <Play size={16} color="#fff" fill="#fff" />
+                          ) : (
+                            <Clock size={16} color="#fff" />
+                          )}
+                          <Text style={styles.workoutModalCompactActionText}>
+                            {isPaused ? "RETOMAR" : "PAUSAR"}
+                          </Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    ) : activeSession ? (
+                      <TouchableOpacity
+                        onPress={() => void openActiveWorkout()}
+                        testID="workouts-modal-open-active"
+                      >
+                        <LinearGradient
+                          colors={["#0ea5e9", "#0284c7"]}
+                          style={styles.workoutModalCompactAction}
+                        >
+                          <Clock size={16} color="#fff" />
+                          <Text style={styles.workoutModalCompactActionText}>
+                            ATIVO
+                          </Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => handleStartSession(selectedWorkout)}
+                        testID="workouts-modal-start"
+                      >
+                        <LinearGradient
+                          colors={["#10b981", "#059669"]}
+                          style={styles.workoutModalCompactAction}
+                        >
+                          <Play size={16} color="#fff" fill="#fff" />
+                          <Text style={styles.workoutModalCompactActionText}>
+                            INICIAR
+                          </Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    )}
                   </View>
-                )}
-                <View style={styles.tag}>
-                  <Text style={styles.tagText}>
-                    {selectedWorkout.data.exercises.length} exercícios
+                </Animated.View>
+
+                <Animated.View
+                  style={[
+                    styles.workoutModalHeaderExpanded,
+                    { opacity: workoutModalHeaderExpandedOpacity },
+                  ]}
+                  pointerEvents="box-none"
+                >
+                  <View style={styles.workoutModalHeaderTopRow}>
+                    <TouchableOpacity
+                      onPress={closeWorkoutModal}
+                      style={styles.backButton}
+                      testID="workouts-modal-back"
+                    >
+                      <ChevronLeft size={16} color="#fff" />
+                      <Text style={styles.backButtonText}>Voltar</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={styles.modalTitle} numberOfLines={2}>
+                    {selectedWorkout.title}
                   </Text>
-                </View>
-              </View>
 
-              <View style={styles.modalHero}>
-                <View style={styles.heroIcon}>
-                  <Dumbbell size={32} color="#fff" />
-                </View>
-
-                {workoutLoading ? (
-                  <Skeleton />
-                ) : isTraningFinished ? (
-                  <View style={styles.doneBadge}>
-                    <CheckCircle size={20} color="#16a34a" />
-                    <Text style={styles.doneText}>TREINO REALIZADO</Text>
-                  </View>
-                ) : activeSession &&
-                  activeSession.workoutId === selectedWorkout.id ? (
-                  <ActiveWorkoutHeroActions
-                    session={activeSession}
-                    elapsedSeconds={elapsedSeconds}
-                    isPaused={isPaused}
-                    onFinished={async () => {
-                      await clearActiveSession();
-                    }}
-                    onRequestRefreshDays={async () => {
-                      if (!user) return;
-                      const days = await getWeeklyActivity(user.id);
-                      setActiveDays(days);
-                    }}
-                    onPause={() => {
-                      void pauseTraining();
-                      setSelectedWorkout(null);
-                    }}
-                    onResume={() => void resumeTraining()}
-                    onCloseParentModal={() => setSelectedWorkout(null)}
-                  />
-                ) : activeSession ? (
-                  <TouchableOpacity onPress={() => void openActiveWorkout()}>
-                    <LinearGradient
-                      colors={["#0ea5e9", "#0284c7"]}
-                      style={styles.startButton}
-                    >
-                      <Clock size={20} color="#fff" />
-                      <Text style={styles.startButtonText}>
-                        ABRIR TREINO ATIVO
-                      </Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    onPress={() => handleStartSession(selectedWorkout)}
-                  >
-                    <LinearGradient
-                      colors={["#10b981", "#059669"]}
-                      style={styles.startButton}
-                    >
-                      <Play size={20} fill="#fff" color="#fff" />
-                      <Text style={styles.startButtonText}>INICIAR TREINO</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </LinearGradient>
-
-            <FlatList
-              data={selectedWorkout.data.exercises}
-              keyExtractor={(_, i) => String(i)}
-              contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
-              viewabilityConfig={previewViewabilityConfig}
-              onViewableItemsChanged={onPreviewViewableItemsChanged}
-              ListHeaderComponent={
-                selectedWorkout.data.notes ? (
-                  <View style={styles.notesBox}>
-                    <MessageSquare
-                      size={18}
-                      color="#ea580c"
-                      style={{ marginTop: 2 }}
-                    />
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={styles.notesTitle}>Observações Gerais</Text>
-                      <Text style={styles.notesText}>
-                        {selectedWorkout.data.notes}
+                  <View style={styles.modalTags}>
+                    {selectedWorkout.data.goal && (
+                      <View style={styles.tag}>
+                        <Text style={styles.tagText}>
+                          {selectedWorkout.data.goal}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.tag}>
+                      <Text style={styles.tagText}>
+                        {selectedWorkout.data.exercises.length} exercícios
                       </Text>
                     </View>
                   </View>
-                ) : null
+                </Animated.View>
+              </View>
+            </Animated.View>
+
+            <Animated.FlatList
+              data={selectedWorkout.data.exercises}
+              keyExtractor={(_, i) => String(i)}
+              contentContainerStyle={{
+                paddingTop: workoutModalHeaderExpandedHeight + 16,
+                paddingHorizontal: 16,
+                paddingBottom: 100,
+              }}
+              scrollEventThrottle={16}
+              onScroll={Animated.event(
+                [
+                  {
+                    nativeEvent: { contentOffset: { y: workoutModalScrollY } },
+                  },
+                ],
+                { useNativeDriver: false },
+              )}
+              viewabilityConfig={previewViewabilityConfig}
+              onViewableItemsChanged={onPreviewViewableItemsChanged}
+              ListHeaderComponent={
+                <View style={styles.workoutModalListHeader}>
+                  <LinearGradient
+                    colors={["#1e3a8a", "#172554"]}
+                    style={styles.workoutModalHeroCard}
+                  >
+                    <View style={styles.workoutModalHeroTopRow}>
+                      <View style={styles.workoutModalHeroIcon}>
+                        <Dumbbell size={22} color="#fff" />
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.workoutModalHeroTitle}>
+                          {selectedWorkout.data.goal
+                            ? selectedWorkout.data.goal
+                            : "Treino"}
+                        </Text>
+                        <Text style={styles.workoutModalHeroSubtitle}>
+                          {selectedWorkout.data.exercises.length} exercícios
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.workoutModalHeroActions}>
+                      {workoutLoading ? (
+                        <Skeleton />
+                      ) : isTraningFinished ? (
+                        <View style={styles.doneBadge}>
+                          <CheckCircle size={18} color="#16a34a" />
+                          <Text style={styles.doneText}>TREINO REALIZADO</Text>
+                        </View>
+                      ) : activeSession &&
+                        activeSession.workoutId === selectedWorkout.id ? (
+                        <ActiveWorkoutHeroActions
+                          session={activeSession}
+                          elapsedSeconds={elapsedSeconds}
+                          isPaused={isPaused}
+                          onFinished={async () => {
+                            await clearActiveSession();
+                          }}
+                          onRequestRefreshDays={async () => {
+                            if (!user) return;
+                            const days = await getWeeklyActivity(user.id);
+                            setActiveDays(days);
+                          }}
+                          onPause={() => {
+                            void pauseTraining();
+                            setSelectedWorkout(null);
+                          }}
+                          onResume={() => void resumeTraining()}
+                          onCloseParentModal={() => setSelectedWorkout(null)}
+                        />
+                      ) : activeSession ? (
+                        <TouchableOpacity
+                          onPress={() => void openActiveWorkout()}
+                        >
+                          <LinearGradient
+                            colors={["#0ea5e9", "#0284c7"]}
+                            style={styles.startButton}
+                          >
+                            <Clock size={18} color="#fff" />
+                            <Text style={styles.startButtonText}>
+                              ABRIR TREINO ATIVO
+                            </Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => handleStartSession(selectedWorkout)}
+                        >
+                          <LinearGradient
+                            colors={["#10b981", "#059669"]}
+                            style={styles.startButton}
+                          >
+                            <Play size={18} fill="#fff" color="#fff" />
+                            <Text style={styles.startButtonText}>
+                              INICIAR TREINO
+                            </Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </LinearGradient>
+
+                  {selectedWorkout.data.notes ? (
+                    <View style={styles.notesBox}>
+                      <MessageSquare
+                        size={18}
+                        color="#ea580c"
+                        style={{ marginTop: 2 }}
+                      />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.notesTitle}>
+                          Observações Gerais
+                        </Text>
+                        <Text style={styles.notesText}>
+                          {selectedWorkout.data.notes}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
               }
               renderItem={({ item: ex, index: i }) => {
                 const video = ex.videoUrl || ex.video_url;
@@ -960,7 +1167,7 @@ export default function Workouts() {
                 );
               }}
             />
-          </View>
+          </SafeAreaView>
         )}
       </Modal>
 
@@ -1183,7 +1390,83 @@ const styles = StyleSheet.create({
   otherButtonText: { fontWeight: "700", color: "#0f172a", fontSize: 12 },
 
   // Modal
-  modalHeader: { padding: 20, paddingBottom: 30 },
+  workoutModalHeaderContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    overflow: "hidden",
+  },
+  workoutModalHeaderInner: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 12,
+    justifyContent: "center",
+  },
+  workoutModalHeaderCollapsed: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+  },
+  workoutModalHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  workoutModalBackIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  workoutModalCollapsedTitle: {
+    flex: 1,
+    minWidth: 0,
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 16,
+    letterSpacing: 0.2,
+  },
+  workoutModalCompactAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  workoutModalCompactActionText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 12,
+    letterSpacing: 0.6,
+  },
+  workoutModalCompactActionDone: {
+    backgroundColor: "#fff",
+    borderColor: "rgba(255,255,255,0.22)",
+  },
+  workoutModalHeaderExpanded: {
+    justifyContent: "center",
+    gap: 8,
+  },
+  workoutModalHeaderTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   backButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1191,17 +1474,16 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.1)",
     alignSelf: "flex-start",
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: 20,
-    marginBottom: 24,
   },
+  backButtonText: { color: "#fff", fontWeight: "900", fontSize: 13 },
   modalTitle: {
-    fontSize: 24,
-    fontWeight: "800",
+    fontSize: 20,
+    fontWeight: "900",
     color: "#fff",
-    marginBottom: 12,
   },
-  modalTags: { flexDirection: "row", gap: 8, flexWrap: "wrap" }, // Adicionado flexWrap
+  modalTags: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   tag: {
     backgroundColor: "rgba(255,255,255,0.15)",
     paddingHorizontal: 10,
@@ -1211,41 +1493,60 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.1)",
   },
   tagText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  modalHero: { marginTop: 20, alignItems: "center", gap: 16 },
-  heroIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(255,255,255,0.1)",
+  workoutModalListHeader: { gap: 14, marginBottom: 18 },
+  workoutModalHeroCard: {
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  workoutModalHeroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  workoutModalHeroIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.12)",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: "rgba(255,255,255,0.18)",
   },
+  workoutModalHeroTitle: { color: "#fff", fontWeight: "900", fontSize: 14 },
+  workoutModalHeroSubtitle: {
+    color: "rgba(255,255,255,0.84)",
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  workoutModalHeroActions: { marginTop: 14, alignItems: "center" },
   startButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 14,
     shadowColor: "#10b981",
     shadowOpacity: 0.4,
     shadowOffset: { width: 0, height: 10 },
     shadowRadius: 20,
     elevation: 10,
   },
-  startButtonText: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  startButtonText: { color: "#fff", fontWeight: "900", fontSize: 14 },
   doneBadge: {
     backgroundColor: "#fff",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 30,
   },
-  doneText: { color: "#16a34a", fontWeight: "700", fontSize: 14 },
+  doneText: { color: "#16a34a", fontWeight: "900", fontSize: 13 },
 
   // Exercises - Novo Layout Horizontal
   notesBox: {
