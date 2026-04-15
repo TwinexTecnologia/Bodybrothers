@@ -77,7 +77,10 @@ export async function finishSession(
 }
 
 export async function cancelSession(id: string) {
-  const { error } = await supabase.from("workout_history").delete().eq("id", id);
+  const { error } = await supabase
+    .from("workout_history")
+    .delete()
+    .eq("id", id);
   if (error) throw error;
 }
 
@@ -132,6 +135,26 @@ export async function getWeeklyActivity(studentId: string): Promise<number[]> {
     .filter((d) => d >= 0);
 
   return [...new Set(activeDays)];
+}
+
+export async function getTrainingIsFinished(studentId: string, workoutId: string): Promise<boolean> {
+  const today = new Date();
+  const firstDay = new Date(today);
+  firstDay.setDate(today.getDate() - today.getDay());
+  firstDay.setHours(0, 0, 0, 0);
+
+  const { data, error } = await supabase
+    .from("workout_history")
+    .select("*")
+    .eq("student_id", studentId)
+    .eq("workout_id", workoutId)
+    .gte("started_at", firstDay.toISOString())
+    .not("finished_at", "is", null)
+    .limit(1);
+  
+  if (error || !data) return false;
+
+  return data.length > 0;
 }
 
 export async function getActiveSession(

@@ -1,9 +1,14 @@
+/** 4h — treino sem interação (pausar, retomar, trocar exercício) é encerrado automaticamente. */
+export const TRAINING_INACTIVITY_THRESHOLD_MS = 4 * 60 * 60 * 1000;
+
 export type ActiveTrainingSession = {
   id: string;
   studentId: string;
   workoutId: string;
   workoutTitle: string;
   startedAt: string;
+  /** ISO — última ação explícita no treino; inatividade medida a partir daqui. */
+  lastInteractionAt: string;
   notificationId?: string;
   totalPausedSeconds: number;
   pauseStartedAt?: string | null;
@@ -29,6 +34,16 @@ export function computeElapsedSeconds(
   }
   const raw = Math.floor((nowMs - startMs) / 1000) - totalPaused;
   return raw > 0 ? raw : 0;
+}
+
+export function isInactiveBeyondThreshold(
+  session: Pick<ActiveTrainingSession, "lastInteractionAt">,
+  nowMs: number,
+): boolean {
+  if (!session.lastInteractionAt) return false;
+  const t = new Date(session.lastInteractionAt).getTime();
+  if (!Number.isFinite(t)) return false;
+  return nowMs - t >= TRAINING_INACTIVITY_THRESHOLD_MS;
 }
 
 export function formatElapsedTime(seconds: number) {

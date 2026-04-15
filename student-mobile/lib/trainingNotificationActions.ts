@@ -1,5 +1,6 @@
 import * as Notifications from "expo-notifications";
-import { cancelSession, finishSession } from "./history";
+import { persistFinishActiveSession } from "./activeSessionFinish";
+import { cancelSession } from "./history";
 import {
   ACTION_CANCEL,
   ACTION_FINISH,
@@ -8,10 +9,7 @@ import {
 } from "./trainingNotificationConstants";
 import { dismissTrainingNotification } from "./trainingNotifications";
 import { loadActiveSession, saveActiveSession } from "./trainingSessionStorage";
-import {
-  computeElapsedSeconds,
-  type ActiveTrainingSession,
-} from "./trainingSessionTypes";
+import { type ActiveTrainingSession } from "./trainingSessionTypes";
 
 export async function handleTrainingNotificationResponse(
   response: Notifications.NotificationResponse,
@@ -46,9 +44,11 @@ export async function handleTrainingNotificationResponse(
 
 async function applyPause(session: ActiveTrainingSession) {
   if (session.pauseStartedAt) return;
+  const now = new Date().toISOString();
   await saveActiveSession({
     ...session,
-    pauseStartedAt: new Date().toISOString(),
+    pauseStartedAt: now,
+    lastInteractionAt: now,
   });
 }
 
@@ -56,10 +56,12 @@ async function applyResume(session: ActiveTrainingSession) {
   if (!session.pauseStartedAt) return;
   const p = new Date(session.pauseStartedAt).getTime();
   const add = Math.max(0, Math.floor((Date.now() - p) / 1000));
+  const now = new Date().toISOString();
   await saveActiveSession({
     ...session,
     pauseStartedAt: null,
     totalPausedSeconds: (session.totalPausedSeconds ?? 0) + add,
+    lastInteractionAt: now,
   });
 }
 
@@ -74,12 +76,5 @@ async function applyCancel(session: ActiveTrainingSession) {
 }
 
 async function applyFinish(session: ActiveTrainingSession) {
-  const elapsed = computeElapsedSeconds(session, Date.now());
-  try {
-    await finishSession(session.id, elapsed, "");
-  } catch {
-    return;
-  }
-  await saveActiveSession(null);
-  await dismissTrainingNotification(session.notificationId);
+  await persistFinishActiveSession(session);
 }

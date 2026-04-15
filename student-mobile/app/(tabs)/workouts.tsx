@@ -34,7 +34,11 @@ import {
   ChevronLeft,
 } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { startSession, getWeeklyActivity } from "../../lib/history";
+import {
+  startSession,
+  getWeeklyActivity,
+  getTrainingIsFinished,
+} from "../../lib/history";
 import { LinearGradient } from "expo-linear-gradient";
 import ActiveWorkoutHeroActions from "../../components/ActiveWorkoutHeroActions";
 import ExerciseSetCard from "../../components/ExerciseSetCard";
@@ -54,6 +58,7 @@ import { VideoView, useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { getStartWorkoutBlockReason } from "../../lib/workoutStartGuard";
+import { Skeleton } from "../../components/ui/skeleton";
 
 // Tipos
 type ExerciseSet = {
@@ -112,8 +117,7 @@ function getPrimaryExerciseTypeLabel(ex: Exercise): string {
     if (t === "working") return "Série principal";
     if (t === "feeder") return "Feeder";
     if (t === "topset") return "Top set";
-    if (t === "custom")
-      return sets[0].customLabel?.trim() || "Personalizado";
+    if (t === "custom") return sets[0].customLabel?.trim() || "Personalizado";
   }
   if (ex.warmupSeries || ex.warmupReps) return "Aquecimento";
   if (ex.feederSeries || ex.feederReps) return "Feeder";
@@ -153,6 +157,8 @@ export default function Workouts() {
   const [activeDays, setActiveDays] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [workoutLoading, setWorkoutLoading] = useState(false);
+  const [isTraningFinished, setIsTraningFinished] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
 
   const [previewActiveVideoIndex, setPreviewActiveVideoIndex] = useState<
@@ -356,6 +362,24 @@ export default function Workouts() {
     const days = schedule ? schedule[w.id] : undefined;
     return !days || !Array.isArray(days) || days.length === 0;
   });
+
+  const openWorkout = useCallback(
+    async (w: Workout) => {
+      if (!user) return;
+
+      setWorkoutLoading(true);
+      try {
+        setSelectedWorkout(w);
+        const isTrainingFinished = await getTrainingIsFinished(user.id, w.id);
+        setIsTraningFinished(isTrainingFinished);
+      } catch {
+        Alert.alert("Erro", "Não foi possível abrir o treino.");
+      } finally {
+        setWorkoutLoading(false);
+      }
+    },
+    [user, setSelectedWorkout, setIsTraningFinished],
+  );
 
   const getYoutubeThumbnail = useCallback((url?: string) => {
     if (!url) return null;
@@ -565,7 +589,7 @@ export default function Workouts() {
             {group.workouts.map((w) => (
               <View key={w.id} style={styles.workoutItem}>
                 <Text style={styles.workoutTitleItem}>{w.title}</Text>
-                <TouchableOpacity onPress={() => setSelectedWorkout(w)}>
+                <TouchableOpacity onPress={() => openWorkout(w)}>
                   <LinearGradient
                     colors={["#0ea5e9", "#0284c7"]}
                     start={{ x: 0, y: 0 }}
@@ -651,7 +675,9 @@ export default function Workouts() {
                   <Dumbbell size={32} color="#fff" />
                 </View>
 
-                {activeDays.includes(new Date().getDay()) ? (
+                {workoutLoading ? (
+                  <Skeleton />
+                ) : isTraningFinished ? (
                   <View style={styles.doneBadge}>
                     <CheckCircle size={20} color="#16a34a" />
                     <Text style={styles.doneText}>TREINO REALIZADO</Text>

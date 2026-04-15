@@ -10,6 +10,7 @@ import React, {
 import { AppState } from "react-native";
 import { router } from "expo-router";
 import { useAuth } from "./auth";
+import { persistFinishActiveSession } from "./activeSessionFinish";
 import { getActiveSession, WorkoutSession } from "./history";
 import {
   dismissTrainingNotification,
@@ -19,6 +20,7 @@ import { loadActiveSession, saveActiveSession } from "./trainingSessionStorage";
 import {
   computeElapsedSeconds,
   formatElapsedTime,
+  isInactiveBeyondThreshold,
   type ActiveTrainingSession,
 } from "./trainingSessionTypes";
 
@@ -71,8 +73,12 @@ export function TrainingSessionProvider({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [resumeToken, setResumeToken] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const inactivityIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   const appStateRef = useRef(AppState.currentState);
   const sessionRef = useRef<ActiveTrainingSession | null>(null);
+  const inactivityFinishingRef = useRef(false);
   sessionRef.current = activeSession;
 
   const isPaused = Boolean(activeSession?.pauseStartedAt);
@@ -83,12 +89,14 @@ export function TrainingSessionProvider({
 
   const setActiveSessionFromDbSession = useCallback(
     async (session: WorkoutSession) => {
+      const now = new Date().toISOString();
       const next: ActiveTrainingSession = {
         id: session.id,
         studentId: session.studentId,
         workoutId: session.workoutId || "",
         workoutTitle: session.workoutTitle,
         startedAt: session.startedAt,
+        lastInteractionAt: session.startedAt,
         totalPausedSeconds: 0,
         pauseStartedAt: null,
       };
@@ -102,9 +110,16 @@ export function TrainingSessionProvider({
             pauseStartedAt: prev.pauseStartedAt ?? null,
             currentExerciseName: prev.currentExerciseName,
             currentExerciseTypeLabel: prev.currentExerciseTypeLabel,
+            lastInteractionAt:
+              prev.lastInteractionAt ?? prev.startedAt ?? next.startedAt,
           };
         } else {
-          result = { ...next, totalPausedSeconds: 0, pauseStartedAt: null };
+          result = {
+            ...next,
+            lastInteractionAt: now,
+            totalPausedSeconds: 0,
+            pauseStartedAt: null,
+          };
         }
         void persist(result);
         queueMicrotask(() =>
@@ -157,9 +172,11 @@ export function TrainingSessionProvider({
   const pauseTraining = useCallback(async () => {
     setActiveSession((prev) => {
       if (!prev || prev.pauseStartedAt) return prev;
+      const now = new Date().toISOString();
       const next: ActiveTrainingSession = {
         ...prev,
-        pauseStartedAt: new Date().toISOString(),
+        pauseStartedAt: now,
+        lastInteractionAt: now,
       };
       void saveActiveSession(next);
       return next;
@@ -171,10 +188,12 @@ export function TrainingSessionProvider({
       if (!prev?.pauseStartedAt) return prev;
       const p = new Date(prev.pauseStartedAt).getTime();
       const add = Math.max(0, Math.floor((Date.now() - p) / 1000));
+      const now = new Date().toISOString();
       const next: ActiveTrainingSession = {
         ...prev,
         pauseStartedAt: null,
         totalPausedSeconds: (prev.totalPausedSeconds ?? 0) + add,
+        lastInteractionAt: now,
       };
       void saveActiveSession(next);
       return next;
@@ -185,10 +204,12 @@ export function TrainingSessionProvider({
     async (name: string, typeLabel: string) => {
       setActiveSession((prev) => {
         if (!prev) return prev;
+        const now = new Date().toISOString();
         const next: ActiveTrainingSession = {
           ...prev,
           currentExerciseName: name,
           currentExerciseTypeLabel: typeLabel,
+          lastInteractionAt: now,
         };
         void saveActiveSession(next);
         return next;
@@ -196,6 +217,56 @@ export function TrainingSessionProvider({
     },
     [],
   );
+
+  /** Encerra treino inativo (≥4h sem interação). Só roda com app em execução — sem job no servidor. */
+  const runInactivityAutoFinish = useCallback(async () => {
+    if (!user || inactivityFinishingRef.current) return;
+    const stored = await loadActiveSession();
+    if (!stored || stored.studentId !== user.id) return;
+    if (!isInactiveBeyondThreshold(stored, Date.now())) return;
+    inactivityFinishingRef.current = true;
+    try {
+      await persistFinishActiveSession(stored, {
+        showInactiveAutoClosedNotification: true,
+      });
+      setActiveSession(null);
+      setElapsedSeconds(0);
+    } finally {
+      inactivityFinishingRef.current = false;
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (loading || !user) return;
+    void runInactivityAutoFinish();
+  }, [
+    loading,
+    user?.id,
+    activeSession?.id,
+    activeSession?.lastInteractionAt,
+    runInactivityAutoFinish,
+  ]);
+
+  useEffect(() => {
+    if (!activeSession || !user) {
+      if (inactivityIntervalRef.current) {
+        clearInterval(inactivityIntervalRef.current);
+        inactivityIntervalRef.current = null;
+      }
+      return;
+    }
+    if (inactivityIntervalRef.current) clearInterval(inactivityIntervalRef.current);
+    inactivityIntervalRef.current = setInterval(() => {
+      if (appStateRef.current !== "active") return;
+      void runInactivityAutoFinish();
+    }, 60_000);
+    return () => {
+      if (inactivityIntervalRef.current) {
+        clearInterval(inactivityIntervalRef.current);
+        inactivityIntervalRef.current = null;
+      }
+    };
+  }, [activeSession?.id, user?.id, runInactivityAutoFinish]);
 
   useEffect(() => {
     let mounted = true;
@@ -220,6 +291,7 @@ export function TrainingSessionProvider({
         if (user) {
           await syncWithServer();
         }
+        await runInactivityAutoFinish();
       } finally {
         if (mounted) setLoading(false);
       }
@@ -227,7 +299,7 @@ export function TrainingSessionProvider({
     return () => {
       mounted = false;
     };
-  }, [syncWithServer, user]);
+  }, [runInactivityAutoFinish, syncWithServer, user]);
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -271,6 +343,7 @@ export function TrainingSessionProvider({
           }
         }
         await syncWithServer();
+        await runInactivityAutoFinish();
       }
 
       if (prev === "active" && nextState !== "active") {
@@ -297,7 +370,7 @@ export function TrainingSessionProvider({
     });
 
     return () => sub.remove();
-  }, [setNotificationId, syncWithServer, user]);
+  }, [runInactivityAutoFinish, setNotificationId, syncWithServer, user]);
 
   const value = useMemo<TrainingSessionContextValue>(
     () => ({

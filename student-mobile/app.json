@@ -23,7 +23,7 @@
           "NSAllowsArbitraryLoadsInMedia": true
         }
       },
-      "buildNumber": "4"
+      "buildNumber": "5"
     },
     "android": {
       "package": "com.twinex.fitbodypro",
