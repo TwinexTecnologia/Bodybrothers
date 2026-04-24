@@ -1,5 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { ActiveTrainingSession } from "./trainingSessionTypes";
+import {
+  getNextAutoCloseDeadlineIso,
+  type ActiveTrainingSession,
+} from "./trainingSessionTypes";
 
 export const ACTIVE_SESSION_STORAGE_KEY = "@fitbody:active_training_session_v2";
 const LEGACY_STORAGE_KEY = "@fitbody:active_training_session_v1";
@@ -48,6 +51,36 @@ function safeParseV2(raw: string | null): ActiveTrainingSession | null {
           : typeof parsed.startedAt === "string"
             ? parsed.startedAt
             : new Date().toISOString(),
+      inactiveAutoCloseAt:
+        typeof parsed.inactiveAutoCloseAt === "string"
+          ? parsed.inactiveAutoCloseAt
+          : getNextAutoCloseDeadlineIso(
+              {
+                ...parsed,
+                totalPausedSeconds:
+                  typeof parsed.totalPausedSeconds === "number"
+                    ? parsed.totalPausedSeconds
+                    : 0,
+                pauseStartedAt:
+                  parsed.pauseStartedAt === null ||
+                  parsed.pauseStartedAt === undefined
+                    ? null
+                    : typeof parsed.pauseStartedAt === "string"
+                      ? parsed.pauseStartedAt
+                      : null,
+                lastInteractionAt:
+                  typeof parsed.lastInteractionAt === "string"
+                    ? parsed.lastInteractionAt
+                    : typeof parsed.startedAt === "string"
+                      ? parsed.startedAt
+                      : new Date().toISOString(),
+              } as ActiveTrainingSession,
+              Date.now(),
+            ),
+      inactiveAutoCloseNotificationId:
+        typeof parsed.inactiveAutoCloseNotificationId === "string"
+          ? parsed.inactiveAutoCloseNotificationId
+          : undefined,
     } as ActiveTrainingSession;
   } catch {
     return null;
@@ -73,6 +106,16 @@ function safeParseLegacy(raw: string | null): ActiveTrainingSession | null {
       totalPausedSeconds: 0,
       pauseStartedAt: null,
       lastInteractionAt: parsed.startedAt,
+      inactiveAutoCloseAt: getNextAutoCloseDeadlineIso(
+        {
+          ...parsed,
+          totalPausedSeconds: 0,
+          pauseStartedAt: null,
+          lastInteractionAt: parsed.startedAt,
+        } as ActiveTrainingSession,
+        Date.now(),
+      ),
+      inactiveAutoCloseNotificationId: undefined,
     } as ActiveTrainingSession;
   } catch {
     return null;

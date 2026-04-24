@@ -1,7 +1,11 @@
 import {
   computeElapsedSeconds,
   formatElapsedTime,
+  getNextAutoCloseDeadlineMs,
+  getTrainingInactivityDeadlineIso,
+  getTrainingInactivityDeadlineMs,
   isInactiveBeyondThreshold,
+  shouldAutoCloseTrainingSession,
   TRAINING_INACTIVITY_THRESHOLD_MS,
 } from "../lib/trainingSessionTypes";
 
@@ -58,9 +62,61 @@ describe("trainingSessionTypes", () => {
     expect(isInactiveBeyondThreshold({ lastInteractionAt }, now)).toBe(true);
   });
 
+  it("getTrainingInactivityDeadlineMs/Iso somam 4h ao lastInteractionAt", () => {
+    const lastInteractionAt = "2026-03-31T08:00:00.000Z";
+    expect(getTrainingInactivityDeadlineMs({ lastInteractionAt })).toBe(
+      new Date("2026-03-31T12:00:00.000Z").getTime(),
+    );
+    expect(getTrainingInactivityDeadlineIso({ lastInteractionAt })).toBe(
+      "2026-03-31T12:00:00.000Z",
+    );
+  });
+
   it("isInactiveBeyondThreshold false com lastInteractionAt inválido", () => {
     expect(
       isInactiveBeyondThreshold({ lastInteractionAt: "invalid" }, Date.now()),
     ).toBe(false);
+  });
+
+  it("shouldAutoCloseTrainingSession por tempo de execução (≥4h) sem pausa", () => {
+    const startedAt = "2026-03-31T08:00:00.000Z";
+    const lastInteractionAt = "2026-03-31T09:00:00.000Z";
+    const now = new Date("2026-03-31T12:00:00.000Z").getTime();
+    expect(
+      shouldAutoCloseTrainingSession(
+        {
+          id: "s",
+          studentId: "st",
+          workoutId: "w",
+          workoutTitle: "T",
+          startedAt,
+          lastInteractionAt,
+          totalPausedSeconds: 0,
+          pauseStartedAt: null,
+        },
+        now,
+      ),
+    ).toEqual({ reason: "max_active_time" });
+  });
+
+  it("getNextAutoCloseDeadlineMs retorna o menor entre inatividade e fim de 4h de execução", () => {
+    const startedAt = "2026-03-31T10:00:00.000Z";
+    const lastInteractionAt = "2026-03-31T10:00:00.000Z";
+    const now = new Date("2026-03-31T11:00:00.000Z").getTime();
+    const session = {
+      id: "s",
+      studentId: "st",
+      workoutId: "w",
+      workoutTitle: "T",
+      startedAt,
+      lastInteractionAt,
+      totalPausedSeconds: 0,
+      pauseStartedAt: null,
+    };
+    const dInact = new Date("2026-03-31T14:00:00.000Z").getTime();
+    const dMax = new Date("2026-03-31T15:00:00.000Z").getTime();
+    expect(getNextAutoCloseDeadlineMs(session, now)).toBe(
+      Math.min(dInact, dMax),
+    );
   });
 });

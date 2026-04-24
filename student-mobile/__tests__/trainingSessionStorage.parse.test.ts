@@ -3,6 +3,7 @@ import {
   ACTIVE_SESSION_STORAGE_KEY,
   loadActiveSession,
 } from "../lib/trainingSessionStorage";
+import { getNextAutoCloseDeadlineIso } from "../lib/trainingSessionTypes";
 
 describe("trainingSessionStorage parse", () => {
   beforeEach(async () => {
@@ -10,6 +11,9 @@ describe("trainingSessionStorage parse", () => {
   });
 
   it("preenche lastInteractionAt com startedAt quando ausente no JSON v2", async () => {
+    const nowSpy = jest
+      .spyOn(Date, "now")
+      .mockReturnValue(new Date("2026-03-31T14:00:00.000Z").getTime());
     const startedAt = "2026-03-31T12:00:00.000Z";
     await AsyncStorage.setItem(
       ACTIVE_SESSION_STORAGE_KEY,
@@ -25,6 +29,12 @@ describe("trainingSessionStorage parse", () => {
     );
     const s = await loadActiveSession();
     expect(s?.lastInteractionAt).toBe(startedAt);
+    expect(s).not.toBeNull();
+    expect(s?.inactiveAutoCloseAt).toBe(
+      getNextAutoCloseDeadlineIso(s!, Date.now()),
+    );
+    expect(s?.inactiveAutoCloseNotificationId).toBeUndefined();
+    nowSpy.mockRestore();
   });
 
   it("preserva lastInteractionAt quando presente no JSON v2", async () => {
@@ -39,11 +49,15 @@ describe("trainingSessionStorage parse", () => {
         workoutTitle: "Teste",
         startedAt,
         lastInteractionAt,
+        inactiveAutoCloseAt: "2026-03-31T15:30:00.000Z",
+        inactiveAutoCloseNotificationId: "notif-123",
         totalPausedSeconds: 0,
         pauseStartedAt: null,
       }),
     );
     const s = await loadActiveSession();
     expect(s?.lastInteractionAt).toBe(lastInteractionAt);
+    expect(s?.inactiveAutoCloseAt).toBe("2026-03-31T15:30:00.000Z");
+    expect(s?.inactiveAutoCloseNotificationId).toBe("notif-123");
   });
 });

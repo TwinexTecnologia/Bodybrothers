@@ -35,8 +35,12 @@ jest.mock("expo-notifications", () => ({
     HIGH: 6,
     MAX: 7,
   },
+  AndroidNotificationPriority: {
+    HIGH: 1,
+    MAX: 2,
+  },
   AndroidNotificationVisibility: { PUBLIC: 1 },
-  SchedulableTriggerInputTypes: { TIME_INTERVAL: "timeInterval" },
+  SchedulableTriggerInputTypes: { TIME_INTERVAL: "timeInterval", DATE: "date" },
   getPermissionsAsync: jest.fn(async () => ({ granted: true })),
   requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
   setNotificationChannelAsync: jest.fn(async () => {}),

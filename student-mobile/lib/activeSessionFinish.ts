@@ -2,15 +2,19 @@ import { finishSession } from "./history";
 import {
   dismissTrainingNotification,
   showTrainingInactiveAutoClosedNotification,
+  showTrainingMaxActiveTimeAutoClosedNotification,
 } from "./trainingNotifications";
+import { clearActiveSessionInactivity } from "./trainingSessionInactivity";
 import { saveActiveSession } from "./trainingSessionStorage";
 import {
   computeElapsedSeconds,
+  type AutoCloseReason,
   type ActiveTrainingSession,
 } from "./trainingSessionTypes";
 
 export type PersistFinishActiveSessionOptions = {
   showInactiveAutoClosedNotification?: boolean;
+  autoClose?: AutoCloseReason;
 };
 
 /**
@@ -27,9 +31,12 @@ export async function persistFinishActiveSession(
   } catch {
     /* sessão já finalizada ou rede — ainda limpamos local para não travar o app */
   }
+  await clearActiveSessionInactivity(session);
   await saveActiveSession(null);
   await dismissTrainingNotification(session.notificationId);
-  if (options.showInactiveAutoClosedNotification) {
+  if (options.autoClose === "max_active_time") {
+    await showTrainingMaxActiveTimeAutoClosedNotification(session.workoutTitle);
+  } else if (options.autoClose === "inactivity" || options.showInactiveAutoClosedNotification) {
     await showTrainingInactiveAutoClosedNotification(session.workoutTitle);
   }
 }

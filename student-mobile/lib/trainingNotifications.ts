@@ -31,6 +31,7 @@ export type TrainingNotificationInput = {
 };
 
 let setupPromise: Promise<void> | null = null;
+const INACTIVE_AUTO_CLOSE_NOTIFICATION_PREFIX = "fitbody_inactive_auto_close_";
 
 export function ensureTrainingNotificationSetup(): Promise<void> {
   if (Platform.OS === "web") return Promise.resolve();
@@ -242,6 +243,103 @@ export async function showTrainingInactiveAutoClosedNotification(
     },
     trigger: null,
   });
+}
+
+export async function showTrainingMaxActiveTimeAutoClosedNotification(
+  workoutTitle: string,
+): Promise<void> {
+  if (Platform.OS === "web") return;
+  const granted = await ensureTrainingNotificationPermission();
+  if (!granted) return;
+  await ensureTrainingNotificationSetup();
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Treino encerrado",
+      body: `O treino "${workoutTitle}" foi encerrado após 4 horas em execução.`,
+      sound: true,
+      color: NOTIFICATION_COLOR_FINISHED,
+      ...(Platform.OS === "android"
+        ? { priority: Notifications.AndroidNotificationPriority.HIGH }
+        : {}),
+      data: { kind: "training_max_time_auto_closed" },
+      ...(Platform.OS === "android"
+        ? { channelId: CHANNEL_FINISHED }
+        : { interruptionLevel: "active" as const }),
+    },
+    trigger: null,
+  });
+}
+
+function buildInactiveAutoCloseNotificationId(sessionId: string) {
+  return `${INACTIVE_AUTO_CLOSE_NOTIFICATION_PREFIX}${sessionId.replace(/[^a-zA-Z0-9_]/g, "_")}`;
+}
+
+export async function scheduleTrainingInactiveAutoCloseNotification(input: {
+  workoutTitle: string;
+  triggerAt: Date;
+  sessionId: string;
+}): Promise<string | undefined> {
+  if (Platform.OS === "web") return undefined;
+  if (!Number.isFinite(input.triggerAt.getTime())) return undefined;
+  if (input.triggerAt.getTime() <= Date.now()) return undefined;
+
+  const granted = await ensureTrainingNotificationPermission();
+  if (!granted) return undefined;
+  await ensureTrainingNotificationSetup();
+
+  const identifier = buildInactiveAutoCloseNotificationId(input.sessionId);
+  try {
+    await Notifications.cancelScheduledNotificationAsync(identifier);
+  } catch {}
+
+  try {
+    return await Notifications.scheduleNotificationAsync({
+      identifier,
+      content: {
+        title: "Treino encerrado",
+        body: `O treino "${input.workoutTitle}" atingiu o limite de 4 horas e foi encerrado.`,
+        sound: true,
+        color: NOTIFICATION_COLOR_FINISHED,
+        ...(Platform.OS === "android"
+          ? { priority: Notifications.AndroidNotificationPriority.HIGH }
+          : {}),
+        data: {
+          kind: "training_inactive_auto_closed",
+          sessionId: input.sessionId,
+          inactiveAutoCloseAt: input.triggerAt.toISOString(),
+        },
+        ...(Platform.OS === "android"
+          ? { channelId: CHANNEL_FINISHED }
+          : { interruptionLevel: "active" as const }),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: input.triggerAt,
+      },
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+export async function cancelTrainingInactiveAutoCloseNotification(
+  notificationId?: string,
+  sessionId?: string,
+): Promise<void> {
+  if (Platform.OS === "web") return;
+
+  const ids = new Set<string>();
+  if (notificationId) ids.add(notificationId);
+  if (sessionId) ids.add(buildInactiveAutoCloseNotificationId(sessionId));
+
+  await Promise.all(
+    Array.from(ids).map(async (id) => {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(id);
+      } catch {}
+    }),
+  );
 }
 
 export async function showTrainingFinishedNotification(

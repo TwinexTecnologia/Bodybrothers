@@ -8,6 +8,10 @@ import {
   ACTION_RESUME,
 } from "./trainingNotificationConstants";
 import { dismissTrainingNotification } from "./trainingNotifications";
+import {
+  clearActiveSessionInactivity,
+  syncActiveSessionInactivity,
+} from "./trainingSessionInactivity";
 import { loadActiveSession, saveActiveSession } from "./trainingSessionStorage";
 import { type ActiveTrainingSession } from "./trainingSessionTypes";
 
@@ -45,11 +49,12 @@ export async function handleTrainingNotificationResponse(
 async function applyPause(session: ActiveTrainingSession) {
   if (session.pauseStartedAt) return;
   const now = new Date().toISOString();
-  await saveActiveSession({
+  const updated = await syncActiveSessionInactivity({
     ...session,
     pauseStartedAt: now,
     lastInteractionAt: now,
   });
+  await saveActiveSession(updated);
 }
 
 async function applyResume(session: ActiveTrainingSession) {
@@ -57,12 +62,13 @@ async function applyResume(session: ActiveTrainingSession) {
   const p = new Date(session.pauseStartedAt).getTime();
   const add = Math.max(0, Math.floor((Date.now() - p) / 1000));
   const now = new Date().toISOString();
-  await saveActiveSession({
+  const updated = await syncActiveSessionInactivity({
     ...session,
     pauseStartedAt: null,
     totalPausedSeconds: (session.totalPausedSeconds ?? 0) + add,
     lastInteractionAt: now,
   });
+  await saveActiveSession(updated);
 }
 
 async function applyCancel(session: ActiveTrainingSession) {
@@ -71,6 +77,7 @@ async function applyCancel(session: ActiveTrainingSession) {
   } catch {
     return;
   }
+  await clearActiveSessionInactivity(session);
   await saveActiveSession(null);
   await dismissTrainingNotification(session.notificationId);
 }
