@@ -55,6 +55,35 @@ function formatClock(seconds: number) {
   return `${m}:${String(r).padStart(2, "0")}`;
 }
 
+/**
+ * 16:9 "cover" dentro de um contêiner retrato (ou qualquer tamanho), para
+ * o iframe do YouTube preencher e ser recortado como a thumbnail.
+ */
+function getYoutube16by9CoverLayout(
+  containerW: number,
+  containerH: number,
+): { width: number; height: number; left: number; top: number } {
+  if (containerW <= 0 || containerH <= 0) {
+    return { width: 1, height: 1, left: 0, top: 0 };
+  }
+  const wByHeight = (containerH * 16) / 9;
+  if (wByHeight >= containerW) {
+    return {
+      width: wByHeight,
+      height: containerH,
+      left: (containerW - wByHeight) / 2,
+      top: 0,
+    };
+  }
+  const hByWidth = (containerW * 9) / 16;
+  return {
+    width: containerW,
+    height: hByWidth,
+    left: 0,
+    top: (containerH - hByWidth) / 2,
+  };
+}
+
 function ControlButton({
   icon,
   label,
@@ -63,6 +92,7 @@ function ControlButton({
   testID,
   tone,
   variant,
+  size,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -77,6 +107,7 @@ function ControlButton({
     border: string;
   };
   variant?: "regular" | "primary";
+  size: number;
 }) {
   return (
     <Pressable
@@ -89,7 +120,6 @@ function ControlButton({
         const hovered = !!(state as any).hovered;
         return [
           styles.controlButton,
-          variant === "primary" ? styles.controlButtonPrimary : null,
           {
             backgroundColor: state.pressed
               ? tone.bgPressed
@@ -98,7 +128,12 @@ function ControlButton({
                 : tone.bg,
             borderColor: tone.border,
             opacity: disabled ? 0.55 : 1,
+            width: size,
+            height: size,
+            minWidth: size,
+            minHeight: size,
           },
+          variant === "primary" ? styles.controlButtonPrimary : null,
         ];
       }}
       hitSlop={6}
@@ -116,6 +151,7 @@ function ProgressBar({
   tone,
   label,
   containerWidth,
+  verticalPadding,
 }: {
   currentTime: number;
   duration: number;
@@ -124,6 +160,7 @@ function ProgressBar({
   tone: { track: string; fill: string; knob: string };
   label: string;
   containerWidth: number;
+  verticalPadding: number;
 }) {
   const ratio = duration > 0 ? clamp(currentTime / duration, 0, 1) : 0;
   const widthRef = useRef(Math.max(1, containerWidth));
@@ -138,7 +175,7 @@ function ProgressBar({
         const nextRatio = clamp(x / w, 0, 1);
         onSeek(nextRatio * duration);
       }}
-      style={styles.progressHitArea}
+      style={[styles.progressHitArea, { paddingVertical: verticalPadding }]}
     >
       <View
         onLayout={(e) => {
@@ -172,8 +209,13 @@ export default memo(function WorkoutInlineVideo({
   youtubeId,
   onRequestFullscreen,
   onRequestClose,
-  onNativeFullscreenChange,
   testIDPrefix,
+  alwaysShowControls = false,
+  compactControls,
+  showFullscreenButton = true,
+  flatRoot = false,
+  contentVariant = "inline",
+  safeAreaInsets,
 }: {
   width: number;
   height: number;
@@ -183,15 +225,26 @@ export default memo(function WorkoutInlineVideo({
   youtubeId?: string | null;
   onRequestFullscreen: () => void;
   onRequestClose: () => void;
-  onNativeFullscreenChange?: (isFullscreen: boolean) => void;
   testIDPrefix: string;
+  /** Desativa auto-hide e mantém a barra de controle visível (ex.: modal tela cheia do app). */
+  alwaysShowControls?: boolean;
+  compactControls?: boolean;
+  showFullscreenButton?: boolean;
+  flatRoot?: boolean;
+  /** `fullscreen`: fundo preto, sem relógio no topo, superfície de vídeo otimizada para tela cheia. */
+  contentVariant?: "inline" | "fullscreen";
+  safeAreaInsets?: {
+    top?: number;
+    right?: number;
+    bottom?: number;
+    left?: number;
+  };
 }) {
   const scheme = useColorScheme();
   const { t } = useVideoStrings();
   const overlayOpacity = useRef(new Animated.Value(1)).current;
 
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [nativeFullscreen, setNativeFullscreen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -204,9 +257,6 @@ export default memo(function WorkoutInlineVideo({
   const [youtubeTime, setYoutubeTime] = useState(0);
   const [youtubeError, setYoutubeError] = useState(false);
   const youtubeRef = useRef<YoutubeIframeRef | null>(null);
-  const mp4VideoRef = useRef<VideoView | null>(null);
-  const mp4VideoReadyRef = useRef(false);
-  const pendingEnterFullscreenRef = useRef(false);
   const mp4LoopGuardRef = useRef(false);
   const lastTapMsRef = useRef(0);
   const singleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -232,6 +282,84 @@ export default memo(function WorkoutInlineVideo({
     };
   }, [scheme]);
 
+  const youtubeCover = useMemo(
+    () => getYoutube16by9CoverLayout(width, height),
+    [width, height],
+  );
+  const isCompactControls = compactControls ?? width <= 140;
+  const isFullscreenContent = contentVariant === "fullscreen";
+  const rootBackgroundColor = isFullscreenContent ? "#000" : tone.rootBg;
+  const mediaBackgroundColor = isFullscreenContent ? "#000" : undefined;
+  const overlayInsets = safeAreaInsets ?? {};
+  const metrics = useMemo(
+    () => {
+      if (!isCompactControls) {
+        if (isFullscreenContent) {
+          if (height < 620) {
+            return {
+              closeIcon: 18,
+              sideIcon: 18,
+              playIcon: 20,
+              button: 38,
+              primaryButton: 46,
+              overlayPadding: 8,
+              gap: 8,
+              clockFont: 11,
+              progressPadding: 6,
+            };
+          }
+          if (height < 760) {
+            return {
+              closeIcon: 20,
+              sideIcon: 20,
+              playIcon: 22,
+              button: 42,
+              primaryButton: 50,
+              overlayPadding: 9,
+              gap: 8,
+              clockFont: 12,
+              progressPadding: 7,
+            };
+          }
+        }
+        return {
+            closeIcon: 20,
+            sideIcon: 20,
+            playIcon: 24,
+            button: 44,
+            primaryButton: 56,
+            overlayPadding: 10,
+            gap: 10,
+            clockFont: 12,
+            progressPadding: 8,
+          };
+      }
+
+      const gap = 4;
+      const overlayPadding = 5;
+      const availableWidth = Math.max(72, width - overlayPadding * 2);
+      const button = clamp(
+        Math.floor((availableWidth - gap * 2 - 6) / 3),
+        22,
+        28,
+      );
+      const primaryButton = clamp(button + 6, 28, 34);
+
+      return {
+        closeIcon: button >= 26 ? 16 : 14,
+        sideIcon: button >= 26 ? 14 : 12,
+        playIcon: primaryButton >= 32 ? 18 : 16,
+        button,
+        primaryButton,
+        overlayPadding,
+        gap,
+        clockFont: 10,
+        progressPadding: 4,
+      };
+    },
+    [height, isCompactControls, isFullscreenContent, width],
+  );
+
   const showControls = useCallback(() => {
     setControlsVisible(true);
     Animated.timing(overlayOpacity, {
@@ -252,13 +380,13 @@ export default memo(function WorkoutInlineVideo({
   }, [overlayOpacity]);
 
   useEffect(() => {
-    if (nativeFullscreen) return;
+    if (alwaysShowControls) return;
     if (!controlsVisible) return;
     const id = setTimeout(() => {
       hideControls();
     }, 2500);
     return () => clearTimeout(id);
-  }, [controlsVisible, hideControls, nativeFullscreen]);
+  }, [alwaysShowControls, controlsVisible, hideControls]);
 
   useEffect(() => {
     if (!isMp4) return;
@@ -396,18 +524,8 @@ export default memo(function WorkoutInlineVideo({
 
   const requestFullscreen = useCallback(() => {
     showControls();
-    if (!isMp4 || Platform.OS === "web") {
-      onRequestFullscreen();
-      return;
-    }
-    if (mp4VideoReadyRef.current && mp4VideoRef.current) {
-      try {
-        (mp4VideoRef.current as any).enterFullscreen?.();
-      } catch {}
-      return;
-    }
-    pendingEnterFullscreenRef.current = true;
-  }, [isMp4, onRequestFullscreen, showControls]);
+    onRequestFullscreen();
+  }, [onRequestFullscreen, showControls]);
 
   const onTapSurface = useCallback(() => {
     showControls();
@@ -449,58 +567,67 @@ export default memo(function WorkoutInlineVideo({
 
   return (
     <View
-      style={[styles.root, { width, height, backgroundColor: tone.rootBg }]}
+      style={[
+        styles.root,
+        flatRoot ? styles.rootFlat : null,
+        { width, height, backgroundColor: rootBackgroundColor },
+      ]}
       testID={`${testIDPrefix}-root`}
     >
-      <View style={styles.media}>
+      <View
+        style={[
+          styles.media,
+          mediaBackgroundColor
+            ? { backgroundColor: mediaBackgroundColor }
+            : null,
+        ]}
+      >
         {isMp4 ? (
           <VideoView
-            ref={mp4VideoRef}
             player={mp4Player as any}
             style={styles.video}
             nativeControls={false}
-            fullscreenOptions={{ enable: true, orientation: "default" }}
-            surfaceType="textureView"
-            onLayout={() => {
-              mp4VideoReadyRef.current = true;
-              if (pendingEnterFullscreenRef.current) {
-                pendingEnterFullscreenRef.current = false;
-                try {
-                  (mp4VideoRef.current as any)?.enterFullscreen?.();
-                } catch {}
-              }
-            }}
-            onFullscreenEnter={() => {
-              setNativeFullscreen(true);
-              setControlsVisible(false);
-              overlayOpacity.setValue(0);
-              onNativeFullscreenChange?.(true);
-            }}
-            onFullscreenExit={() => {
-              setNativeFullscreen(false);
-              showControls();
-              onNativeFullscreenChange?.(false);
-            }}
+            contentFit="cover"
+            fullscreenOptions={{ enable: false }}
+            {...(Platform.OS === "android"
+              ? {
+                  surfaceType: "textureView" as const,
+                }
+              : {})}
           />
         ) : (
-          <YoutubePlayer
-            key={youtubeId || "youtube"}
-            ref={youtubeRef}
-            height={height}
-            width={width}
-            play={youtubePlay}
-            mute={youtubeMute}
-            volume={youtubeVolume}
-            videoId={youtubeId || undefined}
-            initialPlayerParams={{ controls: false, preventFullScreen: true }}
-            onChangeState={onYouTubeStateChange as any}
-            onReady={() => setYoutubeError(false)}
-            onError={() => {
-              setYoutubeError(true);
-              setYoutubePlay(false);
-              showControls();
-            }}
-          />
+          <View style={styles.youtubeCoverContainer}>
+            <View
+              style={[
+                styles.youtubeCoverInner,
+                {
+                  left: youtubeCover.left,
+                  top: youtubeCover.top,
+                  width: youtubeCover.width,
+                  height: youtubeCover.height,
+                },
+              ]}
+            >
+              <YoutubePlayer
+                key={youtubeId || "youtube"}
+                ref={youtubeRef}
+                height={youtubeCover.height}
+                width={youtubeCover.width}
+                play={youtubePlay}
+                mute={youtubeMute}
+                volume={youtubeVolume}
+                videoId={youtubeId || undefined}
+                initialPlayerParams={{ controls: false, preventFullScreen: true }}
+                onChangeState={onYouTubeStateChange as any}
+                onReady={() => setYoutubeError(false)}
+                onError={() => {
+                  setYoutubeError(true);
+                  setYoutubePlay(false);
+                  showControls();
+                }}
+              />
+            </View>
+          </View>
         )}
       </View>
 
@@ -518,23 +645,42 @@ export default memo(function WorkoutInlineVideo({
           pointerEvents="box-none"
           style={[
             styles.overlay,
-            { backgroundColor: tone.overlay, opacity: overlayOpacity },
+            {
+              backgroundColor: tone.overlay,
+              opacity: overlayOpacity,
+              paddingTop: metrics.overlayPadding + (overlayInsets.top ?? 0),
+              paddingRight: metrics.overlayPadding + (overlayInsets.right ?? 0),
+              paddingBottom:
+                metrics.overlayPadding + (overlayInsets.bottom ?? 0),
+              paddingLeft: metrics.overlayPadding + (overlayInsets.left ?? 0),
+            },
           ]}
         >
-          <View style={styles.topRow}>
-            <Text style={[styles.clock, { color: "#fff" }]} numberOfLines={1}>
-              {clock}
-            </Text>
+          <View style={[styles.topRow, { gap: metrics.gap }]}>
+            {!isCompactControls && !isFullscreenContent ? (
+              <Text
+                style={[
+                  styles.clock,
+                  { color: "#fff", fontSize: metrics.clockFont },
+                ]}
+                numberOfLines={1}
+              >
+                {clock}
+              </Text>
+            ) : (
+              <View style={styles.clockSpacer} />
+            )}
             <ControlButton
-              icon={<X color={tone.button.fg} size={20} />}
+              icon={<X color={tone.button.fg} size={metrics.closeIcon} />}
               label={t("close")}
               onPress={onRequestClose}
               tone={tone.button}
               testID={`${testIDPrefix}-close`}
+              size={metrics.button}
             />
           </View>
 
-          <View style={styles.bottomArea}>
+          <View style={[styles.bottomArea, { gap: metrics.gap }]}>
             <ProgressBar
               currentTime={progressCurrent}
               duration={progressDuration}
@@ -543,29 +689,31 @@ export default memo(function WorkoutInlineVideo({
               testID={`${testIDPrefix}-progress`}
               label={t("progress")}
               containerWidth={width}
+              verticalPadding={metrics.progressPadding}
             />
 
-            <View style={styles.bottomRow}>
+            <View style={[styles.bottomRow, { gap: metrics.gap }]}>
               <ControlButton
                 icon={
                   (isMp4 ? muted : youtubeMute) ? (
-                    <VolumeX color={tone.button.fg} size={20} />
+                    <VolumeX color={tone.button.fg} size={metrics.sideIcon} />
                   ) : (
-                    <Volume2 color={tone.button.fg} size={20} />
+                    <Volume2 color={tone.button.fg} size={metrics.sideIcon} />
                   )
                 }
                 label={(isMp4 ? muted : youtubeMute) ? t("unmute") : t("mute")}
                 onPress={onToggleMute}
                 tone={tone.button}
                 testID={`${testIDPrefix}-mute`}
+                size={metrics.button}
               />
 
               <ControlButton
                 icon={
                   (isMp4 ? isPlaying : youtubePlay) ? (
-                    <Pause color={tone.button.fg} size={24} />
+                    <Pause color={tone.button.fg} size={metrics.playIcon} />
                   ) : (
-                    <Play color={tone.button.fg} size={24} />
+                    <Play color={tone.button.fg} size={metrics.playIcon} />
                   )
                 }
                 label={
@@ -576,15 +724,19 @@ export default memo(function WorkoutInlineVideo({
                 testID={`${testIDPrefix}-play`}
                 variant="primary"
                 disabled={!isMp4 && youtubeError}
+                size={metrics.primaryButton}
               />
 
-              <ControlButton
-                icon={<Maximize2 color={tone.button.fg} size={20} />}
-                label={t("fullscreen")}
-                onPress={requestFullscreen}
-                tone={tone.button}
-                testID={`${testIDPrefix}-fullscreen`}
-              />
+              {showFullscreenButton ? (
+                <ControlButton
+                  icon={<Maximize2 color={tone.button.fg} size={metrics.sideIcon} />}
+                  label={t("fullscreen")}
+                  onPress={requestFullscreen}
+                  tone={tone.button}
+                  testID={`${testIDPrefix}-fullscreen`}
+                  size={metrics.button}
+                />
+              ) : null}
             </View>
           </View>
         </Animated.View>
@@ -598,8 +750,17 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: "hidden",
   },
-  media: { flex: 1 },
-  video: { width: "100%", height: "100%" },
+  rootFlat: {
+    borderRadius: 0,
+  },
+  media: {
+    flex: 1,
+    overflow: "hidden",
+    position: "relative",
+  },
+  video: { ...StyleSheet.absoluteFillObject },
+  youtubeCoverContainer: { flex: 1, overflow: "hidden" },
+  youtubeCoverInner: { position: "absolute" },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "space-between",
@@ -610,6 +771,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
+  },
+  clockSpacer: {
+    flex: 1,
   },
   clock: {
     fontSize: 12,
@@ -633,8 +797,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   controlButtonPrimary: {
-    minWidth: 56,
-    minHeight: 56,
+    // Size is injected inline so the same component can scale on thumbnails.
   },
   progressHitArea: { paddingVertical: 8 },
   progressTrack: {

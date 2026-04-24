@@ -25,7 +25,6 @@ import { supabase } from "../../lib/supabase";
 import {
   Dumbbell,
   ChevronRight,
-  X,
   Clock,
   Play,
   CheckCircle,
@@ -55,11 +54,9 @@ import {
   isMp4Url,
   useMp4PreviewVideo,
 } from "../../lib/workoutsPreviewVideo";
-import { useVideoStrings } from "../../lib/videoStrings";
 import { useLocalSearchParams } from "expo-router";
-import { VideoView, useVideoPlayer } from "expo-video";
+import { useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import YoutubePlayer from "react-native-youtube-iframe";
 import { getStartWorkoutBlockReason } from "../../lib/workoutStartGuard";
 import { Skeleton } from "../../components/ui/skeleton";
 
@@ -144,7 +141,6 @@ export default function Workouts() {
   const { width: viewportWidth, height: viewportHeight } =
     useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const { t: tVideo } = useVideoStrings();
   const {
     activeSession,
     elapsedSeconds,
@@ -171,6 +167,12 @@ export default function Workouts() {
   const [previewFullscreenIndex, setPreviewFullscreenIndex] = useState<
     number | null
   >(null);
+  const [previewInlineSurfaceVersion, setPreviewInlineSurfaceVersion] =
+    useState(0);
+  const [previewFullscreenLayout, setPreviewFullscreenLayout] = useState<{
+    w: number;
+    h: number;
+  } | null>(null);
   const [previewVideoLoading, setPreviewVideoLoading] = useState(false);
   const [previewThumbnails, setPreviewThumbnails] = useState<
     Record<number, string>
@@ -178,8 +180,8 @@ export default function Workouts() {
   const previewThumbnailsCache = useRef<Record<number, string>>({});
   const previewThumbProcessing = useRef<Record<number, boolean>>({});
   const previewPlayer = useVideoPlayer("");
-  const previewNativeFullscreenRef = useRef(false);
-  const previewPendingClearRef = useRef(false);
+  const previewFullscreenPlayer = useVideoPlayer("");
+  const previewFullscreenLoadedUrlRef = useRef<string | null>(null);
 
   const clearPreviewPlayer = useCallback(async () => {
     previewPlayer.pause();
@@ -188,15 +190,24 @@ export default function Workouts() {
     } catch {}
   }, [previewPlayer]);
 
+  const clearPreviewFullscreenPlayer = useCallback(async () => {
+    previewFullscreenPlayer.pause();
+    try {
+      await previewFullscreenPlayer.replaceAsync(null);
+    } catch {}
+    previewFullscreenLoadedUrlRef.current = null;
+  }, [previewFullscreenPlayer]);
+
   const requestClearPreviewPlayer = useCallback(() => {
-    if (previewNativeFullscreenRef.current) {
-      previewPendingClearRef.current = true;
-      previewPlayer.pause();
-      return;
-    }
-    previewPendingClearRef.current = false;
+    previewPlayer.pause();
     void clearPreviewPlayer();
   }, [clearPreviewPlayer, previewPlayer]);
+
+  useEffect(() => {
+    if (previewFullscreenIndex == null) {
+      setPreviewFullscreenLayout(null);
+    }
+  }, [previewFullscreenIndex]);
 
   const isWide = viewportWidth >= 720;
   const workoutModalScrollY = useRef(new Animated.Value(0)).current;
@@ -239,7 +250,8 @@ export default function Workouts() {
     setPreviewFullscreenIndex(null);
     setPreviewVideoLoading(false);
     requestClearPreviewPlayer();
-  }, [requestClearPreviewPlayer]);
+    void clearPreviewFullscreenPlayer();
+  }, [clearPreviewFullscreenPlayer, requestClearPreviewPlayer]);
 
   const openActiveWorkout = useCallback(async () => {
     debugWorkouts("openActiveWorkout:request", {
@@ -504,7 +516,8 @@ export default function Workouts() {
     previewThumbnailsCache.current = {};
     previewThumbProcessing.current = {};
     requestClearPreviewPlayer();
-  }, [requestClearPreviewPlayer, selectedWorkout?.id]);
+    void clearPreviewFullscreenPlayer();
+  }, [clearPreviewFullscreenPlayer, requestClearPreviewPlayer, selectedWorkout?.id]);
 
   useEffect(() => {
     const sub = previewPlayer.addListener("statusChange", (status) => {
@@ -526,6 +539,17 @@ export default function Workouts() {
     return isMp4Url(previewVideoUrl) ? previewVideoUrl : null;
   }, [previewVideoUrl]);
 
+  const previewFullscreenVideoUrl = useMemo(() => {
+    if (!selectedWorkout || previewFullscreenIndex == null) return null;
+    const ex = selectedWorkout.data.exercises[previewFullscreenIndex];
+    return ex?.videoUrl || ex?.video_url || null;
+  }, [previewFullscreenIndex, selectedWorkout]);
+
+  const previewFullscreenMp4Url = useMemo(() => {
+    if (!previewFullscreenVideoUrl) return null;
+    return isMp4Url(previewFullscreenVideoUrl) ? previewFullscreenVideoUrl : null;
+  }, [previewFullscreenVideoUrl]);
+
   useMp4PreviewVideo({
     player: previewPlayer as any,
     mp4Url: previewMp4Url,
@@ -538,6 +562,82 @@ export default function Workouts() {
         hasVideo: !!previewVideoUrl,
       }),
   });
+
+  useEffect(() => {
+    const syncFullscreenMp4 = async () => {
+      if (!previewFullscreenMp4Url || previewFullscreenIndex == null) {
+        await clearPreviewFullscreenPlayer();
+        return;
+      }
+
+      try {
+        if (previewFullscreenLoadedUrlRef.current !== previewFullscreenMp4Url) {
+          previewFullscreenLoadedUrlRef.current = previewFullscreenMp4Url;
+          await previewFullscreenPlayer.replaceAsync({ uri: previewFullscreenMp4Url });
+        }
+        previewFullscreenPlayer.muted = !!previewPlayer.muted;
+        previewFullscreenPlayer.volume = Number.isFinite(previewPlayer.volume)
+          ? previewPlayer.volume
+          : 1;
+        previewFullscreenPlayer.currentTime = Number.isFinite(previewPlayer.currentTime)
+          ? previewPlayer.currentTime
+          : 0;
+        if (previewPlayer.playing) previewFullscreenPlayer.play();
+        else previewFullscreenPlayer.pause();
+        previewPlayer.pause();
+      } catch {
+        setPreviewVideoLoading(false);
+      }
+    };
+
+    void syncFullscreenMp4();
+  }, [
+    clearPreviewFullscreenPlayer,
+    previewFullscreenIndex,
+    previewFullscreenMp4Url,
+    previewFullscreenPlayer,
+    previewPlayer,
+  ]);
+
+  const closePreviewFullscreen = useCallback(() => {
+    const syncBackToInline = async () => {
+      if (previewFullscreenMp4Url) {
+        try {
+          const nextMuted = !!previewFullscreenPlayer.muted;
+          const nextVolume = Number.isFinite(previewFullscreenPlayer.volume)
+            ? previewFullscreenPlayer.volume
+            : 1;
+          const nextTime = Number.isFinite(previewFullscreenPlayer.currentTime)
+            ? previewFullscreenPlayer.currentTime
+            : previewPlayer.currentTime;
+          const wasPlaying = !!previewFullscreenPlayer.playing;
+
+          setPreviewVideoLoading(true);
+          previewPlayer.pause();
+          await previewPlayer.replaceAsync({ uri: previewFullscreenMp4Url });
+          previewPlayer.muted = nextMuted;
+          previewPlayer.volume = nextVolume;
+          previewPlayer.currentTime = nextTime;
+          if (wasPlaying) previewPlayer.play();
+          else previewPlayer.pause();
+          setPreviewInlineSurfaceVersion((v) => v + 1);
+        } catch {
+          setPreviewVideoLoading(false);
+        }
+        await clearPreviewFullscreenPlayer();
+      }
+
+      setPreviewFullscreenIndex(null);
+      setPreviewVideoLoading(false);
+    };
+
+    void syncBackToInline();
+  }, [
+    clearPreviewFullscreenPlayer,
+    previewFullscreenMp4Url,
+    previewFullscreenPlayer,
+    previewPlayer,
+  ]);
 
   useEffect(() => {
     if (openActive !== "1") return;
@@ -967,9 +1067,10 @@ export default function Workouts() {
                 const playing = previewActiveVideoIndex === i;
                 const youtubeId = video ? getYoutubeId(video) : null;
                 const suppressInlineVideo = previewFullscreenIndex === i;
+                // Thumbnail/mini player: ~30% da largura (cap), formato retrato 9:16
                 const videoBoxWidth = Math.max(
-                  140,
-                  Math.round(viewportWidth * 0.5),
+                  100,
+                  Math.min(128, Math.round(viewportWidth * 0.3)),
                 );
                 const videoBoxHeight = Math.round((videoBoxWidth * 16) / 9);
 
@@ -1121,6 +1222,7 @@ export default function Workouts() {
 
                           {!suppressInlineVideo ? (
                             <WorkoutInlineVideo
+                              key={`preview-inline-${i}-${previewInlineSurfaceVersion}`}
                               width={videoBoxWidth}
                               height={videoBoxHeight}
                               isMp4={isMp4Url(video)}
@@ -1144,17 +1246,7 @@ export default function Workouts() {
                                 );
                                 setPreviewFullscreenIndex(i);
                               }}
-                              onNativeFullscreenChange={(isFullscreen) => {
-                                previewNativeFullscreenRef.current =
-                                  isFullscreen;
-                                if (
-                                  !isFullscreen &&
-                                  previewPendingClearRef.current
-                                ) {
-                                  previewPendingClearRef.current = false;
-                                  void clearPreviewPlayer();
-                                }
-                              }}
+                              compactControls
                               testIDPrefix={`workouts-video-${i}`}
                             />
                           ) : (
@@ -1167,90 +1259,57 @@ export default function Workouts() {
                 );
               }}
             />
-          </SafeAreaView>
-        )}
-      </Modal>
 
-      <Modal
-        visible={previewFullscreenIndex != null}
-        animationType="slide"
-        presentationStyle="fullScreen"
-      >
-        <View style={{ flex: 1, backgroundColor: "#000" }}>
-          <View style={styles.videoHeader}>
-            <Text style={{ color: "#fff", fontWeight: "bold" }}>Vídeo</Text>
-            <TouchableOpacity
-              onPress={() => setPreviewFullscreenIndex(null)}
-              style={styles.videoHeaderClose}
-              accessibilityRole="button"
-              accessibilityLabel={tVideo("close")}
-            >
-              <X color="#fff" size={24} />
-            </TouchableOpacity>
-          </View>
-
-          {selectedWorkout && previewFullscreenIndex != null ? (
-            (() => {
-              const ex = selectedWorkout.data.exercises[previewFullscreenIndex];
-              const video = ex?.videoUrl || ex?.video_url;
-              if (!video) return null;
-              const youtubeId = !isMp4Url(video) ? getYoutubeId(video) : null;
-
-              if (isMp4Url(video)) {
-                return (
-                  <VideoView
-                    player={previewPlayer}
-                    style={{ flex: 1 }}
-                    fullscreenOptions={{ enable: true, orientation: "default" }}
-                    nativeControls
-                  />
-                );
-              }
-
-              if (Platform.OS === "web" && youtubeId) {
-                return (
-                  <iframe
-                    src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1`}
-                    style={{ width: "100%", height: "100%", border: "none" }}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                );
-              }
-
-              return (
+            {selectedWorkout && previewFullscreenIndex != null ? (
+              <View style={styles.previewFullscreenOverlay}>
+                <View style={styles.previewFullscreenBackdrop} />
                 <View
-                  style={{
-                    flex: 1,
-                    justifyContent: "center",
-                    alignItems: "center",
+                  style={[
+                    styles.previewFullscreenContent,
+                  ]}
+                  onLayout={(e) => {
+                    const { width: w, height: h } = e.nativeEvent.layout;
+                    if (w > 0 && h > 0) {
+                      setPreviewFullscreenLayout({ w, h });
+                    }
                   }}
                 >
-                  <YoutubePlayer
-                    height={Math.max(
-                      200,
-                      Math.min(
-                        viewportHeight - 72,
-                        Math.round((Math.min(viewportWidth, 960) * 9) / 16),
-                      ),
-                    )}
-                    width={Math.min(viewportWidth, 960)}
-                    play
-                    videoId={youtubeId || undefined}
-                    initialPlayerParams={{
-                      controls: true,
-                      preventFullScreen: true,
-                    }}
-                    onReady={() => setPreviewVideoLoading(false)}
-                    onError={() => setPreviewVideoLoading(false)}
-                  />
+                  {previewFullscreenLayout ? (() => {
+                    const ex =
+                      selectedWorkout.data.exercises[previewFullscreenIndex];
+                    const video = ex?.videoUrl || ex?.video_url;
+                    if (!video) return null;
+                    const youtubeId = !isMp4Url(video)
+                      ? getYoutubeId(video)
+                      : null;
+                    return (
+                      <WorkoutInlineVideo
+                        width={previewFullscreenLayout.w}
+                        height={previewFullscreenLayout.h}
+                        isMp4={isMp4Url(video)}
+                        mp4Player={
+                          (isMp4Url(video)
+                            ? previewFullscreenPlayer
+                            : previewPlayer) as any
+                        }
+                        mp4Url={isMp4Url(video) ? video : null}
+                        youtubeId={youtubeId}
+                        onRequestClose={closePreviewFullscreen}
+                        onRequestFullscreen={() => {}}
+                        alwaysShowControls
+                        showFullscreenButton={false}
+                        flatRoot
+                        contentVariant="fullscreen"
+                        safeAreaInsets={insets}
+                        testIDPrefix="workouts-video-fullscreen"
+                      />
+                    );
+                  })() : null}
                 </View>
-              );
-            })()
-          ) : (
-            <View style={{ flex: 1 }} />
-          )}
-        </View>
+              </View>
+            ) : null}
+          </SafeAreaView>
+        )}
       </Modal>
     </SafeAreaView>
   );
@@ -1638,6 +1697,21 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.35)",
     zIndex: 2,
   },
+  previewFullscreenOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 50,
+    elevation: 50,
+  },
+  previewFullscreenBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+  },
+  previewFullscreenContent: {
+    flex: 1,
+    minHeight: 0,
+    minWidth: 0,
+    backgroundColor: "#000",
+  },
 
   // Textos Simples
   simpleSetText: {
@@ -1668,20 +1742,4 @@ const styles = StyleSheet.create({
   },
   exNoteText: { fontSize: 12, color: "#c2410c" },
 
-  videoHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
-  },
-  videoHeaderClose: {
-    minWidth: 44,
-    minHeight: 44,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

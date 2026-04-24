@@ -110,7 +110,7 @@ describe("WorkoutInlineVideo UI", () => {
     expect(flat.minHeight).toBeGreaterThanOrEqual(44);
 
     fireEvent.press(screen.getByTestId("t-fullscreen"));
-    expect(onRequestFullscreen).not.toHaveBeenCalled();
+    expect(onRequestFullscreen).toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId("t-close"));
     expect(onRequestClose).toHaveBeenCalled();
@@ -178,7 +178,7 @@ describe("WorkoutInlineVideo UI", () => {
       fireEvent.press(screen.getByTestId("t-surface"));
       jest.advanceTimersByTime(270);
     });
-    expect(onRequestFullscreen).not.toHaveBeenCalled();
+    expect(onRequestFullscreen).toHaveBeenCalled();
     jest.useRealTimers();
   });
 
@@ -261,6 +261,80 @@ describe("WorkoutInlineVideo UI", () => {
     );
 
     expect(screen.getByTestId("t-fullscreen")).toBeTruthy();
+  });
+
+  it("reduz o tamanho dos controles quando usado como thumbnail", () => {
+    const player = createMp4PlayerMock();
+    const screen = render(
+      <WorkoutInlineVideo
+        width={112}
+        height={199}
+        isMp4
+        mp4Player={player}
+        mp4Url="https://cdn.example.com/a.mp4"
+        youtubeId={null}
+        onRequestFullscreen={() => {}}
+        onRequestClose={() => {}}
+        compactControls
+        testIDPrefix="t"
+      />,
+    );
+
+    const btn = screen.getByTestId("t-play");
+    const styleProp = btn.props.style;
+    const resolved =
+      typeof styleProp === "function"
+        ? styleProp({ pressed: false, hovered: false })
+        : styleProp;
+    const flat = StyleSheet.flatten(resolved);
+    expect(flat.minWidth).toBeLessThan(44);
+    expect(flat.minHeight).toBeLessThan(44);
+  });
+
+  it("com alwaysShowControls os botões permanecem após o auto-hide (timer)", () => {
+    jest.useFakeTimers();
+    const player = createMp4PlayerMock();
+    const screen = render(
+      <WorkoutInlineVideo
+        width={320}
+        height={180}
+        isMp4
+        mp4Player={player}
+        mp4Url="https://cdn.example.com/a.mp4"
+        youtubeId={null}
+        onRequestFullscreen={() => {}}
+        onRequestClose={() => {}}
+        alwaysShowControls
+        testIDPrefix="t"
+      />,
+    );
+    expect(screen.getByTestId("t-play")).toBeTruthy();
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(screen.getByTestId("t-mute")).toBeTruthy();
+    expect(screen.getByTestId("t-fullscreen")).toBeTruthy();
+    jest.useRealTimers();
+  });
+
+  it("esconde o botão de fullscreen quando solicitado", () => {
+    const player = createMp4PlayerMock();
+    const screen = render(
+      <WorkoutInlineVideo
+        width={320}
+        height={180}
+        isMp4
+        mp4Player={player}
+        mp4Url="https://cdn.example.com/a.mp4"
+        youtubeId={null}
+        onRequestFullscreen={() => {}}
+        onRequestClose={() => {}}
+        showFullscreenButton={false}
+        testIDPrefix="t"
+      />,
+    );
+
+    expect(screen.queryByTestId("t-fullscreen")).toBeNull();
   });
 
   it("no web, fullscreen do MP4 delega para callback externo", () => {
