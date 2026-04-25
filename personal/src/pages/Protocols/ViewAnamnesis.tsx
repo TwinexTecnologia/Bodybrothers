@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { getWorkoutById } from '../../store/workouts'
 import { Toast, type ToastType } from '../../components/Toast'
+import Modal from '../../components/Modal'
 import { ArrowLeft, Calendar, User } from 'lucide-react'
 
 export default function ViewAnamnesis() {
@@ -13,6 +14,7 @@ export default function ViewAnamnesis() {
     const [marking, setMarking] = useState(false)
     const [confirmModal, setConfirmModal] = useState<{ open: boolean, days: number }>({ open: false, days: 90 })
     const [toast, setToast] = useState<{ msg: string, type: ToastType } | null>(null)
+    const [previewImage, setPreviewImage] = useState<string | null>(null)
 
     useEffect(() => {
         if (!id) return
@@ -197,9 +199,75 @@ export default function ViewAnamnesis() {
     // Se questions estiver vazio, pode ser que o conteúdo seja apenas respostas chave-valor
     const hasQuestions = questions.length > 0
 
+    const renderPhotoAnswer = (imageUrl: string, alt: string) => (
+        <div style={{ marginTop: 8 }}>
+            <img
+                src={imageUrl}
+                alt={alt}
+                style={{
+                    maxWidth: '100%',
+                    maxHeight: 400,
+                    borderRadius: 8,
+                    border: '1px solid #e2e8f0',
+                    cursor: 'zoom-in',
+                    display: 'block',
+                    marginBottom: 12
+                }}
+                onClick={() => setPreviewImage(imageUrl)}
+                onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    if (e.currentTarget.parentElement) {
+                        const span = document.createElement('span');
+                        span.style.color = '#ef4444';
+                        span.style.fontSize = '0.9rem';
+                        span.innerText = '⚠️ Imagem corrompida ou formato não suportado (.heic)';
+                        e.currentTarget.parentElement.appendChild(span);
+                    }
+                }}
+            />
+            <button
+                type="button"
+                onClick={() => setPreviewImage(imageUrl)}
+                style={{
+                    background: '#fff',
+                    border: '1px solid #cbd5e1',
+                    color: '#0f172a',
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                }}
+            >
+                Ver foto maior
+            </button>
+        </div>
+    )
+
     return (
         <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px', paddingBottom: 100 }}>
             {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+            <Modal
+                isOpen={!!previewImage}
+                onClose={() => setPreviewImage(null)}
+                title="Visualizar foto"
+                width={900}
+            >
+                {previewImage && (
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                        <img
+                            src={previewImage}
+                            alt="Visualizacao ampliada"
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '75vh',
+                                objectFit: 'contain',
+                                borderRadius: 12,
+                                border: '1px solid #e2e8f0'
+                            }}
+                        />
+                    </div>
+                )}
+            </Modal>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <button 
                     onClick={() => navigate(-1)} 
@@ -328,24 +396,7 @@ export default function ViewAnamnesis() {
                                     
                                     {q.type === 'photo' ? (
                                         answer ? (
-                                            <div style={{ marginTop: 8 }}>
-                                                <img 
-                                                    src={answer} 
-                                                    alt="Resposta" 
-                                                    style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 8, border: '1px solid #e2e8f0' }} 
-                                                    onError={(e) => {
-                                                        // Fallback se a imagem quebrar
-                                                        e.currentTarget.style.display = 'none';
-                                                        if (e.currentTarget.parentElement) {
-                                                            const span = document.createElement('span');
-                                                            span.style.color = '#ef4444';
-                                                            span.style.fontSize = '0.9rem';
-                                                            span.innerText = '⚠️ Imagem corrompida ou formato não suportado (.heic)';
-                                                            e.currentTarget.parentElement.appendChild(span);
-                                                        }
-                                                    }}
-                                                />
-                                            </div>
+                                            renderPhotoAnswer(answer, `Resposta ${index + 1}`)
                                         ) : (
                                             <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>Sem foto enviada.</div>
                                         )
@@ -382,24 +433,7 @@ export default function ViewAnamnesis() {
                                     </div>
                                     
                                     {isImage ? (
-                                        <div style={{ marginTop: 8 }}>
-                                            <img 
-                                                src={value} 
-                                                alt="Resposta Visual"
-                                                style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 8, border: '1px solid #e2e8f0', cursor: 'pointer' }}
-                                                onClick={() => window.open(value, '_blank')}
-                                                onError={(e) => {
-                                                    e.currentTarget.style.display = 'none';
-                                                    if (e.currentTarget.parentElement) {
-                                                        const span = document.createElement('span');
-                                                        span.style.color = '#ef4444';
-                                                        span.style.fontSize = '0.9rem';
-                                                        span.innerText = '⚠️ Imagem corrompida ou formato não suportado (.heic)';
-                                                        e.currentTarget.parentElement.appendChild(span);
-                                                    }
-                                                }}
-                                            />
-                                        </div>
+                                        renderPhotoAnswer(value, `Resposta visual ${index + 1}`)
                                     ) : (
                                         <div style={{ color: '#0f172a', whiteSpace: 'pre-wrap' }}>
                                             {Array.isArray(value) ? value.join(', ') : String(value)}
