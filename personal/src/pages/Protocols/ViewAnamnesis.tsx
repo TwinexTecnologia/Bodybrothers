@@ -238,7 +238,7 @@ export default function ViewAnamnesis() {
                     cursor: 'pointer'
                 }}
             >
-                Ver foto maior
+                Ver a foto maior
             </button>
         </div>
     )
