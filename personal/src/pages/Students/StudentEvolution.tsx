@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import Modal from '../../components/Modal'
 import { Camera, ArrowRight, ArrowLeft } from 'lucide-react'
 
 type PhotoRecord = {
@@ -25,6 +26,7 @@ export default function StudentEvolution() {
     const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0])
     const [uploadFiles, setUploadFiles] = useState<FileList | null>(null)
     const [uploading, setUploading] = useState(false)
+    const [previewImage, setPreviewImage] = useState<string | null>(null)
 
     useEffect(() => {
         if (id) {
@@ -129,6 +131,33 @@ export default function StudentEvolution() {
 
     const getRecord = (recordId: string) => history.find(h => h.id === recordId)
 
+    const renderPhotoCard = (photo: string, index: number) => (
+        <div key={index} style={{ position: 'relative', height: 400, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', padding: 16 }}>
+            <img
+                src={photo}
+                alt={`Foto ${index + 1}`}
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', cursor: 'zoom-in', marginBottom: 12 }}
+                onClick={() => setPreviewImage(photo)}
+            />
+            <button
+                type="button"
+                onClick={() => setPreviewImage(photo)}
+                style={{
+                    background: '#fff',
+                    border: '1px solid #cbd5e1',
+                    color: '#0f172a',
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                }}
+            >
+                Ver foto maior
+            </button>
+            <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem' }}>Foto {index + 1}</div>
+        </div>
+    )
+
     const handleUpload = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!uploadFiles || uploadFiles.length === 0) return
@@ -191,6 +220,28 @@ export default function StudentEvolution() {
 
     return (
         <div style={{ maxWidth: 1200, margin: '0 auto', paddingBottom: 40 }}>
+            <Modal
+                isOpen={!!previewImage}
+                onClose={() => setPreviewImage(null)}
+                title="Visualizar foto"
+                width={1000}
+            >
+                {previewImage && (
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                        <img
+                            src={previewImage}
+                            alt="Visualizacao ampliada"
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '75vh',
+                                objectFit: 'contain',
+                                borderRadius: 12,
+                                border: '1px solid #e2e8f0'
+                            }}
+                        />
+                    </div>
+                )}
+            </Modal>
             {/* Modal de Upload */}
             {isUploading && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
@@ -320,12 +371,7 @@ export default function StudentEvolution() {
                             </div>
                             {recordA && (
                                 <div style={{ display: 'grid', gap: 24 }}>
-                                    {recordA.photos.map((photo, i) => (
-                                        <div key={i} style={{ position: 'relative', height: 400, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <img src={photo} alt={`Foto ${i+1}`} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', cursor: 'pointer' }} onClick={() => window.open(photo, '_blank')} />
-                                            <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem' }}>Foto {i+1}</div>
-                                        </div>
-                                    ))}
+                                    {recordA.photos.map((photo, i) => renderPhotoCard(photo, i))}
                                 </div>
                             )}
                         </div>
@@ -337,12 +383,7 @@ export default function StudentEvolution() {
                             </div>
                             {recordB && (
                                 <div style={{ display: 'grid', gap: 24 }}>
-                                    {recordB.photos.map((photo, i) => (
-                                        <div key={i} style={{ position: 'relative', height: 400, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <img src={photo} alt={`Foto ${i+1}`} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', cursor: 'pointer' }} onClick={() => window.open(photo, '_blank')} />
-                                            <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem' }}>Foto {i+1}</div>
-                                        </div>
-                                    ))}
+                                    {recordB.photos.map((photo, i) => renderPhotoCard(photo, i))}
                                 </div>
                             )}
                         </div>
