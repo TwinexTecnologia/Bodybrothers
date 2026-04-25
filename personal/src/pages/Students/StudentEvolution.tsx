@@ -152,7 +152,7 @@ export default function StudentEvolution() {
                     cursor: 'pointer'
                 }}
             >
-                Ver foto maior
+                Ver a foto maior
             </button>
             <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem' }}>Foto {index + 1}</div>
         </div>
