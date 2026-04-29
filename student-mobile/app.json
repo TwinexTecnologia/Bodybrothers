@@ -3,7 +3,7 @@
     "name": "FitBody Pro",
     "slug": "fitbody-pro",
     "scheme": "fitbody-pro",
-    "version": "1.0.9",
+    "version": "1.0.10",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -23,11 +23,11 @@
           "NSAllowsArbitraryLoadsInMedia": true
         }
       },
-      "buildNumber": "5"
+      "buildNumber": "6"
     },
     "android": {
       "package": "com.twinex.fitbodypro",
-      "versionCode": 8,
+      "versionCode": 9,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
