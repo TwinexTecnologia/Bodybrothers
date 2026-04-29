@@ -24,6 +24,10 @@ FOR SELECT USING (auth.uid() = student_id);
 CREATE POLICY "Student insert own history" ON public.workout_history
 FOR INSERT WITH CHECK (auth.uid() = student_id);
 
+-- 2b. Aluno pode remover (cancelar) sua própria sessão em aberto / registro
+CREATE POLICY "Student delete own history" ON public.workout_history
+FOR DELETE USING (auth.uid() = student_id);
+
 -- 3. Personal pode ver histórico dos seus alunos
 -- (Essa query verifica se o student_id da linha pertence a um aluno cujo personal_id é o usuário atual)
 CREATE POLICY "Personal view student history" ON public.workout_history

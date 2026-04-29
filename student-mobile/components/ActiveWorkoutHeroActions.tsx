@@ -151,7 +151,9 @@ export default function ActiveWorkoutHeroActions({
           ) : (
             <Pause color="#0f172a" size={18} />
           )}
-          <Text style={[styles.activeHeroActionText, styles.activeHeroPauseText]}>
+          <Text
+            style={[styles.activeHeroActionText, styles.activeHeroPauseText]}
+          >
             {isPaused ? "Retomar" : "Pausar"}
           </Text>
         </TouchableOpacity>
@@ -193,7 +195,10 @@ export default function ActiveWorkoutHeroActions({
 
             <View style={styles.finishModalButtons}>
               <TouchableOpacity
-                style={[styles.finishModalButton, styles.finishModalCancelButton]}
+                style={[
+                  styles.finishModalButton,
+                  styles.finishModalCancelButton,
+                ]}
                 onPress={() => setShowFinishModal(false)}
                 disabled={isFinishing}
                 testID="finish-modal-cancel"
@@ -201,7 +206,10 @@ export default function ActiveWorkoutHeroActions({
                 <Text style={styles.finishModalCancelText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.finishModalButton, styles.finishModalConfirmButton]}
+                style={[
+                  styles.finishModalButton,
+                  styles.finishModalConfirmButton,
+                ]}
                 onPress={handleFinish}
                 disabled={isFinishing}
                 testID="finish-modal-confirm"
