@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Camera } from 'lucide-react'
 import { listStudentsByPersonal, updateStudent, getStudent, toggleStudentActive, type StudentRecord } from '../../store/students'
@@ -47,6 +48,7 @@ export default function EditStudent() {
   const [studentDiets, setStudentDiets] = useState<DietRecord[]>([]) // Dietas personalizadas
   const [selectedDietIds, setSelectedDietIds] = useState<string[]>([])
   const [workoutSchedule, setWorkoutSchedule] = useState<Record<string, string[]>>({})
+  const [orderedWorkoutIds, setOrderedWorkoutIds] = useState<string[]>([])
   
   // Anamneses
   const [libraryAnamnesis, setLibraryAnamnesis] = useState<AnamnesisModel[]>([])
@@ -86,7 +88,20 @@ export default function EditStudent() {
   const [searchTerm, setSearchTerm] = useState('') // Estado para busca
 
   // Filtros
-  const studentWorkouts = allWorkouts.filter(w => w.studentId === selectedId && w.status === 'ativo')
+  const studentWorkouts = useMemo(() => {
+      const activeStudentWorkouts = allWorkouts.filter(w => w.studentId === selectedId && w.status === 'ativo')
+      if (activeStudentWorkouts.length === 0) return []
+
+      const workoutMap = new Map(activeStudentWorkouts.map(workout => [workout.id, workout]))
+      const normalizedIds = orderedWorkoutIds.filter(id => workoutMap.has(id))
+      const missingIds = activeStudentWorkouts
+          .map(workout => workout.id)
+          .filter(id => !normalizedIds.includes(id))
+
+      return [...normalizedIds, ...missingIds]
+          .map(id => workoutMap.get(id))
+          .filter(Boolean) as WorkoutRecord[]
+  }, [allWorkouts, selectedId, orderedWorkoutIds])
   const libraryWorkouts = allWorkouts.filter(w => !w.studentId && w.status === 'ativo')
 
   // Filtra alunos pelo termo de busca
@@ -250,6 +265,7 @@ export default function EditStudent() {
   // Carregar detalhes do aluno selecionado para o Form
   useEffect(() => {
     if (!selectedId) return
+    setOrderedWorkoutIds([])
     
     async function fetchDetails() {
         const s = await getStudent(selectedId)
@@ -270,10 +286,31 @@ export default function EditStudent() {
             setDueDay(s.dueDay ? String(s.dueDay) : '')
             setSelectedDietIds(s.dietIds || [])
             setWorkoutSchedule(s.workoutSchedule || {})
+            setOrderedWorkoutIds(s.workoutIds || [])
         }
     }
     fetchDetails()
   }, [selectedId])
+
+  useEffect(() => {
+      if (!selectedId) return
+
+      const currentIds = allWorkouts
+          .filter(workout => workout.studentId === selectedId && workout.status === 'ativo')
+          .map(workout => workout.id)
+
+      setOrderedWorkoutIds(prev => {
+          const preserved = prev.filter(id => currentIds.includes(id))
+          const missing = currentIds.filter(id => !preserved.includes(id))
+          const next = [...preserved, ...missing]
+
+          if (prev.length === next.length && prev.every((id, index) => id === next[index])) {
+              return prev
+          }
+
+          return next
+      })
+  }, [allWorkouts, selectedId])
   
   // --- HANDLERS ---
 
@@ -410,10 +447,12 @@ export default function EditStudent() {
       setLoading(true)
 
       const { type, itemId, days } = smartLinkState
+      let addedWorkoutId: string | null = null
 
       if (action === 'link') {
           if (type === 'workout') {
-              await updateWorkout(itemId, { studentId: selectedId })
+              const linkedWorkout = await updateWorkout(itemId, { studentId: selectedId })
+              addedWorkoutId = linkedWorkout?.id || itemId
               await reloadWorkouts()
           } else if (type === 'diet') {
               await updateDiet(itemId, { studentId: selectedId })
@@ -426,7 +465,8 @@ export default function EditStudent() {
       } else {
           // COPY
           if (type === 'workout') {
-              await duplicateWorkout(itemId, selectedId)
+              const duplicatedWorkout = await duplicateWorkout(itemId, selectedId)
+              addedWorkoutId = duplicatedWorkout?.id || null
               await reloadWorkouts()
           } else if (type === 'diet') {
               await duplicateDiet(itemId, selectedId)
@@ -439,6 +479,11 @@ export default function EditStudent() {
       }
 
       setSmartLinkState(null)
+      if (type === 'workout' && addedWorkoutId) {
+          const nextIds = [...orderedWorkoutIds.filter(id => id !== addedWorkoutId), addedWorkoutId]
+          setOrderedWorkoutIds(nextIds)
+          await persistWorkoutOrder(nextIds)
+      }
       // Recarrega bibliotecas
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
@@ -475,8 +520,13 @@ export default function EditStudent() {
           return
       }
 
-      await duplicateWorkout(libraryWorkoutId, selectedId)
+      const newWorkout = await duplicateWorkout(libraryWorkoutId, selectedId)
       await reloadWorkouts()
+      if (newWorkout) {
+          const nextIds = [...orderedWorkoutIds.filter(id => id !== newWorkout.id), newWorkout.id]
+          setOrderedWorkoutIds(nextIds)
+          await persistWorkoutOrder(nextIds)
+      }
       setLibraryWorkoutId('')
       setLoading(false)
   }
@@ -491,6 +541,9 @@ export default function EditStudent() {
               setLoading(true)
               // Atualiza studentId para null (volta pra biblioteca) E status para 'inativo' (arquivado)
               await updateWorkout(wid, { studentId: null, status: 'inativo' })
+              const nextIds = orderedWorkoutIds.filter(id => id !== wid)
+              setOrderedWorkoutIds(nextIds)
+              await persistWorkoutOrder(nextIds)
               await reloadWorkouts()
               setLoading(false)
               setConfirmModal(prev => ({ ...prev, isOpen: false }))
@@ -506,6 +559,32 @@ export default function EditStudent() {
               : [...days, day]
           return { ...prev, [wid]: newDays }
       })
+  }
+
+  const persistWorkoutOrder = async (nextIds: string[]) => {
+      if (!selectedId) return
+      await updateStudent(selectedId, { workoutIds: nextIds })
+      setStudents(prev => prev.map(student => (
+          student.id === selectedId ? { ...student, workoutIds: nextIds } : student
+      )))
+  }
+
+  const handleWorkoutDragEnd = async (result: DropResult) => {
+      if (!result.destination) return
+      if (result.destination.index === result.source.index) return
+
+      const nextIds = Array.from(studentWorkouts.map(workout => workout.id))
+      const [movedId] = nextIds.splice(result.source.index, 1)
+      nextIds.splice(result.destination.index, 0, movedId)
+
+      setOrderedWorkoutIds(nextIds)
+      try {
+          await persistWorkoutOrder(nextIds)
+          setMsg('Ordem dos treinos atualizada!')
+      } catch (error) {
+          console.error('Erro ao salvar ordem dos treinos:', error)
+          setMsg('Erro ao salvar ordem dos treinos.')
+      }
   }
 
   // Função auxiliar para recarregar biblioteca de anamneses
@@ -728,6 +807,7 @@ export default function EditStudent() {
       planStartDate: newData.planStartDate,
       dueDay: newData.dueDay,
       dietIds: newData.dietIds,
+      workoutIds: orderedWorkoutIds,
       workoutSchedule,
       tempPassword
     })
@@ -968,39 +1048,87 @@ export default function EditStudent() {
                             Sem treinos ativos.
                         </div>
                     ) : (
-                        <div style={{ display: 'grid', gap: 12 }}>
-                            {studentWorkouts.map(w => (
-                                <div key={w.id} style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                        <div style={{ fontWeight: 600, fontSize: '1.05em' }}>{w.name}</div>
-                                        <div style={{ display: 'flex', gap: 6 }}>
-                                            <button className="btn" style={{ padding: '4px 8px', fontSize: '0.8em' }} onClick={() => navigate(`/protocols/workouts/edit/${w.id}`)}>✎ Editar</button>
-                                            <button className="btn" style={{ padding: '4px 8px', fontSize: '0.8em', background: '#fee2e2', color: '#dc2626' }} onClick={() => handleRemoveStudentWorkout(w.id)}>✕</button>
-                                        </div>
+                        <DragDropContext onDragEnd={handleWorkoutDragEnd}>
+                            <Droppable droppableId="student-workouts-order">
+                                {(provided) => (
+                                    <div
+                                        ref={provided.innerRef}
+                                        {...provided.droppableProps}
+                                        style={{ display: 'grid', gap: 12 }}
+                                    >
+                                        {studentWorkouts.map((w, index) => (
+                                            <Draggable key={w.id} draggableId={w.id} index={index}>
+                                                {(dragProvided, snapshot) => (
+                                                    <div
+                                                        ref={dragProvided.innerRef}
+                                                        {...dragProvided.draggableProps}
+                                                        style={{
+                                                            border: '1px solid #e2e8f0',
+                                                            borderRadius: 8,
+                                                            padding: 12,
+                                                            background: snapshot.isDragging ? '#eff6ff' : '#fff',
+                                                            boxShadow: snapshot.isDragging ? '0 10px 20px -10px rgba(37, 99, 235, 0.35)' : 'none',
+                                                            ...dragProvided.draggableProps.style
+                                                        }}
+                                                    >
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 12 }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                                                                <div
+                                                                    {...dragProvided.dragHandleProps}
+                                                                    title="Arrastar para reordenar"
+                                                                    style={{
+                                                                        cursor: snapshot.isDragging ? 'grabbing' : 'grab',
+                                                                        color: '#94a3b8',
+                                                                        fontSize: '1.1rem',
+                                                                        lineHeight: 1,
+                                                                        padding: '4px 6px',
+                                                                        borderRadius: 6,
+                                                                        border: '1px solid #e2e8f0',
+                                                                        background: '#f8fafc',
+                                                                        userSelect: 'none'
+                                                                    }}
+                                                                >
+                                                                    ⋮⋮
+                                                                </div>
+                                                                <div style={{ minWidth: 0 }}>
+                                                                    <div style={{ fontWeight: 600, fontSize: '1.05em' }}>{w.name}</div>
+                                                                    <div style={{ fontSize: '0.8em', color: '#64748b' }}>Arraste para cima ou para baixo para definir a ordem do aluno.</div>
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ display: 'flex', gap: 6 }}>
+                                                                <button className="btn" style={{ padding: '4px 8px', fontSize: '0.8em' }} onClick={() => navigate(`/protocols/workouts/edit/${w.id}`)}>✎ Editar</button>
+                                                                <button className="btn" style={{ padding: '4px 8px', fontSize: '0.8em', background: '#fee2e2', color: '#dc2626' }} onClick={() => handleRemoveStudentWorkout(w.id)}>✕</button>
+                                                            </div>
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                                            {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'].map(day => {
+                                                                const isSelected = (workoutSchedule[w.id] || []).includes(day)
+                                                                return (
+                                                                    <button 
+                                                                        key={day} 
+                                                                        onClick={() => toggleDay(w.id, day)}
+                                                                        style={{
+                                                                            padding: '2px 8px', fontSize: '0.75em', borderRadius: 12,
+                                                                            border: isSelected ? 'none' : '1px solid #e2e8f0',
+                                                                            background: isSelected ? '#3b82f6' : '#fff',
+                                                                            color: isSelected ? '#fff' : '#64748b',
+                                                                            cursor: 'pointer'
+                                                                        }}
+                                                                    >
+                                                                        {day.substring(0, 3)}
+                                                                    </button>
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </Draggable>
+                                        ))}
+                                        {provided.placeholder}
                                     </div>
-                                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                        {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'].map(day => {
-                                            const isSelected = (workoutSchedule[w.id] || []).includes(day)
-                                            return (
-                                                <button 
-                                                    key={day} 
-                                                    onClick={() => toggleDay(w.id, day)}
-                                                    style={{
-                                                        padding: '2px 8px', fontSize: '0.75em', borderRadius: 12,
-                                                        border: isSelected ? 'none' : '1px solid #e2e8f0',
-                                                        background: isSelected ? '#3b82f6' : '#fff',
-                                                        color: isSelected ? '#fff' : '#64748b',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    {day.substring(0, 3)}
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                )}
+                            </Droppable>
+                        </DragDropContext>
                     )}
                 </div>
 
