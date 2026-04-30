@@ -65,6 +65,7 @@ export default function DietCreate() {
   const [loading, setLoading] = useState(true)
   const [personalId, setPersonalId] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
 
   // Load Data
   useEffect(() => {
@@ -145,6 +146,15 @@ export default function DietCreate() {
     }
     load()
   }, [dietIdFromParams])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Sincroniza meals com a variante ativa sempre que meals mudar
   useEffect(() => {
@@ -524,6 +534,10 @@ export default function DietCreate() {
 
   if (loading && !personalId) return <div style={{ padding: 20 }}>Carregando dados...</div>
 
+  const foodGridTemplate = isMobile
+    ? '32px minmax(220px, 2.3fr) 84px 80px 64px 56px 56px 56px 56px 32px'
+    : '30px 3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 0.5fr 40px'
+
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', paddingBottom: 100 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -733,29 +747,29 @@ export default function DietCreate() {
               }}
             >
               {/* Header da Refeição */}
-              <div style={{ background: '#f8fafc', padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', gap: 16, alignItems: 'center', flex: 1 }}>
+              <div style={{ background: '#f8fafc', padding: isMobile ? '14px 12px' : '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 0 }}>
+                  <div style={{ display: 'flex', gap: 16, alignItems: isMobile ? 'flex-start' : 'center', flex: 1, width: '100%' }}>
                       <div style={{ 
                           width: 32, height: 32, background: '#3b82f6', color: '#fff', 
                           borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 
                       }}>{mi + 1}</div>
                       
-                      <div style={{ display: 'flex', gap: 12, flex: 1 }}>
+                      <div style={{ display: 'flex', gap: 12, flex: 1, flexDirection: isMobile ? 'column' : 'row', minWidth: 0 }}>
                         <input 
                             className="input" 
-                            style={{ flex: 1, fontWeight: 600, fontSize: '1.05em', border: '1px solid transparent', background: 'transparent' }} 
+                            style={{ flex: 1, width: '100%', minWidth: 0, fontWeight: 600, fontSize: '1.05em', border: '1px solid transparent', background: 'transparent' }} 
                             value={m.title} 
                             onChange={(e) => updateMeal(mi, { title: e.target.value })} 
                             placeholder="Nome da Refeição (ex: Café da Manhã)"
                             onFocus={(e) => e.target.style.background = '#fff'}
                             onBlur={(e) => e.target.style.background = 'transparent'}
                         />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '0.85em', color: '#64748b', fontWeight: 600 }}>Horário:</span>
                             <input
                                 type="time"
                                 className="input"
-                                style={{ width: 110, textAlign: 'center', border: '1px solid #cbd5e1', background: '#fff', fontWeight: 600, padding: '6px' }}
+                                style={{ width: isMobile ? '100%' : 110, maxWidth: isMobile ? 160 : 'none', textAlign: 'center', border: '1px solid #cbd5e1', background: '#fff', fontWeight: 600, padding: '6px' }}
                                 value={m.time}
                                 onChange={(e) => updateMeal(mi, { time: e.target.value })} 
                             />
@@ -763,7 +777,7 @@ export default function DietCreate() {
                       </div>
                   </div>
                   
-                  <div style={{ display: 'flex', gap: 8, marginLeft: 16 }}>
+                  <div style={{ display: 'flex', gap: 8, marginLeft: isMobile ? 0 : 16, alignSelf: isMobile ? 'flex-end' : 'auto' }}>
                       <button className="btn" style={{ padding: 6, background: '#f1f5f9', color: '#64748b' }} onClick={() => reorderMeals(mi, mi - 1)} disabled={mi === 0} title="Subir">↑</button>
                       <button className="btn" style={{ padding: 6, background: '#f1f5f9', color: '#64748b' }} onClick={() => reorderMeals(mi, mi + 1)} disabled={mi === meals.length - 1} title="Descer">↓</button>
                       <button className="btn" style={{ padding: 6, background: '#f1f5f9', color: '#ef4444' }} onClick={() => removeMeal(mi)} title="Remover">✕</button>
@@ -772,17 +786,19 @@ export default function DietCreate() {
 
               <div style={{ padding: 20 }}>
                 {/* Tabela de Alimentos */}
-                <div style={{ display: 'grid', gridTemplateColumns: '30px 3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 0.5fr 40px', gap: 8, marginBottom: 8, padding: '0 8px' }}>
-                    <div></div>
-                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>ALIMENTO</div>
-                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>QTD</div>
-                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>UNID</div>
-                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Calorias">KCAL</div>
-                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Proteína">P</div>
-                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Carboidrato">C</div>
-                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Gordura">G</div>
-                    <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Sódio (mg)">SOD</div>
-                    <div></div>
+                <div style={{ overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 8 : 0 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: foodGridTemplate, gap: 8, marginBottom: 8, padding: '0 8px', minWidth: isMobile ? 820 : 'auto' }}>
+                        <div></div>
+                        <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>ALIMENTO</div>
+                        <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>QTD</div>
+                        <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }}>UNID</div>
+                        <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Calorias">KCAL</div>
+                        <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Proteína">P</div>
+                        <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Carboidrato">C</div>
+                        <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Gordura">G</div>
+                        <div style={{ fontSize: '0.75em', fontWeight: 700, color: '#94a3b8' }} title="Sódio (mg)">SOD</div>
+                        <div></div>
+                    </div>
                 </div>
 
                 <Droppable droppableId={`meal-${mi}`}>
@@ -799,7 +815,8 @@ export default function DietCreate() {
                                                 marginBottom: 12, padding: '8px', background: '#fff', borderRadius: 8, border: '1px solid #f1f5f9' 
                                             }}
                                         >
-                                            <div style={{ display: 'grid', gridTemplateColumns: '30px 3fr 0.8fr 0.6fr 0.7fr 0.5fr 0.5fr 0.5fr 0.5fr 40px', gap: 8, alignItems: 'center' }}>
+                                            <div style={{ overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 6 : 0 }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: foodGridTemplate, gap: 8, alignItems: 'center', minWidth: isMobile ? 820 : 'auto' }}>
                                                 <div {...provided.dragHandleProps} style={{ cursor: 'grab', color: '#cbd5e1', display: 'flex', justifyContent: 'center' }}>
                                                     <GripVertical size={18} />
                                                 </div>
@@ -847,12 +864,13 @@ export default function DietCreate() {
 
                                                 <button onClick={() => removeFood(mi, fi)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
                                             </div>
+                                            </div>
                                             
                                             {/* Substitutos */}
                                             {(f.substitutes || []).map((s, si) => (
-                                                <div key={si} style={{ display: 'flex', gap: 10, marginTop: 8, alignItems: 'center', paddingLeft: 50 }}>
+                                                <div key={si} style={{ display: 'flex', gap: 10, marginTop: 8, alignItems: 'center', paddingLeft: isMobile ? 16 : 50, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                                                     <div style={{ color: '#cbd5e1' }}>↳</div>
-                                                    <div style={{ flex: 3 }}>
+                                                    <div style={{ flex: isMobile ? '1 1 100%' : 3, minWidth: isMobile ? '100%' : 0 }}>
                                                         <FoodAutocomplete 
                                                             className="input" 
                                                             style={{ width: '100%', minWidth: 0, fontSize: '0.9em', background: '#f8fafc' }} 
@@ -866,13 +884,13 @@ export default function DietCreate() {
                                                             })}
                                                         />
                                                     </div>
-                                                    <input className="input" style={{ flex: 1, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Qtd" value={s.quantity} onChange={(e) => updateSubstitute(mi, fi, si, { quantity: e.target.value })} />
-                                                    <input className="input" style={{ flex: 1, fontSize: '0.9em', background: '#f8fafc' }} placeholder="Unid" value={s.unit} onChange={(e) => updateSubstitute(mi, fi, si, { unit: e.target.value })} />
+                                                    <input className="input" style={{ flex: isMobile ? '1 1 110px' : 1, fontSize: '0.9em', background: '#f8fafc', minWidth: isMobile ? 110 : 0 }} placeholder="Qtd" value={s.quantity} onChange={(e) => updateSubstitute(mi, fi, si, { quantity: e.target.value })} />
+                                                    <input className="input" style={{ flex: isMobile ? '1 1 110px' : 1, fontSize: '0.9em', background: '#f8fafc', minWidth: isMobile ? 110 : 0 }} placeholder="Unid" value={s.unit} onChange={(e) => updateSubstitute(mi, fi, si, { unit: e.target.value })} />
                                                     <button onClick={() => removeSubstitute(mi, fi, si)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8em', padding: '0 8px' }}>✕</button>
                                                 </div>
                                             ))}
                                             
-                                            <div style={{ marginTop: 6, display: 'flex', gap: 12, paddingLeft: 30 }}>
+                                            <div style={{ marginTop: 6, display: 'flex', gap: 12, paddingLeft: isMobile ? 16 : 30 }}>
                                                 <button onClick={() => addSubstitute(mi, fi)} style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '0.8em', cursor: 'pointer', textDecoration: 'underline' }}>+ Adicionar Substituto</button>
                                             </div>
                                         </div>
@@ -884,9 +902,9 @@ export default function DietCreate() {
                     )}
                 </Droppable>
                 
-                <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <button className="btn" onClick={() => addFood(mi)} style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1' }}>+ Adicionar Alimento</button>
-                    <div style={{ flex: 1, marginLeft: 20 }}>
+                <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexDirection: isMobile ? 'column' : 'row' }}>
+                    <button className="btn" onClick={() => addFood(mi)} style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', width: isMobile ? '100%' : 'auto' }}>+ Adicionar Alimento</button>
+                    <div style={{ flex: 1, marginLeft: isMobile ? 0 : 20, width: isMobile ? '100%' : 'auto' }}>
                         <input className="input" style={{ width: '100%', fontSize: '0.9em' }} value={m.notes || ''} onChange={(e) => updateMeal(mi, { notes: e.target.value })} placeholder="Observações desta refeição..." />
                     </div>
                 </div>
@@ -907,8 +925,9 @@ export default function DietCreate() {
                          if (m.foods.length === 0) return null
 
                          return (
-                             <div style={{ 
-                                 display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'flex-end', 
+                            <div style={{ 
+                                display: 'flex', gap: 16, alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'flex-end', 
+                                flexWrap: 'wrap',
                                  marginBottom: 16, background: '#f8fafc', padding: '8px 16px', borderRadius: 8,
                                  fontSize: '0.9em', fontWeight: 600, color: '#475569'
                              }}>
@@ -921,9 +940,9 @@ export default function DietCreate() {
                          )
                      })()}
 
-                     <div style={{ display: 'flex', gap: 10 }}>
-                         <button className="btn" onClick={() => duplicateMeal(mi)} style={{ fontSize: '0.85em', padding: '6px 12px' }}>Duplicar Refeição</button>
-                         <button className="btn" onClick={() => addMealAfter(mi)} style={{ fontSize: '0.85em', padding: '6px 12px', background: '#10b981' }}>+ Refeição Abaixo</button>
+                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                         <button className="btn" onClick={() => duplicateMeal(mi)} style={{ fontSize: '0.85em', padding: '6px 12px', width: isMobile ? '100%' : 'auto' }}>Duplicar Refeição</button>
+                         <button className="btn" onClick={() => addMealAfter(mi)} style={{ fontSize: '0.85em', padding: '6px 12px', background: '#10b981', width: isMobile ? '100%' : 'auto' }}>+ Refeição Abaixo</button>
                      </div>
                 </div>
               </div>
