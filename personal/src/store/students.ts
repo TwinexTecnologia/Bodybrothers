@@ -86,7 +86,7 @@ export async function updateStudent(id: string, updates: Partial<Omit<StudentRec
       ...(updates.planId ? { planId: updates.planId } : {}),
       ...(updates.planStartDate ? { planStartDate: updates.planStartDate } : {}),
       ...(updates.dueDay ? { dueDay: updates.dueDay } : {}),
-      ...(updates.workoutIds ? { workoutIds: updates.workoutIds } : {}),
+      ...(updates.workoutIds !== undefined ? { workoutIds: updates.workoutIds } : {}),
       ...(updates.workoutSchedule ? { workoutSchedule: updates.workoutSchedule } : {}),
       ...(updates.dietIds ? { dietIds: updates.dietIds } : {}),
       ...(updates.tempPassword ? { tempPassword: updates.tempPassword } : {}),

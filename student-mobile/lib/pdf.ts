@@ -3,6 +3,16 @@ import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
+function orderWorkoutsByIds<T extends { id: string }>(list: T[], orderedIds: string[]) {
+    if (!orderedIds.length) return list;
+
+    const workoutMap = new Map(list.map(item => [item.id, item]));
+    const ordered = orderedIds.map(id => workoutMap.get(id)).filter(Boolean) as T[];
+    const remaining = list.filter(item => !orderedIds.includes(item.id));
+
+    return [...ordered, ...remaining];
+}
+
 export const generateAndShareWorkoutPdf = async (studentId: string, studentName: string) => {
     try {
         // 1. Buscar Treinos Completos
@@ -24,6 +34,8 @@ export const generateAndShareWorkoutPdf = async (studentId: string, studentName:
             alert('Nenhum treino encontrado para exportar.');
             return;
         }
+
+        const orderedWorkouts = orderWorkoutsByIds(workouts, workoutIds);
 
         // 2. Montar HTML
         const htmlContent = `
@@ -56,7 +68,7 @@ export const generateAndShareWorkoutPdf = async (studentId: string, studentName:
             <h1>Ficha de Treino - ${studentName.toUpperCase()}</h1>
             <div class="meta">Gerado via FitBody Pro em ${new Date().toLocaleDateString('pt-BR')}</div>
 
-            ${workouts.map((w: any) => `
+            ${orderedWorkouts.map((w: any) => `
                 <div class="workout">
                     <div class="workout-title">${w.title}</div>
                     ${w.data.notes ? `<div class="workout-notes">Obs: ${w.data.notes}</div>` : ''}

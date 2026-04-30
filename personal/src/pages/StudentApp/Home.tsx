@@ -6,6 +6,16 @@ import { supabase } from '../../lib/supabase'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
+function orderWorkoutsByIds<T extends { id: string }>(list: T[], orderedIds: string[]) {
+  if (!orderedIds.length) return list
+
+  const workoutMap = new Map(list.map(item => [item.id, item]))
+  const ordered = orderedIds.map(id => workoutMap.get(id)).filter(Boolean) as T[]
+  const remaining = list.filter(item => !orderedIds.includes(item.id))
+
+  return [...ordered, ...remaining]
+}
+
 export default function StudentHome() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
@@ -39,7 +49,7 @@ export default function StudentHome() {
               }
 
               const { data: wData } = await query
-              setWorkouts(wData || [])
+              setWorkouts(orderWorkoutsByIds(wData || [], workoutIds))
           } catch (error) {
               console.error(error)
           } finally {

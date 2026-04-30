@@ -75,6 +75,16 @@ const DAYS_MAP: Record<string, string> = {
 
 const DAYS_ORDER = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom']
 
+function orderWorkoutsByIds<T extends { id: string }>(list: T[], orderedIds: string[]) {
+    if (!orderedIds.length) return list
+
+    const workoutMap = new Map(list.map(item => [item.id, item]))
+    const ordered = orderedIds.map(id => workoutMap.get(id)).filter(Boolean) as T[]
+    const remaining = list.filter(item => !orderedIds.includes(item.id))
+
+    return [...ordered, ...remaining]
+}
+
 export default function ListWorkoutsWrapper() {
     return (
         <ErrorBoundary>
@@ -271,7 +281,7 @@ function ListWorkouts() {
 
         const { data, error } = await query
         if (error) throw error
-        setWorkouts(data || [])
+        setWorkouts(orderWorkoutsByIds(data || [], linkedIds))
     } catch (error) {
         console.error('Erro ao carregar treinos:', error)
     } finally {

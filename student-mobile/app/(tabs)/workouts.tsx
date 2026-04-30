@@ -100,6 +100,18 @@ type Workout = {
   };
 };
 
+function orderWorkoutsByIds<T extends { id: string }>(list: T[], orderedIds: string[]) {
+  if (!orderedIds.length) return list;
+
+  const workoutMap = new Map(list.map((item) => [item.id, item]));
+  const ordered = orderedIds
+    .map((id) => workoutMap.get(id))
+    .filter(Boolean) as T[];
+  const remaining = list.filter((item) => !orderedIds.includes(item.id));
+
+  return [...ordered, ...remaining];
+}
+
 const DEBUG_WORKOUTS =
   __DEV__ && process.env.EXPO_PUBLIC_DEBUG_WORKOUTS === "1";
 
@@ -327,7 +339,7 @@ export default function Workouts() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setWorkouts(data || []);
+      setWorkouts(orderWorkoutsByIds(data || [], linkedIds));
     } catch (error) {
       console.error(error);
     } finally {
