@@ -78,6 +78,7 @@ export default function WorkoutCreate() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
   // Pega o ID da rota (useParams) ou da query string (searchParams)
   const workoutId = id || searchParams.get('id')
   
@@ -99,6 +100,15 @@ export default function WorkoutCreate() {
   // Seletor de Exercícios (Modal)
   const [selectorOpen, setSelectorOpen] = useState<number | null>(null)
   const [selectorSearch, setSelectorSearch] = useState('')
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -382,6 +392,10 @@ export default function WorkoutCreate() {
 
   if (loading) return <div>Carregando...</div>
 
+  const setGridTemplate = isMobile
+    ? '32px minmax(160px, 1.5fr) 84px 84px 92px 84px 32px'
+    : '30px minmax(100px, 1.2fr) 0.6fr 0.8fr 0.8fr 0.6fr 40px'
+
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', paddingBottom: 100 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -462,8 +476,8 @@ export default function WorkoutCreate() {
                             >
                                 
                                 {/* Header do Exercício */}
-                                <div style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flex: 1 }}>
+                                <div style={{ padding: isMobile ? '14px 12px' : '16px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 0 }}>
+                                    <div style={{ display: 'flex', gap: 12, alignItems: isMobile ? 'flex-start' : 'center', flex: 1, width: '100%' }}>
                                         {/* Handle para arrastar */}
                                         <div {...provided.dragHandleProps} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', color: '#94a3b8', marginRight: -4 }}>
                                             <GripVertical size={20} />
@@ -474,13 +488,13 @@ export default function WorkoutCreate() {
                                         </div>
                                         
                                         {/* Nome e Biblioteca */}
-                                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <div style={{ flex: 1, display: 'flex', alignItems: isMobile ? 'stretch' : 'center', gap: 8, flexDirection: isMobile ? 'column' : 'row', minWidth: 0 }}>
                                             <input 
                                                 className="input" 
                                                 value={ex.name} 
                                                 onChange={(e) => updateExercise(idx, { name: e.target.value })} 
                                                 placeholder="Nome do Exercício"
-                                                style={{ flex: 1, fontWeight: 600, fontSize: '1.05em', border: '1px solid transparent', background: 'transparent' }}
+                                                style={{ flex: 1, width: '100%', minWidth: 0, fontWeight: 600, fontSize: '1.05em', border: '1px solid transparent', background: 'transparent' }}
                                                 onFocus={(e) => e.target.style.background = '#fff'}
                                                 onBlur={(e) => e.target.style.background = 'transparent'}
                                             />
@@ -494,7 +508,7 @@ export default function WorkoutCreate() {
                                                         background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: 6, 
                                                         padding: '6px 10px', cursor: 'pointer', color: '#0369a1', 
                                                         display: 'flex', alignItems: 'center', gap: 6, 
-                                                        fontSize: '0.85em', fontWeight: 600, whiteSpace: 'nowrap'
+                                                        fontSize: '0.85em', fontWeight: 600, whiteSpace: 'nowrap', width: isMobile ? '100%' : 'auto', justifyContent: 'center'
                                                     }}
                                                     title="Selecionar da Biblioteca"
                                                 >
@@ -508,12 +522,12 @@ export default function WorkoutCreate() {
                                             value={ex.group} 
                                             onChange={(e) => updateExercise(idx, { group: e.target.value })} 
                                             placeholder="Grupo Muscular"
-                                            style={{ width: 150, fontSize: '0.9em', border: '1px solid transparent', background: 'transparent', textAlign: 'right', color: '#64748b' }}
+                                            style={{ width: isMobile ? '100%' : 150, fontSize: '0.9em', border: '1px solid transparent', background: 'transparent', textAlign: isMobile ? 'left' : 'right', color: '#64748b' }}
                                             onFocus={(e) => e.target.style.background = '#fff'}
                                             onBlur={(e) => e.target.style.background = 'transparent'}
                                         />
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', alignSelf: isMobile ? 'flex-end' : 'auto' }}>
                                         <button 
                                             onClick={() => duplicateExercise(idx)}
                                             style={{ marginLeft: 8, background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer', padding: 4 }}
@@ -533,14 +547,16 @@ export default function WorkoutCreate() {
 
                                 <div style={{ padding: 20 }}>
                                     {/* Cabeçalho da Tabela de Sets */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: '30px minmax(100px, 1.2fr) 0.6fr 0.8fr 0.8fr 0.6fr 40px', gap: 10, alignItems: 'center', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #f1f5f9' }}>
-                                        <div></div> {/* Espaço para o drag handle */}
-                                        <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>TIPO</div>
-                                        <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>SÉRIES</div>
-                                        <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>REPS</div>
-                                        <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>CARGA</div>
-                                        <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>DESC.</div>
-                                        <div></div>
+                                    <div style={{ overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 8 : 0 }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: setGridTemplate, gap: 10, alignItems: 'center', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #f1f5f9', minWidth: isMobile ? 620 : 'auto' }}>
+                                            <div></div> {/* Espaço para o drag handle */}
+                                            <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>TIPO</div>
+                                            <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>SÉRIES</div>
+                                            <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>REPS</div>
+                                            <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>CARGA</div>
+                                            <div style={{ fontSize: '0.7em', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>DESC.</div>
+                                            <div></div>
+                                        </div>
                                     </div>
 
                                     {/* Lista de Sets Dinâmicos */}
@@ -559,14 +575,18 @@ export default function WorkoutCreate() {
                                                                 {...provided.draggableProps}
                                                                 style={{ 
                                                                     ...provided.draggableProps.style,
-                                                                    display: 'grid', 
-                                                                    gridTemplateColumns: '30px minmax(100px, 1.2fr) 0.6fr 0.8fr 0.8fr 0.6fr 40px', 
-                                                                    gap: 10, 
-                                                                    alignItems: 'center',
                                                                     background: '#fff',
                                                                     borderRadius: 6
                                                                 }}
                                                             >
+                                                                <div style={{ overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 6 : 0 }}>
+                                                                <div style={{ 
+                                                                    display: 'grid', 
+                                                                    gridTemplateColumns: setGridTemplate, 
+                                                                    gap: 10, 
+                                                                    alignItems: 'center',
+                                                                    minWidth: isMobile ? 620 : 'auto'
+                                                                }}>
                                                                 {/* Handle para arrastar set */}
                                                                 <div {...provided.dragHandleProps} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
                                                                     <GripVertical size={16} />
@@ -627,6 +647,8 @@ export default function WorkoutCreate() {
                                                                         <X size={14} />
                                                                     </button>
                                                                 )}
+                                                                </div>
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </Draggable>
@@ -637,15 +659,15 @@ export default function WorkoutCreate() {
                                     </Droppable>
 
                                     {/* Botões para Adicionar Sets */}
-                                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                                        <button onClick={() => addSet(idx, 'warmup')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#fff7ed', color: '#ea580c', border: '1px solid #fed7aa', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Aquecimento</button>
-                                        <button onClick={() => addSet(idx, 'feeder')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#f0f9ff', color: '#0284c7', border: '1px solid #bae6fd', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Preparação</button>
-                                        <button onClick={() => addSet(idx, 'working')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Trabalho</button>
-                                        <button onClick={() => addSet(idx, 'custom')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Outro</button>
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                                        <button onClick={() => addSet(idx, 'warmup')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#fff7ed', color: '#ea580c', border: '1px solid #fed7aa', borderRadius: 4, cursor: 'pointer', fontWeight: 600, width: isMobile ? 'calc(50% - 4px)' : 'auto' }}>+ Aquecimento</button>
+                                        <button onClick={() => addSet(idx, 'feeder')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#f0f9ff', color: '#0284c7', border: '1px solid #bae6fd', borderRadius: 4, cursor: 'pointer', fontWeight: 600, width: isMobile ? 'calc(50% - 4px)' : 'auto' }}>+ Preparação</button>
+                                        <button onClick={() => addSet(idx, 'working')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: 4, cursor: 'pointer', fontWeight: 600, width: isMobile ? 'calc(50% - 4px)' : 'auto' }}>+ Trabalho</button>
+                                        <button onClick={() => addSet(idx, 'custom')} style={{ fontSize: '0.75em', padding: '4px 8px', background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: 4, cursor: 'pointer', fontWeight: 600, width: isMobile ? 'calc(50% - 4px)' : 'auto' }}>+ Outro</button>
                                     </div>
 
                                     {/* Footer do Card: Toggle Avançado, Obs e Vídeo */}
-                                    <div style={{ display: 'flex', gap: 20, paddingTop: 16, marginTop: 16, borderTop: '1px solid #f1f5f9' }}>
+                                    <div style={{ display: 'flex', gap: 20, paddingTop: 16, marginTop: 16, borderTop: '1px solid #f1f5f9', flexDirection: isMobile ? 'column' : 'row' }}>
                                         
                                         {/* Botão Toggle Avançado */}
                                         {/* (Removido pois agora é sempre visível/dinâmico) */}
@@ -659,7 +681,7 @@ export default function WorkoutCreate() {
                                                 onChange={(e) => updateExercise(idx, { notes: e.target.value })} 
                                                 placeholder="Observações do exercício..." 
                                             />
-                                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexDirection: isMobile ? 'column' : 'row' }}>
                                                 <input 
                                                     className="input" 
                                                     style={{ fontSize: '0.9em', flex: 1 }} 
@@ -679,7 +701,9 @@ export default function WorkoutCreate() {
                                                         gap: 6,
                                                         fontSize: '0.9em',
                                                         color: '#475569',
-                                                        whiteSpace: 'nowrap'
+                                                        whiteSpace: 'nowrap',
+                                                        width: isMobile ? '100%' : 'auto',
+                                                        justifyContent: 'center'
                                                     }}
                                                     title="Fazer upload de vídeo"
                                                 >
@@ -733,15 +757,14 @@ export default function WorkoutCreate() {
                                                         </div>
                                                     )}
                                                 </div>
-                                            )}
-                                        </div>
+                                                                )}
+                                                                </div>
+                                                                </div>
                                     </div>
                                 </div>
-
-                            </div>
                         )}
                     </Draggable>
-                    ))}
+                ))}
                     {provided.placeholder}
                 </div>
             )}
