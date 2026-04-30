@@ -85,6 +85,14 @@ function orderWorkoutsByIds<T extends { id: string }>(list: T[], orderedIds: str
     return [...ordered, ...remaining]
 }
 
+function normalizeWorkoutDays(days: string[] | undefined) {
+    if (!Array.isArray(days)) return []
+
+    return DAYS_ORDER.filter(dayKey =>
+        days.map(day => String(day).toLowerCase()).includes(dayKey)
+    )
+}
+
 export default function ListWorkoutsWrapper() {
     return (
         <ErrorBoundary>
@@ -379,24 +387,28 @@ function ListWorkouts() {
       return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
-  // Agrupamento
-  const workoutsByDay = DAYS_ORDER.map(dayKey => {
-      const workoutIdsForDay: string[] = []
-      if (schedule && typeof schedule === 'object') {
-        Object.entries(schedule).forEach(([wId, days]) => {
-            if (Array.isArray(days)) {
-                const normalizedDays = days.map(d => String(d).toLowerCase()) // Garante string
-                if (normalizedDays.includes(dayKey)) workoutIdsForDay.push(wId)
-            }
-        })
-      }
-      const dayWorkouts = workouts.filter(w => workoutIdsForDay.includes(w.id))
-      return { dayKey, label: DAYS_MAP[dayKey], workouts: dayWorkouts }
-  }).filter(group => group.workouts.length > 0)
+  // Agrupamento: a ordem dos blocos segue a ordem manual dos treinos
+  const workoutsByDay = (() => {
+      const groups = new Map<string, Workout[]>()
+
+      workouts.forEach(workout => {
+          const normalizedDays = normalizeWorkoutDays((schedule && typeof schedule === 'object') ? schedule[workout.id] : undefined)
+          normalizedDays.forEach(dayKey => {
+              if (!groups.has(dayKey)) groups.set(dayKey, [])
+              groups.get(dayKey)!.push(workout)
+          })
+      })
+
+      return Array.from(groups.entries()).map(([dayKey, dayWorkouts]) => ({
+          dayKey,
+          label: DAYS_MAP[dayKey],
+          workouts: dayWorkouts
+      }))
+  })()
 
   const unscheduledWorkouts = workouts.filter(w => {
       const days = (schedule && typeof schedule === 'object') ? schedule[w.id] : undefined
-      return !days || !Array.isArray(days) || days.length === 0
+      return normalizeWorkoutDays(days).length === 0
   })
 
   const handleExportPDF = () => {
