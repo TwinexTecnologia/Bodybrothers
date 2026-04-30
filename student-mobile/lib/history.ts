@@ -84,9 +84,7 @@ export async function cancelSession(id: string) {
     .select("id");
   if (error) throw error;
   if (!data?.length) {
-    throw new Error(
-      "Nenhuma sessão foi removida. Verifique permissões (RLS) no Supabase ou o ID da sessão.",
-    );
+    throw new Error("Não foi possível cancelar esse treino.");
   }
 }
 
