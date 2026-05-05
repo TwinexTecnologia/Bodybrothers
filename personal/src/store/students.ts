@@ -48,7 +48,7 @@ export async function listStudentsByPersonal(personalId: string): Promise<Studen
     email: d.email || d.data?.email || '',
     status: d.data?.status || 'ativo',
     createdAt: d.created_at,
-    lastAccess: d.last_login_at,
+    lastAccess: d.data?.last_app_access_at,
     address: d.data?.address,
     planId: d.plan_id || d.data?.planId, // Prioriza coluna real
     planStartDate: d.data?.planStartDate,
@@ -124,7 +124,7 @@ export async function getStudent(id: string): Promise<StudentRecord | undefined>
     whatsapp: data.data?.whatsapp,
     status: data.data?.status || 'ativo',
     createdAt: data.created_at,
-    lastAccess: data.last_login_at,
+    lastAccess: data.data?.last_app_access_at,
     address: data.data?.address,
     planId: data.plan_id || data.data?.planId, // Prioriza coluna real
     planStartDate: data.data?.planStartDate,
