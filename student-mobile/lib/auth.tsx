@@ -1,6 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import {
+  disableCurrentRemotePushToken,
+  resetPushRegistrationCache,
+} from './pushRegistration';
 
 type AuthContextType = {
   user: User | null;
@@ -67,12 +71,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (event === 'SIGNED_IN' && session?.user) {
         void updateLastAppAccess(session.user.id);
       }
+      if (event === 'SIGNED_OUT') {
+        resetPushRegistrationCache();
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
+    await disableCurrentRemotePushToken();
     await supabase.auth.signOut();
   };
 

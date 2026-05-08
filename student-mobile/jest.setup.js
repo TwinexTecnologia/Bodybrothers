@@ -7,6 +7,7 @@ jest.mock("@react-native-async-storage/async-storage", () =>
 jest.mock("expo-router", () => ({
   router: { replace: jest.fn(), push: jest.fn(), back: jest.fn() },
   useLocalSearchParams: () => ({}),
+  useRootNavigationState: () => ({ key: "root" }),
 }));
 
 jest.mock("expo-video", () => ({
@@ -43,6 +44,7 @@ jest.mock("expo-notifications", () => ({
   SchedulableTriggerInputTypes: { TIME_INTERVAL: "timeInterval", DATE: "date" },
   getPermissionsAsync: jest.fn(async () => ({ granted: true })),
   requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  getExpoPushTokenAsync: jest.fn(async () => ({ data: "ExponentPushToken[mock]" })),
   setNotificationChannelAsync: jest.fn(async () => {}),
   setNotificationCategoryAsync: jest.fn(async () => {}),
   setNotificationHandler: jest.fn(),
@@ -50,8 +52,10 @@ jest.mock("expo-notifications", () => ({
   dismissNotificationAsync: jest.fn(async () => {}),
   cancelScheduledNotificationAsync: jest.fn(async () => {}),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  getLastNotificationResponseAsync: jest.fn(async () => null),
   registerTaskAsync: jest.fn(async () => null),
   getPresentedNotificationsAsync: jest.fn(async () => []),
+  DEFAULT_ACTION_IDENTIFIER: "expo.notifications.actions.DEFAULT",
 }));
 
 jest.mock("expo-task-manager", () => ({

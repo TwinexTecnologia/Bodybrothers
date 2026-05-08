@@ -1,12 +1,16 @@
 import "react-native-url-polyfill/auto";
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import * as Notifications from "expo-notifications";
-import { Stack } from "expo-router";
-import { AuthProvider } from "../lib/auth";
-import { handleTrainingNotificationResponse } from "../lib/trainingNotificationActions";
+import { Stack, useRootNavigationState } from "expo-router";
+import { AuthProvider, useAuth } from "../lib/auth";
 import { registerTrainingNotificationBackgroundTask } from "../lib/notificationTask";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { TrainingSessionProvider } from "../lib/trainingSession";
+import {
+  getNotificationResponseKey,
+  handleAppNotificationResponse,
+} from "../lib/notificationRouting";
+import { syncRemotePushTokenForUser } from "../lib/pushRegistration";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -18,6 +22,21 @@ Notifications.setNotificationHandler({
 });
 
 function NotificationResponseBridge() {
+  const { user, loading } = useAuth();
+  const navigationState = useRootNavigationState();
+  const handledKeysRef = useRef<Set<string>>(new Set());
+
+  const processResponse = useCallback(
+    async (response: Notifications.NotificationResponse) => {
+      const key = getNotificationResponseKey(response);
+      if (handledKeysRef.current.has(key)) return;
+
+      handledKeysRef.current.add(key);
+      await handleAppNotificationResponse(response);
+    },
+    [],
+  );
+
   useEffect(() => {
     let sub: { remove: () => void } | undefined;
     (async () => {
@@ -28,14 +47,34 @@ function NotificationResponseBridge() {
       }
       sub = Notifications.addNotificationResponseReceivedListener(
         (response) => {
-          void handleTrainingNotificationResponse(response);
+          void processResponse(response);
         },
       );
     })();
     return () => {
       sub?.remove();
     };
-  }, []);
+  }, [processResponse]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    void syncRemotePushTokenForUser(user.id);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (loading || !navigationState?.key) return;
+
+    let active = true;
+    (async () => {
+      const response = await Notifications.getLastNotificationResponseAsync();
+      if (!active || !response) return;
+      await processResponse(response);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [loading, navigationState?.key, processResponse]);
 
   return null;
 }
