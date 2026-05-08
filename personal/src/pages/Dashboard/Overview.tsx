@@ -9,6 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 export default function Overview() {
   const navigate = useNavigate()
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
   const [filters, setFilters] = useState({
     year: new Date().getFullYear(),
     month: 'all' // 'all' or '0', '1', ... '11'
@@ -37,6 +38,15 @@ export default function Overview() {
     pendingAnamnesis: 0, // NOVO
     showAnamnesisPending: false // NOVO
   })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Recalcula gráfico quando filtros ou dados mudam
   useEffect(() => {
@@ -526,14 +536,14 @@ export default function Overview() {
       </div>
 
       {/* Gráfico de Faturamento Mensal (MRR) */}
-      <div style={{ marginTop: 40, background: '#fff', padding: 24, borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+      <div style={{ marginTop: 40, background: '#fff', padding: isMobile ? 16 : 24, borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
-              <h2 style={{ fontSize: 18, color: '#334155', margin: 0 }}>Projeção de Faturamento (Competência)</h2>
-              <div style={{ display: 'flex', gap: 10 }}>
+              <h2 style={{ fontSize: isMobile ? 15 : 18, color: '#334155', margin: 0, lineHeight: 1.2 }}>Projeção de Faturamento (Competência)</h2>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
                   <select 
                       value={filters.month} 
                       onChange={e => setFilters(prev => ({ ...prev, month: e.target.value }))}
-                      style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 14, color: '#475569' }}
+                      style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 14, color: '#475569', flex: isMobile ? 1 : 'unset', minWidth: isMobile ? 0 : 180 }}
                   >
                       <option value="all">Todos os Meses</option>
                       <option value="0">Janeiro</option>
@@ -552,7 +562,7 @@ export default function Overview() {
                   <select 
                       value={filters.year} 
                       onChange={e => setFilters(prev => ({ ...prev, year: Number(e.target.value) }))}
-                      style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 14, color: '#475569' }}
+                      style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 14, color: '#475569', width: isMobile ? 96 : 'auto' }}
                   >
                       <option value={new Date().getFullYear() - 1}>{new Date().getFullYear() - 1}</option>
                       <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
@@ -561,22 +571,25 @@ export default function Overview() {
               </div>
           </div>
           
-          <div style={{ width: '100%', height: 300 }}>
+          <div style={{ width: '100%', height: isMobile ? 260 : 300 }}>
               <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 30, right: 30, left: 20, bottom: 5 }}>
+                  <BarChart data={chartData} margin={{ top: isMobile ? 12 : 30, right: isMobile ? 8 : 30, left: isMobile ? 0 : 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis 
                           dataKey="name" 
                           axisLine={false} 
                           tickLine={false} 
-                          tick={{ fill: '#64748b', fontSize: 12 }} 
+                          tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 12 }} 
+                          interval={0}
+                          minTickGap={isMobile ? 4 : 12}
                           dy={10}
                       />
                       <YAxis 
                           axisLine={false} 
                           tickLine={false} 
-                          tick={{ fill: '#64748b', fontSize: 12 }}
-                          tickFormatter={(value) => `R$ ${value}`}
+                          width={isMobile ? 50 : 70}
+                          tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 12 }}
+                          tickFormatter={(value) => isMobile ? `R$${Math.round(value / 1000)}k` : `R$ ${value}`}
                           // domain removido para auto-scale padrão
                       />
                       <Tooltip 
@@ -591,14 +604,16 @@ export default function Overview() {
                           dataKey="revenue" 
                           fill="#0ea5e9" 
                           radius={[4, 4, 0, 0]} 
-                          barSize={40}
+                          barSize={isMobile ? 26 : 40}
                       >
-                          <LabelList 
-                            dataKey="revenue" 
-                            position="top" 
-                            formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
-                            style={{ fontSize: 12, fill: '#64748b' }}
-                          />
+                          {!isMobile && (
+                            <LabelList 
+                              dataKey="revenue" 
+                              position="top" 
+                              formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
+                              style={{ fontSize: 12, fill: '#64748b' }}
+                            />
+                          )}
                       </Bar>
                   </BarChart>
               </ResponsiveContainer>

@@ -4,6 +4,16 @@ import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { Dumbbell, Utensils, AlertCircle, CheckCircle, Clock, X, DollarSign, FileText } from 'lucide-react'
 
+function orderWorkoutsByIds<T extends { id: string }>(list: T[], orderedIds: string[]) {
+  if (!orderedIds.length) return list
+
+  const workoutMap = new Map(list.map(item => [item.id, item]))
+  const ordered = orderedIds.map(id => workoutMap.get(id)).filter(Boolean) as T[]
+  const remaining = list.filter(item => !orderedIds.includes(item.id))
+
+  return [...ordered, ...remaining]
+}
+
 export default function Overview() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -236,6 +246,8 @@ export default function Overview() {
               return
           }
 
+          const orderedWorkouts = orderWorkoutsByIds(workouts, workoutIds)
+
           // Importação Dinâmica para evitar crash no mobile/build
           const jsPDF = (await import('jspdf')).default
           const autoTable = (await import('jspdf-autotable')).default
@@ -253,7 +265,7 @@ export default function Overview() {
 
           let yPos = 35
 
-          workouts.forEach((workout, index) => {
+          orderedWorkouts.forEach((workout, index) => {
               // Título
               doc.setFontSize(14)
               doc.setTextColor(15, 23, 42)
@@ -333,7 +345,7 @@ export default function Overview() {
 
               yPos = (doc as any).lastAutoTable.finalY + 15
               
-              if (index < workouts.length - 1 && yPos > 250) {
+              if (index < orderedWorkouts.length - 1 && yPos > 250) {
                   doc.addPage()
                   yPos = 20
               }

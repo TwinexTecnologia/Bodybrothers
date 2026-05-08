@@ -47,13 +47,17 @@ export default function FoodAutocomplete({
 
     // Fechar ao clicar fora
     useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
+        function handlePointerOutside(event: MouseEvent | TouchEvent) {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
                 setShowSuggestions(false)
             }
         }
-        document.addEventListener("mousedown", handleClickOutside)
-        return () => document.removeEventListener("mousedown", handleClickOutside)
+        document.addEventListener("mousedown", handlePointerOutside)
+        document.addEventListener("touchstart", handlePointerOutside)
+        return () => {
+            document.removeEventListener("mousedown", handlePointerOutside)
+            document.removeEventListener("touchstart", handlePointerOutside)
+        }
     }, [])
 
     // Timeout maior para não metralhar a API enquanto digita a palavra inteira
@@ -75,12 +79,7 @@ export default function FoodAutocomplete({
             // Vamos usar o OpenFoodFacts para a busca primária que é livre de CORS e tokens
             const offResponse = await fetch(
                 `https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&action=process&json=1&page_size=24`,
-                { 
-                    signal: controllerRef.current.signal,
-                    headers: {
-                        'User-Agent': 'GerencialBodybrothers - Web - 1.0' // Exigência da API para não dar block fácil
-                    }
-                }
+                { signal: controllerRef.current.signal }
             )
             
             if (!offResponse.ok) {
@@ -345,6 +344,22 @@ export default function FoodAutocomplete({
         }
     }
 
+    const handleInputFocus = () => {
+        if (value.trim().length >= 2) {
+            setShowSuggestions(true)
+        }
+    }
+
+    const handleSelectPointerDown = (event: React.MouseEvent | React.TouchEvent, item: FoodSuggestion) => {
+        event.preventDefault()
+        void handleSelect(item)
+    }
+
+    const handleSearchWebPointerDown = (event: React.MouseEvent | React.TouchEvent) => {
+        event.preventDefault()
+        void searchWeb(value)
+    }
+
     return (
         <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
             <input
@@ -352,6 +367,7 @@ export default function FoodAutocomplete({
                 style={style}
                 value={value}
                 onChange={(e) => handleSearch(e.target.value)}
+                onFocus={handleInputFocus}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
             />
@@ -374,6 +390,8 @@ export default function FoodAutocomplete({
                         <div
                             key={s.food_id}
                             onClick={() => handleSelect(s)}
+                            onMouseDown={(e) => handleSelectPointerDown(e, s)}
+                            onTouchStart={(e) => handleSelectPointerDown(e, s)}
                             style={{ padding: '10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
                             onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                             onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
@@ -386,6 +404,8 @@ export default function FoodAutocomplete({
                     {!loading && value.length >= 2 && (
                         <div 
                             onClick={() => searchWeb(value)}
+                            onMouseDown={handleSearchWebPointerDown}
+                            onTouchStart={handleSearchWebPointerDown}
                             style={{ 
                                 padding: '12px', textAlign: 'center', cursor: 'pointer', 
                                 color: '#3b82f6', fontWeight: 600, borderTop: '1px solid #e2e8f0',

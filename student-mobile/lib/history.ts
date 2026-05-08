@@ -77,11 +77,15 @@ export async function finishSession(
 }
 
 export async function cancelSession(id: string) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("workout_history")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .select("id");
   if (error) throw error;
+  if (!data?.length) {
+    throw new Error("Não foi possível cancelar esse treino.");
+  }
 }
 
 export async function getSessionById(id: string): Promise<WorkoutSession> {
@@ -137,7 +141,10 @@ export async function getWeeklyActivity(studentId: string): Promise<number[]> {
   return [...new Set(activeDays)];
 }
 
-export async function getTrainingIsFinished(studentId: string, workoutId: string): Promise<boolean> {
+export async function getTrainingIsFinished(
+  studentId: string,
+  workoutId: string,
+): Promise<boolean> {
   const today = new Date();
   const firstDay = new Date(today);
   firstDay.setDate(today.getDate() - today.getDay());
@@ -151,7 +158,7 @@ export async function getTrainingIsFinished(studentId: string, workoutId: string
     .gte("started_at", firstDay.toISOString())
     .not("finished_at", "is", null)
     .limit(1);
-  
+
   if (error || !data) return false;
 
   return data.length > 0;

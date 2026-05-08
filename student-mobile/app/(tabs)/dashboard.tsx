@@ -8,6 +8,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { useNotifications } from '../../hooks/useNotifications';
 import { generateAndShareWorkoutPdf } from '../../lib/pdf';
+import {
+  getStudentBellNotificationTitle,
+} from '../../lib/studentBellNotifications';
+import { navigateToStudentBellNotification } from '../../lib/notificationRouting';
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
@@ -257,8 +261,7 @@ export default function Dashboard() {
                                 style={[styles.notifCard, item.daysRemaining < 0 && styles.notifCardUrgent]}
                                 onPress={() => {
                                     setModalVisible(false);
-                                    if (item.type === 'anamnesis') router.push('/anamnesis');
-                                    else if (item.type === 'financial') router.push('/financial');
+                                    navigateToStudentBellNotification(item);
                                 }}
                             >
                                 <View style={[
@@ -273,7 +276,7 @@ export default function Dashboard() {
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <Text style={[styles.notifTitle, item.daysRemaining < 0 && { color: '#dc2626' }]}>
-                                        {item.type === 'anamnesis' ? 'Anamnese' : 'Financeiro'}
+                                        {getStudentBellNotificationTitle(item.type)}
                                     </Text>
                                     <Text style={styles.notifMessage}>{item.message}</Text>
                                     <Text style={styles.notifDate}>
