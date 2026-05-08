@@ -101,3 +101,6 @@ Thumbs.db
 
 # SQL Dump files (opcional, mas bom evitar subir dumps grandes)
 *.dump
+
+.vercel
+.env*.local

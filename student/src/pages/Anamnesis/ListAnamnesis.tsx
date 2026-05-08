@@ -24,12 +24,35 @@ type AnamnesisModel = {
 
 type AnamnesisResponse = {
   id: string
+  title: string
   created_at: string
+  personal_id?: string
   data: {
     modelId: string
     answers: Record<string, any>
+    modelTitle?: string
+    questions?: Question[]
   }
   renew_in_days?: number
+}
+
+function normalizeStoredValue(value: any) {
+  if (typeof value !== 'string') return value
+  return value.trim().replace(/^`+|`+$/g, '').trim()
+}
+
+function isPhotoAnswer(value: any) {
+  if (typeof value !== 'string') return false
+  const normalized = normalizeStoredValue(value)
+  return /^https?:\/\//i.test(normalized) && /(storage\/v1\/object\/|\.jpe?g($|\?)|\.png($|\?)|\.gif($|\?)|\.webp($|\?))/i.test(normalized)
+}
+
+function buildFallbackQuestionsFromAnswers(answers: Record<string, any>) {
+  return Object.keys(answers || {}).map((key, index) => ({
+    id: key,
+    text: `Pergunta ${index + 1}`,
+    type: isPhotoAnswer(answers[key]) ? 'photo' : 'text'
+  }))
 }
 
 export default function ListAnamnesis() {
@@ -46,7 +69,8 @@ export default function ListAnamnesis() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null) // Novo estado para erro
 
   // Estado de Visualização
-  const [viewingResponse, setViewingResponse] = useState<{response: AnamnesisResponse, model?: AnamnesisModel} | null>(null)
+  const [viewingResponse, setViewingResponse] = useState<{response: AnamnesisResponse, title: string, questions: Question[]} | null>(null)
+  const [viewingLoading, setViewingLoading] = useState(false)
   
   // Bloqueio de inativos
   const [isBlocked, setIsBlocked] = useState(false)
@@ -96,7 +120,9 @@ export default function ListAnamnesis() {
 
         setResponses((responsesData || []).map(d => ({
             id: d.id,
+            title: d.title,
             created_at: d.created_at,
+            personal_id: d.personal_id,
             data: d.data,
             renew_in_days: d.renew_in_days
         })))
@@ -168,6 +194,8 @@ export default function ListAnamnesis() {
             title: `Resposta: ${answeringModel.title}`,
             data: {
                 modelId: answeringModel.id,
+                modelTitle: answeringModel.title,
+                questions: answeringModel.questions,
                 answers: answers
             },
             starts_at: new Date().toISOString()
@@ -188,13 +216,91 @@ export default function ListAnamnesis() {
     }
   }
 
-  const handleViewResponse = (r: AnamnesisResponse) => {
-    // Tenta achar o modelo original para saber as perguntas
-    // Se o modelo foi deletado, teremos apenas as respostas (idealmente salvar perguntas na resposta, mas vamos buscar do array models por enqto)
-    // Na verdade, a estrutura salva apenas ID do modelo. Se o modelo mudar, a resposta fica desincronizada. 
-    // O ideal seria snapshot, mas vamos tentar parear pelo ID.
-    const model = models.find(m => m.id === r.data.modelId)
-    setViewingResponse({ response: r, model })
+  const recoverQuestions = async (response: AnamnesisResponse) => {
+    const fallbackQuestions = buildFallbackQuestionsFromAnswers(response.data.answers || {})
+
+    if (Array.isArray(response.data.questions) && response.data.questions.length > 0) {
+      return response.data.questions
+    }
+
+    const currentModel = models.find(m => m.id === response.data.modelId)
+    if (currentModel?.questions?.length) {
+      return currentModel.questions
+    }
+
+    const answers = response.data.answers || {}
+    const answerKeys = Object.keys(answers)
+    if (answerKeys.length === 0) return []
+
+    const questionMap = new Map<string, Question>()
+
+    if (response.personal_id) {
+      const { data: allModels } = await supabase
+        .from('protocols')
+        .select('data')
+        .eq('personal_id', response.personal_id)
+        .eq('type', 'anamnesis_model')
+        .limit(50)
+
+      ;(allModels || []).forEach((model: any) => {
+        const questions = model.data?.questions || []
+        questions.forEach((question: any) => {
+          if (question?.id && (question?.text || question?.question)) {
+            questionMap.set(question.id, {
+              id: question.id,
+              text: question.text || question.question,
+              type: question.type || 'text',
+              options: question.options,
+              required: question.required,
+              exampleImage: question.exampleImage
+            })
+          }
+        })
+      })
+    }
+
+    const recovered = answerKeys.map((key, index) => {
+      const mapped = questionMap.get(key)
+      if (mapped) return mapped
+
+      return {
+        id: key,
+        text: `Pergunta ${index + 1}`,
+        type: isPhotoAnswer(answers[key]) ? 'photo' : 'text'
+      }
+    })
+
+    return recovered.length > 0 ? recovered : fallbackQuestions
+  }
+
+  const getResponseTitle = (response: AnamnesisResponse) => {
+    return (
+      models.find(m => m.id === response.data.modelId)?.title ||
+      response.data.modelTitle ||
+      response.title?.replace(/^Resposta:\s*/i, '') ||
+      'Anamnese'
+    )
+  }
+
+  const handleViewResponse = async (r: AnamnesisResponse) => {
+    try {
+      setViewingLoading(true)
+      const questions = await recoverQuestions(r)
+      setViewingResponse({
+        response: r,
+        title: getResponseTitle(r),
+        questions: questions.length > 0 ? questions : buildFallbackQuestionsFromAnswers(r.data.answers || {})
+      })
+    } catch (error) {
+      console.error('Erro ao abrir respostas da anamnese:', error)
+      setViewingResponse({
+        response: r,
+        title: getResponseTitle(r),
+        questions: buildFallbackQuestionsFromAnswers(r.data.answers || {})
+      })
+    } finally {
+      setViewingLoading(false)
+    }
   }
 
   const getDaysLeft = (endsAt?: string) => {
@@ -326,7 +432,7 @@ export default function ListAnamnesis() {
                             >
                                 <div>
                                     <div style={{ fontWeight: 600, color: '#0f172a' }}>
-                                        {models.find(m => m.id === r.data.modelId)?.title || 'Anamnese (Modelo removido)'}
+                                        {getResponseTitle(r)}
                                     </div>
                                     <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: 4 }}>
                                         Enviado em {new Date(r.created_at).toLocaleDateString('pt-BR')} às {new Date(r.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -554,6 +660,18 @@ export default function ListAnamnesis() {
             </div>
         )}
 
+        {viewingLoading && (
+            <div style={{ 
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+                background: 'rgba(0,0,0,0.5)', zIndex: 2000, 
+                display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24
+            }}>
+                <div style={{ background: '#fff', padding: 24, borderRadius: 16, color: '#334155', fontWeight: 600 }}>
+                    Carregando respostas...
+                </div>
+            </div>
+        )}
+
         {/* Modal de Visualização */}
         {viewingResponse && (
             <div style={{ 
@@ -573,6 +691,7 @@ export default function ListAnamnesis() {
                         <div>
                             <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>Respostas Enviadas</h2>
                             <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '0.9rem' }}>
+                                {viewingResponse.title} • {' '}
                                 {new Date(viewingResponse.response.created_at).toLocaleDateString('pt-BR')}
                             </p>
                         </div>
@@ -583,31 +702,32 @@ export default function ListAnamnesis() {
 
                     <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
                         <div style={{ display: 'grid', gap: 24 }}>
-                            {viewingResponse.model ? viewingResponse.model.questions.map((q, i) => (
+                            {viewingResponse.questions.length > 0 ? viewingResponse.questions.map((q) => {
+                                const rawAnswer = viewingResponse.response.data.answers[q.id]
+                                const normalizedAnswer = normalizeStoredValue(rawAnswer)
+                                return (
                                 <div key={q.id} style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: 16 }}>
                                     <div style={{ fontWeight: 600, color: '#334155', marginBottom: 8 }}>
                                         {q.text}
                                     </div>
                                     <div style={{ color: '#0f172a', background: '#f8fafc', padding: 12, borderRadius: 8 }}>
-                                        {q.type === 'photo' && viewingResponse.response.data.answers[q.id] ? (
+                                        {(q.type === 'photo' || isPhotoAnswer(rawAnswer)) && normalizedAnswer ? (
                                             <img 
-                                                src={viewingResponse.response.data.answers[q.id]} 
+                                                src={normalizedAnswer} 
                                                 alt="Foto enviada"
                                                 style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 8 }}
-                                                onClick={() => window.open(viewingResponse.response.data.answers[q.id], '_blank')}
+                                                onClick={() => window.open(normalizedAnswer, '_blank')}
                                             />
+                                        ) : Array.isArray(rawAnswer) ? (
+                                            rawAnswer.join(', ')
                                         ) : (
-                                            String(viewingResponse.response.data.answers[q.id] || '-')
+                                            String(normalizedAnswer || '-')
                                         )}
                                     </div>
                                 </div>
-                            )) : (
+                            )}) : (
                                 <div style={{ color: '#64748b' }}>
-                                    O modelo original deste formulário não está mais disponível. <br/>
-                                    Dados brutos:
-                                    <pre style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginTop: 12, overflowX: 'auto' }}>
-                                        {JSON.stringify(viewingResponse.response.data.answers, null, 2)}
-                                    </pre>
+                                    Nenhuma resposta encontrada para este envio.
                                 </div>
                             )}
                         </div>

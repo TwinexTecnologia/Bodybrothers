@@ -27,6 +27,8 @@ export type AnamnesisResponse = {
   personalId: string
   studentId: string
   modelId: string
+  modelTitle?: string
+  questions?: AnamnesisQuestion[]
   createdAt: string
   answers: Record<string, string | string[] | boolean | number>
   renewEveryDays?: number
@@ -79,6 +81,8 @@ function mapResponseFromDb(d: any): AnamnesisResponse {
         personalId: d.personal_id,
         studentId: d.student_id,
         modelId: d.data?.modelId || '',
+        modelTitle: d.data?.modelTitle,
+        questions: d.data?.questions || [],
         createdAt: d.created_at,
         answers: d.data?.answers || {},
         renewEveryDays: d.renew_in_days,
@@ -191,12 +195,14 @@ export async function addResponse(r: Omit<AnamnesisResponse, 'id' | 'createdAt'>
         personal_id: r.personalId,
         student_id: r.studentId,
         type: 'anamnesis',
-        title: 'Anamnese Aplicada', // Título genérico ou data
+        title: `Resposta: ${r.modelTitle || 'Anamnese Aplicada'}`,
         renew_in_days: r.renewEveryDays,
         starts_at: r.countFromDate || null,
         ends_at: r.dueDate || null,
         data: {
             modelId: r.modelId,
+            modelTitle: r.modelTitle,
+            questions: r.questions,
             answers: r.answers
         }
     })

@@ -164,6 +164,8 @@ export default function AnamnesisAnswer() {
             title: `Resposta: ${model.title}`,
             data: {
                 modelId: model.id,
+                modelTitle: model.title,
+                questions: model.questions,
                 answers: answers
             },
             starts_at: new Date().toISOString()

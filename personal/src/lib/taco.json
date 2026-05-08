@@ -1,0 +1,5972 @@
+[
+  {
+    "id": "taco_1",
+    "name": "Arroz, integral, cozido",
+    "calories": 123.5348925,
+    "protein": 2.58825,
+    "carbs": 25.80975,
+    "fat": 1.00033333333333,
+    "sodium": 1.24466666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_2",
+    "name": "Arroz, integral, cru",
+    "calories": 359.678002032609,
+    "protein": 7.32328586956522,
+    "carbs": 77.4507141304348,
+    "fat": 1.86483333333333,
+    "sodium": 1.64566666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_3",
+    "name": "Arroz, tipo 1, cozido",
+    "calories": 128.258485666667,
+    "protein": 2.52081666666667,
+    "carbs": 28.05985,
+    "fat": 0.227,
+    "sodium": 1.20066666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_4",
+    "name": "Arroz, tipo 1, cru",
+    "calories": 357.789273115942,
+    "protein": 7.15853985507246,
+    "carbs": 78.7595434782609,
+    "fat": 0.335,
+    "sodium": 1.01916666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_5",
+    "name": "Arroz, tipo 2, cozido",
+    "calories": 130.119648333333,
+    "protein": 2.56841666666667,
+    "carbs": 28.1925833333333,
+    "fat": 0.361666666666667,
+    "sodium": 1.95966666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_6",
+    "name": "Arroz, tipo 2, cru",
+    "calories": 358.116761456522,
+    "protein": 7.24188297101449,
+    "carbs": 78.8814503623188,
+    "fat": 0.2755,
+    "sodium": 0.568833333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_7",
+    "name": "Aveia, flocos, crua",
+    "calories": 393.822689449275,
+    "protein": 13.9210260869565,
+    "carbs": 66.6356405797102,
+    "fat": 8.49666666666667,
+    "sodium": 4.62666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_8",
+    "name": "Biscoito, doce, maisena",
+    "calories": 442.819390144928,
+    "protein": 8.07252173913043,
+    "carbs": 75.2341449275362,
+    "fat": 11.9666666666667,
+    "sodium": 352.026666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_9",
+    "name": "Biscoito, doce, recheado com chocolate",
+    "calories": 471.824779710145,
+    "protein": 6.39721739130435,
+    "carbs": 70.5494492753623,
+    "fat": 19.5833333333333,
+    "sodium": 239.2,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_10",
+    "name": "Biscoito, doce, recheado com morango",
+    "calories": 471.174736231884,
+    "protein": 5.71982608695652,
+    "carbs": 71.0135072463768,
+    "fat": 19.5733333333333,
+    "sodium": 229.816666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_11",
+    "name": "Biscoito, doce, wafer, recheado de chocolate",
+    "calories": 502.456857971014,
+    "protein": 5.56452173913044,
+    "carbs": 67.5354782608696,
+    "fat": 24.6733333333333,
+    "sodium": 137.24,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_12",
+    "name": "Biscoito, doce, wafer, recheado de morango",
+    "calories": 513.446182608696,
+    "protein": 4.51704347826087,
+    "carbs": 67.3529565217391,
+    "fat": 26.4,
+    "sodium": 119.9,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_13",
+    "name": "Biscoito, salgado, cream cracker",
+    "calories": 431.73228115942,
+    "protein": 10.0551304347826,
+    "carbs": 68.7315362318841,
+    "fat": 14.4366666666667,
+    "sodium": 854.356666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_14",
+    "name": "Bolo, mistura para",
+    "calories": 418.633333333333,
+    "protein": 6.15942028985507,
+    "carbs": 84.7139130434783,
+    "fat": 6.12666666666667,
+    "sodium": 462.88,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_15",
+    "name": "Bolo, pronto, aipim",
+    "calories": 323.851666666667,
+    "protein": 4.41666666666667,
+    "carbs": 47.864,
+    "fat": 12.7476666666667,
+    "sodium": 111.008333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_16",
+    "name": "Bolo, pronto, chocolate",
+    "calories": 410.013666666667,
+    "protein": 6.22291666666667,
+    "carbs": 54.71775,
+    "fat": 18.4723333333333,
+    "sodium": 283.3,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_17",
+    "name": "Bolo, pronto, coco",
+    "calories": 333.437666666667,
+    "protein": 5.66666666666667,
+    "carbs": 52.276,
+    "fat": 11.2963333333333,
+    "sodium": 190.338666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_18",
+    "name": "Bolo, pronto, milho",
+    "calories": 311.387,
+    "protein": 4.80416666666667,
+    "carbs": 45.1088333333333,
+    "fat": 12.415,
+    "sodium": 133.811,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_19",
+    "name": "Canjica, branca, crua",
+    "calories": 357.60259,
+    "protein": 7.2,
+    "carbs": 78.061,
+    "fat": 0.971,
+    "sodium": 0.789666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_20",
+    "name": "Canjica, com leite integral",
+    "calories": 112.456777220465,
+    "protein": 2.36060004234314,
+    "carbs": 23.6277332909902,
+    "fat": 1.24433333333333,
+    "sodium": 27.5866666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_21",
+    "name": "Cereais, milho, flocos, com sal",
+    "calories": 369.59975,
+    "protein": 7.29166666666667,
+    "carbs": 80.835,
+    "fat": 1.60333333333333,
+    "sodium": 271.737666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_22",
+    "name": "Cereais, milho, flocos, sem sal",
+    "calories": 363.338316666667,
+    "protein": 6.875,
+    "carbs": 80.4483333333333,
+    "fat": 1.18333333333333,
+    "sodium": 30.9703333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_23",
+    "name": "Cereais, mingau, milho, infantil",
+    "calories": 394.42752173913,
+    "protein": 6.43115942028986,
+    "carbs": 87.2655072463768,
+    "fat": 1.09333333333333,
+    "sodium": 399.403333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_24",
+    "name": "Cereais, mistura para vitamina, trigo, cevada e aveia",
+    "calories": 381.133333333333,
+    "protein": 8.89583333333333,
+    "carbs": 81.6175,
+    "fat": 2.12,
+    "sodium": 1163.257,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_25",
+    "name": "Cereal matinal, milho",
+    "calories": 365.354163768116,
+    "protein": 7.15579710144928,
+    "carbs": 83.8242028985507,
+    "fat": 0.956666666666667,
+    "sodium": 654.543333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_26",
+    "name": "Cereal matinal, milho, açúcar",
+    "calories": 376.555253623188,
+    "protein": 4.74275362318841,
+    "carbs": 88.8405797101449,
+    "fat": 0.666666666666667,
+    "sodium": 405.313333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_27",
+    "name": "Creme de arroz, pó",
+    "calories": 386.001190336398,
+    "protein": 7.02694977474213,
+    "carbs": 83.8693835585912,
+    "fat": 1.226,
+    "sodium": 1.03033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_28",
+    "name": "Creme de milho, pó",
+    "calories": 333.034192670544,
+    "protein": 4.82083333333333,
+    "carbs": 86.1485,
+    "fat": 1.63933333333333,
+    "sodium": 593.793666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_29",
+    "name": "Curau, milho verde",
+    "calories": 78.4338183136559,
+    "protein": 2.36060004234314,
+    "carbs": 13.9443999576569,
+    "fat": 1.637,
+    "sodium": 20.512,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_30",
+    "name": "Curau, milho verde, mistura para",
+    "calories": 402.286577435315,
+    "protein": 2.22291666666667,
+    "carbs": 79.8164166666667,
+    "fat": 13.3713333333333,
+    "sodium": 222.925666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_31",
+    "name": "Farinha, de arroz, enriquecida",
+    "calories": 363.056480181224,
+    "protein": 1.26933329264323,
+    "carbs": 85.5040000406901,
+    "fat": 0.3,
+    "sodium": 17.1016666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_32",
+    "name": "Farinha, de centeio, integral",
+    "calories": 335.777662799327,
+    "protein": 12.515066502889,
+    "carbs": 73.2982668304443,
+    "fat": 1.75333333333333,
+    "sodium": 41.3766666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_33",
+    "name": "Farinha, de milho, amarela",
+    "calories": 350.58693322738,
+    "protein": 7.1875,
+    "carbs": 79.0791666666667,
+    "fat": 1.46666666666667,
+    "sodium": 44.9323333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_34",
+    "name": "Farinha, de rosca",
+    "calories": 370.578096666667,
+    "protein": 11.3809996191661,
+    "carbs": 75.7856666666667,
+    "fat": 1.46333333333333,
+    "sodium": 332.5,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_35",
+    "name": "Farinha, de trigo",
+    "calories": 360.472978550725,
+    "protein": 9.79078260869565,
+    "carbs": 75.0925507246377,
+    "fat": 1.36666666666667,
+    "sodium": 0.736666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_36",
+    "name": "Farinha, láctea, de cereais",
+    "calories": 414.850517391304,
+    "protein": 11.8791304347826,
+    "carbs": 77.7708695652174,
+    "fat": 5.79,
+    "sodium": 125.073333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_37",
+    "name": "Lasanha, massa fresca, cozida",
+    "calories": 163.763666666667,
+    "protein": 5.8125,
+    "carbs": 32.5221666666667,
+    "fat": 1.15833333333333,
+    "sodium": 206.769333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_38",
+    "name": "Lasanha, massa fresca, crua",
+    "calories": 220.305666666667,
+    "protein": 7.00833333333333,
+    "carbs": 45.0583333333333,
+    "fat": 1.33766666666667,
+    "sodium": 666.710333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_39",
+    "name": "Macarrão, instantâneo",
+    "calories": 435.864780533333,
+    "protein": 8.79168,
+    "carbs": 62.4316533333333,
+    "fat": 17.2366666666667,
+    "sodium": 1515.52666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_40",
+    "name": "Macarrão, trigo, cru",
+    "calories": 371.122613043478,
+    "protein": 9.99565217391304,
+    "carbs": 77.944347826087,
+    "fat": 1.30333333333333,
+    "sodium": 7.17,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_41",
+    "name": "Macarrão, trigo, cru, com ovos",
+    "calories": 370.567113333333,
+    "protein": 10.3208,
+    "carbs": 76.6225333333334,
+    "fat": 1.97,
+    "sodium": 14.74,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_42",
+    "name": "Milho, amido, cru",
+    "calories": 361.366823878261,
+    "protein": 0.597826086956522,
+    "carbs": 87.1488439130435,
+    "fat": 0,
+    "sodium": 8.083,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_43",
+    "name": "Milho, fubá, cru",
+    "calories": 353.482268115942,
+    "protein": 7.21376811594203,
+    "carbs": 78.8728985507246,
+    "fat": 1.90333333333333,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_44",
+    "name": "Milho, verde, cru",
+    "calories": 138.166565,
+    "protein": 6.58958333333333,
+    "carbs": 28.55575,
+    "fat": 0.609,
+    "sodium": 1.11566666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_45",
+    "name": "Milho, verde, enlatado, drenado",
+    "calories": 97.5648942028985,
+    "protein": 3.22826086956522,
+    "carbs": 17.1350724637681,
+    "fat": 2.35333333333333,
+    "sodium": 260.3499,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_46",
+    "name": "Mingau tradicional, pó",
+    "calories": 373.421466666667,
+    "protein": 0.583333333333333,
+    "carbs": 89.3366666666667,
+    "fat": 0.37,
+    "sodium": 14.8553333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_47",
+    "name": "Pamonha, barra para cozimento, pré-cozida",
+    "calories": 171.219111666667,
+    "protein": 2.55208333333333,
+    "carbs": 30.6849166666667,
+    "fat": 4.84966666666667,
+    "sodium": 131.993,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_48",
+    "name": "Pão, aveia, forma",
+    "calories": 343.085366666667,
+    "protein": 12.35,
+    "carbs": 59.5666666666667,
+    "fat": 5.69333333333333,
+    "sodium": 605.763,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_49",
+    "name": "Pão, de soja",
+    "calories": 308.726323333333,
+    "protein": 11.343,
+    "carbs": 56.5103333333333,
+    "fat": 3.58,
+    "sodium": 662.541333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_50",
+    "name": "Pão, glúten, forma",
+    "calories": 252.99403,
+    "protein": 11.9509996000926,
+    "carbs": 44.119,
+    "fat": 2.72666666666667,
+    "sodium": 22.0453333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_51",
+    "name": "Pão, milho, forma",
+    "calories": 292.01349,
+    "protein": 8.303,
+    "carbs": 56.397,
+    "fat": 3.11,
+    "sodium": 506.644,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_52",
+    "name": "Pão, trigo, forma, integral",
+    "calories": 253.193618333333,
+    "protein": 9.42516666666667,
+    "carbs": 49.9415,
+    "fat": 3.65333333333333,
+    "sodium": 506.103333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_53",
+    "name": "Pão, trigo, francês",
+    "calories": 299.810150434783,
+    "protein": 7.9535652173913,
+    "carbs": 58.6464347826087,
+    "fat": 3.10333333333333,
+    "sodium": 647.673333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_54",
+    "name": "Pão, trigo, sovado",
+    "calories": 310.96494,
+    "protein": 8.398,
+    "carbs": 61.452,
+    "fat": 2.84,
+    "sodium": 430.792,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_55",
+    "name": "Pastel, de carne, cru",
+    "calories": 288.70207151599,
+    "protein": 10.7406996405919,
+    "carbs": 42.0166336927414,
+    "fat": 8.793,
+    "sodium": 1309.265,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_56",
+    "name": "Pastel, de carne, frito",
+    "calories": 388.374651624968,
+    "protein": 10.1041996618907,
+    "carbs": 43.7678003381093,
+    "fat": 20.1366666666667,
+    "sodium": 1039.88866666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_57",
+    "name": "Pastel, de queijo, cru",
+    "calories": 308.474433887374,
+    "protein": 9.853399670283,
+    "carbs": 45.9479336630503,
+    "fat": 9.63466666666667,
+    "sodium": 984.569666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_58",
+    "name": "Pastel, de queijo, frito",
+    "calories": 422.112080039319,
+    "protein": 8.70959970855713,
+    "carbs": 48.1327336247762,
+    "fat": 22.6703333333333,
+    "sodium": 821.382333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_59",
+    "name": "Pastel, massa, crua",
+    "calories": 310.202514333333,
+    "protein": 6.9027,
+    "carbs": 57.3796333333333,
+    "fat": 5.477,
+    "sodium": 1344.20133333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_60",
+    "name": "Pastel, massa, frita",
+    "calories": 569.672459333333,
+    "protein": 6.0192,
+    "carbs": 49.3431333333333,
+    "fat": 40.8603333333333,
+    "sodium": 1174.667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_61",
+    "name": "Pipoca, com óleo de soja, sem sal",
+    "calories": 448.334261847198,
+    "protein": 9.92708333333334,
+    "carbs": 70.3125833333333,
+    "fat": 15.941,
+    "sodium": 4.32033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_62",
+    "name": "Polenta, pré-cozida",
+    "calories": 102.741166666667,
+    "protein": 2.29166666666667,
+    "carbs": 23.3116666666667,
+    "fat": 0.303333333333333,
+    "sodium": 441.889333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_63",
+    "name": "Torrada, pão francês",
+    "calories": 377.422283,
+    "protein": 10.5241,
+    "carbs": 74.5559,
+    "fat": 3.301,
+    "sodium": 829.492333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_64",
+    "name": "Abóbora, cabotian, cozida",
+    "calories": 48.0437425,
+    "protein": 1.44375,
+    "carbs": 10.7609166666667,
+    "fat": 0.729333333333333,
+    "sodium": 1.45166666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_65",
+    "name": "Abóbora, cabotian, crua",
+    "calories": 38.5992942028986,
+    "protein": 1.7463768115942,
+    "carbs": 8.36028985507247,
+    "fat": 0.536666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_66",
+    "name": "Abóbora, menina brasileira, crua",
+    "calories": 13.6056739130435,
+    "protein": 0.608695652173913,
+    "carbs": 3.30130434782609,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_67",
+    "name": "Abóbora, moranga, crua",
+    "calories": 12.364436231884,
+    "protein": 0.960144927536232,
+    "carbs": 2.66652173913043,
+    "fat": 0.06,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_68",
+    "name": "Abóbora, moranga, refogada",
+    "calories": 29.0038220317562,
+    "protein": 0.39375,
+    "carbs": 5.98191666666666,
+    "fat": 0.799,
+    "sodium": 3.02766666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_69",
+    "name": "Abóbora, pescoço, crua",
+    "calories": 24.4662679497004,
+    "protein": 0.670833333333333,
+    "carbs": 6.12283333333334,
+    "fat": 0.116,
+    "sodium": 0.745,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_70",
+    "name": "Abobrinha, italiana, cozida",
+    "calories": 15.03852,
+    "protein": 1.125,
+    "carbs": 2.97700000000001,
+    "fat": 0.199,
+    "sodium": 0.832666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_71",
+    "name": "Abobrinha, italiana, crua",
+    "calories": 19.2791260869565,
+    "protein": 1.14130434782609,
+    "carbs": 4.29202898550724,
+    "fat": 0.14,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_72",
+    "name": "Abobrinha, italiana, refogada",
+    "calories": 24.4296021876534,
+    "protein": 1.06875,
+    "carbs": 4.18691666666666,
+    "fat": 0.821333333333333,
+    "sodium": 2.209,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_73",
+    "name": "Abobrinha, paulista, crua",
+    "calories": 30.8107022288163,
+    "protein": 0.639583333333333,
+    "carbs": 7.86742,
+    "fat": 0.139,
+    "sodium": 0.500666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_74",
+    "name": "Acelga, crua",
+    "calories": 20.9423424999999,
+    "protein": 1.44375,
+    "carbs": 4.63091666666666,
+    "fat": 0.106,
+    "sodium": 1.18066666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_75",
+    "name": "Agrião, cru",
+    "calories": 16.5788014492753,
+    "protein": 2.68840579710145,
+    "carbs": 2.25159420289854,
+    "fat": 0.236666666666667,
+    "sodium": 7.46233333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_76",
+    "name": "Aipo, cru",
+    "calories": 19.0914566449706,
+    "protein": 0.758333333333333,
+    "carbs": 4.27233333333335,
+    "fat": 0.069,
+    "sodium": 9.51566666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_77",
+    "name": "Alface, americana, crua",
+    "calories": 8.79490323686605,
+    "protein": 0.608333333333333,
+    "carbs": 1.74533333333335,
+    "fat": 0.129,
+    "sodium": 7.30833333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_78",
+    "name": "Alface, crespa, crua",
+    "calories": 10.6808565217392,
+    "protein": 1.34782608695652,
+    "carbs": 1.69550724637683,
+    "fat": 0.16,
+    "sodium": 3.38,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_79",
+    "name": "Alface, lisa, crua",
+    "calories": 13.8209014492753,
+    "protein": 1.68840579710145,
+    "carbs": 2.42826086956522,
+    "fat": 0.123333333333333,
+    "sodium": 4.23333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_80",
+    "name": "Alface, roxa, crua",
+    "calories": 12.716997363468,
+    "protein": 0.90625,
+    "carbs": 2.49341666666666,
+    "fat": 0.191666666666667,
+    "sodium": 7.12433333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_81",
+    "name": "Alfavaca, crua",
+    "calories": 29.1836130810579,
+    "protein": 2.65833333333333,
+    "carbs": 5.241,
+    "fat": 0.476333333333333,
+    "sodium": 4.55033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_82",
+    "name": "Alho, cru",
+    "calories": 113.12987826087,
+    "protein": 7.01086956521739,
+    "carbs": 23.9057971014493,
+    "fat": 0.22,
+    "sodium": 5.36,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_83",
+    "name": "Alho-poró, cru",
+    "calories": 31.5079193532467,
+    "protein": 1.4125,
+    "carbs": 6.87816666666667,
+    "fat": 0.139666666666667,
+    "sodium": 1.76233333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_84",
+    "name": "Almeirão, cru",
+    "calories": 18.0344289855072,
+    "protein": 1.76811594202899,
+    "carbs": 3.33521739130435,
+    "fat": 0.216666666666667,
+    "sodium": 2.35066666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_85",
+    "name": "Almeirão, refogado",
+    "calories": 65.0819108288685,
+    "protein": 1.70416666666667,
+    "carbs": 5.70149999999999,
+    "fat": 4.847,
+    "sodium": 14.515,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_86",
+    "name": "Batata, baroa, cozida",
+    "calories": 80.1197625,
+    "protein": 0.852083333333333,
+    "carbs": 18.9475833333333,
+    "fat": 0.166333333333333,
+    "sodium": 2.098,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_87",
+    "name": "Batata, baroa, crua",
+    "calories": 100.984923188406,
+    "protein": 1.04710144927536,
+    "carbs": 23.9828985507246,
+    "fat": 0.17,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_88",
+    "name": "Batata, doce, cozida",
+    "calories": 76.7596105034352,
+    "protein": 0.641666666666667,
+    "carbs": 18.4223333333333,
+    "fat": 0.087666666666667,
+    "sodium": 2.699,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_89",
+    "name": "Batata, doce, crua",
+    "calories": 118.241375362319,
+    "protein": 1.25724637681159,
+    "carbs": 28.1960869565217,
+    "fat": 0.133333333333333,
+    "sodium": 8.77333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_90",
+    "name": "Batata, frita, tipo chips, industrializada",
+    "calories": 542.73467338419,
+    "protein": 5.58333333333333,
+    "carbs": 51.2223333333333,
+    "fat": 36.615,
+    "sodium": 607.399333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_91",
+    "name": "Batata, inglesa, cozida",
+    "calories": 51.5884766362707,
+    "protein": 1.16458333333333,
+    "carbs": 11.94375,
+    "fat": 0,
+    "sodium": 2.29366666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_92",
+    "name": "Batata, inglesa, crua",
+    "calories": 64.3702260869565,
+    "protein": 1.77173913043478,
+    "carbs": 14.6882608695652,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_93",
+    "name": "Batata, inglesa, frita",
+    "calories": 267.157422502041,
+    "protein": 4.96666666666667,
+    "carbs": 35.6403333333333,
+    "fat": 13.1086666666667,
+    "sodium": 1.913,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_94",
+    "name": "Batata, inglesa, sauté",
+    "calories": 67.8879361506303,
+    "protein": 1.29166666666667,
+    "carbs": 14.093,
+    "fat": 0.896333333333333,
+    "sodium": 8.182,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_95",
+    "name": "Berinjela, cozida",
+    "calories": 18.8452855568131,
+    "protein": 0.677083333333333,
+    "carbs": 4.46825,
+    "fat": 0.148333333333333,
+    "sodium": 1.325,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_96",
+    "name": "Berinjela, crua",
+    "calories": 19.6277536231884,
+    "protein": 1.22101449275362,
+    "carbs": 4.42898550724637,
+    "fat": 0.1,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_97",
+    "name": "Beterraba, cozida",
+    "calories": 32.1543243314028,
+    "protein": 1.29375,
+    "carbs": 7.23491666666666,
+    "fat": 0.092666666666667,
+    "sodium": 22.7616666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_98",
+    "name": "Beterraba, crua",
+    "calories": 48.8285086956522,
+    "protein": 1.94565217391304,
+    "carbs": 11.1110144927536,
+    "fat": 0.09,
+    "sodium": 9.72,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_99",
+    "name": "Biscoito, polvilho doce",
+    "calories": 437.549,
+    "protein": 1.29166666666667,
+    "carbs": 80.5353333333333,
+    "fat": 12.249,
+    "sodium": 97.8013333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_100",
+    "name": "Brócolis, cozido",
+    "calories": 24.6361631113688,
+    "protein": 2.13333333333333,
+    "carbs": 4.36666666666666,
+    "fat": 0.459,
+    "sodium": 2.122,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_101",
+    "name": "Brócolis, cru",
+    "calories": 25.495131884058,
+    "protein": 3.64492753623188,
+    "carbs": 4.02507246376812,
+    "fat": 0.266666666666667,
+    "sodium": 3.33333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_102",
+    "name": "Cará, cozido",
+    "calories": 77.5849133333334,
+    "protein": 1.52916666666667,
+    "carbs": 18.8525,
+    "fat": 0.112333333333333,
+    "sodium": 1.00633333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_103",
+    "name": "Cará, cru",
+    "calories": 95.6331347826087,
+    "protein": 2.28260869565217,
+    "carbs": 22.9540579710145,
+    "fat": 0.136666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_104",
+    "name": "Caruru, cru",
+    "calories": 34.03162971735,
+    "protein": 3.2,
+    "carbs": 5.97399999999999,
+    "fat": 0.585,
+    "sodium": 13.665,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_105",
+    "name": "Catalonha, crua",
+    "calories": 23.8884122573733,
+    "protein": 1.86875,
+    "carbs": 4.75224999999999,
+    "fat": 0.282333333333333,
+    "sodium": 9.39366666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_106",
+    "name": "Catalonha, refogada",
+    "calories": 63.4492691488266,
+    "protein": 1.95,
+    "carbs": 4.80933333333334,
+    "fat": 4.80566666666667,
+    "sodium": 24.7193333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_107",
+    "name": "Cebola, crua",
+    "calories": 39.4200463768116,
+    "protein": 1.71014492753623,
+    "carbs": 8.8531884057971,
+    "fat": 0.08,
+    "sodium": 0.596666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_108",
+    "name": "Cebolinha, crua",
+    "calories": 19.5158855072464,
+    "protein": 1.86594202898551,
+    "carbs": 3.37072463768117,
+    "fat": 0.35,
+    "sodium": 1.60333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_109",
+    "name": "Cenoura, cozida",
+    "calories": 29.8617777101596,
+    "protein": 0.847916666666667,
+    "carbs": 6.68674999999999,
+    "fat": 0.218333333333333,
+    "sodium": 7.881,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_110",
+    "name": "Cenoura, crua",
+    "calories": 34.1353884057971,
+    "protein": 1.32246376811594,
+    "carbs": 7.66,
+    "fat": 0.173333333333333,
+    "sodium": 3.33333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_111",
+    "name": "Chicória, crua",
+    "calories": 13.8371202898551,
+    "protein": 1.13768115942029,
+    "carbs": 2.85333333333334,
+    "fat": 0.143333333333333,
+    "sodium": 13.5223333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_112",
+    "name": "Chuchu, cozido",
+    "calories": 18.539790531377,
+    "protein": 0.414583333333333,
+    "carbs": 4.79341666666667,
+    "fat": 0,
+    "sodium": 1.80733333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_113",
+    "name": "Chuchu, cru",
+    "calories": 16.9789188405797,
+    "protein": 0.699275362318841,
+    "carbs": 4.13739130434783,
+    "fat": 0.06,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_114",
+    "name": "Coentro, folhas desidratadas",
+    "calories": 309.070746804476,
+    "protein": 20.875,
+    "carbs": 47.955,
+    "fat": 10.3866666666667,
+    "sodium": 18.2553333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_115",
+    "name": "Couve, manteiga, crua",
+    "calories": 27.0566971014493,
+    "protein": 2.8731884057971,
+    "carbs": 4.33347826086956,
+    "fat": 0.546666666666667,
+    "sodium": 6.171,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_116",
+    "name": "Couve, manteiga, refogada",
+    "calories": 90.3448154261112,
+    "protein": 1.66666666666667,
+    "carbs": 8.70766666666667,
+    "fat": 6.594,
+    "sodium": 11.4466666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_117",
+    "name": "Couve-flor, crua",
+    "calories": 22.5633492753623,
+    "protein": 1.90579710144928,
+    "carbs": 4.51753623188406,
+    "fat": 0.213333333333333,
+    "sodium": 3.43666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_118",
+    "name": "Couve-flor, cozida",
+    "calories": 19.1141406147282,
+    "protein": 1.23958333333333,
+    "carbs": 3.87541666666668,
+    "fat": 0.269333333333333,
+    "sodium": 1.78766666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_119",
+    "name": "Espinafre, Nova Zelândia, cru",
+    "calories": 16.0956942028985,
+    "protein": 1.9963768115942,
+    "carbs": 2.5736231884058,
+    "fat": 0.243333333333333,
+    "sodium": 17.0948333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_120",
+    "name": "Espinafre, Nova Zelândia, refogado",
+    "calories": 67.253651750664,
+    "protein": 2.71875,
+    "carbs": 4.23858333333334,
+    "fat": 5.43466666666667,
+    "sodium": 47.0243333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_121",
+    "name": "Farinha, de mandioca, crua",
+    "calories": 360.869698550725,
+    "protein": 1.55434782608696,
+    "carbs": 87.8989855072464,
+    "fat": 0.276666666666667,
+    "sodium": 1.02333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_122",
+    "name": "Farinha, de mandioca, torrada",
+    "calories": 365.268975,
+    "protein": 1.22916666666667,
+    "carbs": 89.1941666666667,
+    "fat": 0.286666666666667,
+    "sodium": 10.31,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_123",
+    "name": "Farinha, de puba",
+    "calories": 360.179774879932,
+    "protein": 1.61666666666667,
+    "carbs": 87.2853333333333,
+    "fat": 0.469,
+    "sodium": 3.60766666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_124",
+    "name": "Fécula, de mandioca",
+    "calories": 330.850558333333,
+    "protein": 0.520833333333333,
+    "carbs": 81.1491666666667,
+    "fat": 0.283333333333333,
+    "sodium": 2.449,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_125",
+    "name": "Feijão, broto, cru",
+    "calories": 38.7232363754113,
+    "protein": 4.16666666666667,
+    "carbs": 7.75833333333333,
+    "fat": 0.102666666666667,
+    "sodium": 1.793,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_126",
+    "name": "Inhame, cru",
+    "calories": 96.699831884058,
+    "protein": 2.05072463768116,
+    "carbs": 23.2326086956522,
+    "fat": 0.213333333333333,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_127",
+    "name": "Jiló, cru",
+    "calories": 27.3651434782609,
+    "protein": 1.40217391304348,
+    "carbs": 6.19115942028986,
+    "fat": 0.22,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_128",
+    "name": "Jurubeba, crua",
+    "calories": 125.811635,
+    "protein": 4.4125,
+    "carbs": 23.0591666666667,
+    "fat": 3.90966666666667,
+    "sodium": 0.771,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_129",
+    "name": "Mandioca, cozida",
+    "calories": 125.35825,
+    "protein": 0.575,
+    "carbs": 30.09,
+    "fat": 0.298333333333333,
+    "sodium": 0.906666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_130",
+    "name": "Mandioca, crua",
+    "calories": 151.416956521739,
+    "protein": 1.1304347826087,
+    "carbs": 36.1695652173913,
+    "fat": 0.3,
+    "sodium": 2.15,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_131",
+    "name": "Mandioca, farofa, temperada",
+    "calories": 405.693941666667,
+    "protein": 2.0625,
+    "carbs": 80.3041666666667,
+    "fat": 9.12,
+    "sodium": 574.508,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_132",
+    "name": "Mandioca, frita",
+    "calories": 300.05524338915,
+    "protein": 1.38125,
+    "carbs": 50.2514166666667,
+    "fat": 11.195,
+    "sodium": 8.936,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_133",
+    "name": "Manjericão, cru",
+    "calories": 21.1476768115942,
+    "protein": 1.98550724637681,
+    "carbs": 3.64449275362319,
+    "fat": 0.393333333333333,
+    "sodium": 3.88666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_134",
+    "name": "Maxixe, cru",
+    "calories": 13.7472360869565,
+    "protein": 1.39130434782609,
+    "carbs": 2.72869565217391,
+    "fat": 0.073,
+    "sodium": 10.993,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_135",
+    "name": "Mostarda, folha, crua",
+    "calories": 18.1073890521725,
+    "protein": 2.11041666666667,
+    "carbs": 3.23658333333333,
+    "fat": 0.167666666666667,
+    "sodium": 2.87933333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_136",
+    "name": "Nhoque, batata, cozido",
+    "calories": 180.775273993413,
+    "protein": 5.85833333333333,
+    "carbs": 36.78,
+    "fat": 1.94333333333333,
+    "sodium": 7.068,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_137",
+    "name": "Nabo, cru",
+    "calories": 18.1866246376812,
+    "protein": 1.20289855072464,
+    "carbs": 4.14710144927538,
+    "fat": 0.053333333333333,
+    "sodium": 2.46,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_138",
+    "name": "Palmito, Juçara, em conserva",
+    "calories": 23.1997164340813,
+    "protein": 1.79166666666667,
+    "carbs": 4.32833333333333,
+    "fat": 0.403333333333333,
+    "sodium": 513.820333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_139",
+    "name": "Palmito, pupunha, em conserva",
+    "calories": 29.4319633333333,
+    "protein": 2.45833333333333,
+    "carbs": 5.509,
+    "fat": 0.45,
+    "sodium": 562.685333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_140",
+    "name": "Pão, de queijo, assado",
+    "calories": 363.077913333333,
+    "protein": 5.12083333333333,
+    "carbs": 34.2415,
+    "fat": 24.5673333333333,
+    "sodium": 773.493333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_141",
+    "name": "Pão, de queijo, cru",
+    "calories": 294.538,
+    "protein": 3.648,
+    "carbs": 38.512,
+    "fat": 13.9886666666667,
+    "sodium": 404.994,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_142",
+    "name": "Pepino, cru",
+    "calories": 9.53369130434782,
+    "protein": 0.869565217391304,
+    "carbs": 2.03710144927535,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_143",
+    "name": "Pimentão, amarelo, cru",
+    "calories": 27.9274594202899,
+    "protein": 1.22463768115942,
+    "carbs": 5.96202898550725,
+    "fat": 0.436666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_144",
+    "name": "Pimentão, verde, cru",
+    "calories": 21.2858811594203,
+    "protein": 1.05072463768116,
+    "carbs": 4.89260869565218,
+    "fat": 0.15,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_145",
+    "name": "Pimentão, vermelho, cru",
+    "calories": 23.281363768116,
+    "protein": 1.03985507246377,
+    "carbs": 5.46681159420291,
+    "fat": 0.146666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_146",
+    "name": "Polvilho, doce",
+    "calories": 351.226733333333,
+    "protein": 0.43,
+    "carbs": 86.7733333333333,
+    "fat": 0,
+    "sodium": 1.57666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_147",
+    "name": "Quiabo, cru",
+    "calories": 29.9392621500691,
+    "protein": 1.91875,
+    "carbs": 6.37391666666667,
+    "fat": 0.299,
+    "sodium": 0.891,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_148",
+    "name": "Rabanete, cru",
+    "calories": 13.7381260869565,
+    "protein": 1.39130434782609,
+    "carbs": 2.72536231884058,
+    "fat": 0.073333333333333,
+    "sodium": 10.9933333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_149",
+    "name": "Repolho, branco, cru",
+    "calories": 17.1188028985507,
+    "protein": 0.876811594202899,
+    "carbs": 3.85985507246377,
+    "fat": 0.143333333333333,
+    "sodium": 3.64333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_150",
+    "name": "Repolho, roxo, cru",
+    "calories": 30.9075029543241,
+    "protein": 1.90833333333333,
+    "carbs": 7.204,
+    "fat": 0.063666666666667,
+    "sodium": 2.33766666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_151",
+    "name": "Repolho, roxo, refogado",
+    "calories": 41.7735252897143,
+    "protein": 1.80208333333333,
+    "carbs": 7.56158333333333,
+    "fat": 1.24033333333333,
+    "sodium": 3.41666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_152",
+    "name": "Rúcula, crua",
+    "calories": 13.1332566072941,
+    "protein": 1.76666666666667,
+    "carbs": 2.21966666666666,
+    "fat": 0.107333333333333,
+    "sodium": 9.418,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_153",
+    "name": "Salsa, crua",
+    "calories": 33.4241115942029,
+    "protein": 3.25724637681159,
+    "carbs": 5.70608695652174,
+    "fat": 0.61,
+    "sodium": 2.3,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_154",
+    "name": "Seleta de legumes, enlatada",
+    "calories": 56.5337724637681,
+    "protein": 3.42028985507246,
+    "carbs": 12.6697101449275,
+    "fat": 0.353333333333333,
+    "sodium": 398.136666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_155",
+    "name": "Serralha, crua",
+    "calories": 30.3979341666666,
+    "protein": 2.67291666666667,
+    "carbs": 4.94675,
+    "fat": 0.742666666666667,
+    "sodium": 19.347,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_156",
+    "name": "Taioba, crua",
+    "calories": 34.2089183333333,
+    "protein": 2.89583333333333,
+    "carbs": 5.43049999999999,
+    "fat": 0.926666666666667,
+    "sodium": 1.16066666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_157",
+    "name": "Tomate, com semente, cru",
+    "calories": 15.3351565217392,
+    "protein": 1.09782608695652,
+    "carbs": 3.13884057971015,
+    "fat": 0.173333333333333,
+    "sodium": 1.02,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_158",
+    "name": "Tomate, extrato",
+    "calories": 60.9334336521739,
+    "protein": 2.43478260869565,
+    "carbs": 14.9586173913043,
+    "fat": 0.19,
+    "sodium": 497.933333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_159",
+    "name": "Tomate, molho industrializado",
+    "calories": 38.4465494604906,
+    "protein": 1.375,
+    "carbs": 7.71166666666668,
+    "fat": 0.903333333333333,
+    "sodium": 418.280666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_160",
+    "name": "Tomate, purê",
+    "calories": 27.9368797101449,
+    "protein": 1.36231884057971,
+    "carbs": 6.89434782608695,
+    "fat": 0,
+    "sodium": 103.93,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_161",
+    "name": "Tomate, salada",
+    "calories": 20.5469091666666,
+    "protein": 0.810416666666667,
+    "carbs": 5.11791666666666,
+    "fat": 0,
+    "sodium": 5.243,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_162",
+    "name": "Vagem, crua",
+    "calories": 24.8983579710145,
+    "protein": 1.78623188405797,
+    "carbs": 5.34710144927536,
+    "fat": 0.173333333333333,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_163",
+    "name": "Abacate, cru",
+    "calories": 96.1547086956522,
+    "protein": 1.23913043478261,
+    "carbs": 6.0308695652174,
+    "fat": 8.39666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_164",
+    "name": "Abacaxi, cru",
+    "calories": 48.3222130434782,
+    "protein": 0.858695652173913,
+    "carbs": 12.3346376811594,
+    "fat": 0.123333333333333,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_165",
+    "name": "Abacaxi, polpa, congelada",
+    "calories": 30.5917991943359,
+    "protein": 0.466666666666667,
+    "carbs": 7.79866666666666,
+    "fat": 0.113333333333333,
+    "sodium": 1.23633333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_166",
+    "name": "Abiu, cru",
+    "calories": 62.4240984085401,
+    "protein": 0.833333333333333,
+    "carbs": 14.927,
+    "fat": 0.703333333333333,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_167",
+    "name": "Açaí, polpa, com xarope de guaraná e glucose",
+    "calories": 110.29759,
+    "protein": 0.720833333333333,
+    "carbs": 21.4551666666667,
+    "fat": 3.66033333333333,
+    "sodium": 15.0986666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_168",
+    "name": "Açaí, polpa, congelada",
+    "calories": 58.0453688728213,
+    "protein": 0.797916666666667,
+    "carbs": 6.20841666666667,
+    "fat": 3.94433333333333,
+    "sodium": 5.177,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_169",
+    "name": "Acerola, crua",
+    "calories": 33.46227,
+    "protein": 0.90625,
+    "carbs": 7.96641666666667,
+    "fat": 0.207666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_170",
+    "name": "Acerola, polpa, congelada",
+    "calories": 21.9368,
+    "protein": 0.591666666666667,
+    "carbs": 5.54133333333333,
+    "fat": 0,
+    "sodium": 1.28,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_171",
+    "name": "Ameixa, calda, enlatada",
+    "calories": 182.84662,
+    "protein": 0.408333333333333,
+    "carbs": 46.8926666666667,
+    "fat": 0,
+    "sodium": 2.70433333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_172",
+    "name": "Ameixa, crua",
+    "calories": 52.5424826086957,
+    "protein": 0.771739130434783,
+    "carbs": 13.8515942028986,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_173",
+    "name": "Ameixa, em calda, enlatada, drenada",
+    "calories": 177.359185315371,
+    "protein": 1.025,
+    "carbs": 47.658,
+    "fat": 0.280333333333333,
+    "sodium": 2.79033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_174",
+    "name": "Atemóia, crua",
+    "calories": 96.9715874479214,
+    "protein": 0.970833333333333,
+    "carbs": 25.3321666666667,
+    "fat": 0.300333333333333,
+    "sodium": 0.785,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_175",
+    "name": "Banana, da terra, crua",
+    "calories": 128.024452173913,
+    "protein": 1.43478260869565,
+    "carbs": 33.6652173913044,
+    "fat": 0.24,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_176",
+    "name": "Banana, doce em barra",
+    "calories": 280.105192550639,
+    "protein": 2.16875,
+    "carbs": 75.6665833333333,
+    "fat": 0.05,
+    "sodium": 9.88233333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_177",
+    "name": "Banana, figo, crua",
+    "calories": 105.08265,
+    "protein": 1.13125,
+    "carbs": 27.8044166666667,
+    "fat": 0.141666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_178",
+    "name": "Banana, maçã, crua",
+    "calories": 86.8053304347826,
+    "protein": 1.7536231884058,
+    "carbs": 22.3363768115942,
+    "fat": 0.06,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_179",
+    "name": "Banana, nanica, crua",
+    "calories": 91.528847826087,
+    "protein": 1.39855072463768,
+    "carbs": 23.848115942029,
+    "fat": 0.116666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_180",
+    "name": "Banana, ouro, crua",
+    "calories": 112.366047826087,
+    "protein": 1.48188405797101,
+    "carbs": 29.3414492753623,
+    "fat": 0.21,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_181",
+    "name": "Banana, pacova, crua",
+    "calories": 77.9095279250741,
+    "protein": 1.22708333333333,
+    "carbs": 20.3125833333333,
+    "fat": 0.079,
+    "sodium": 0.938666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_182",
+    "name": "Banana, prata, crua",
+    "calories": 98.2497021739131,
+    "protein": 1.26811594202899,
+    "carbs": 25.956884057971,
+    "fat": 0.065,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_183",
+    "name": "Cacau, cru",
+    "calories": 74.29148,
+    "protein": 0.954166666666667,
+    "carbs": 19.4111666666667,
+    "fat": 0.144,
+    "sodium": 0.700333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_184",
+    "name": "Cajá-Manga, cru",
+    "calories": 45.5809687737227,
+    "protein": 1.27916666666667,
+    "carbs": 11.4341666666667,
+    "fat": 0,
+    "sodium": 1.43866666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_185",
+    "name": "Cajá, polpa, congelada",
+    "calories": 26.3322693110506,
+    "protein": 0.589583333333333,
+    "carbs": 6.37441666666666,
+    "fat": 0.167666666666667,
+    "sodium": 6.945,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_186",
+    "name": "Caju, cru",
+    "calories": 43.0650685217391,
+    "protein": 0.971014492753623,
+    "carbs": 10.2889888405797,
+    "fat": 0.33,
+    "sodium": 2.96666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_187",
+    "name": "Caju, polpa, congelada",
+    "calories": 36.56868,
+    "protein": 0.48125,
+    "carbs": 9.35074999999999,
+    "fat": 0.154,
+    "sodium": 4.16166666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_188",
+    "name": "Caju, suco concentrado, envasado",
+    "calories": 45.1086266666667,
+    "protein": 0.404166666666667,
+    "carbs": 10.7338333333333,
+    "fat": 0.2,
+    "sodium": 45.0443333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_189",
+    "name": "Caqui, chocolate, cru",
+    "calories": 71.3500181116462,
+    "protein": 0.35625,
+    "carbs": 19.32575,
+    "fat": 0.069333333333333,
+    "sodium": 2.18333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_190",
+    "name": "Carambola, crua",
+    "calories": 45.7408887934287,
+    "protein": 0.870833333333333,
+    "carbs": 11.4815,
+    "fat": 0.177,
+    "sodium": 4.09466666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_191",
+    "name": "Ciriguela, crua",
+    "calories": 75.59411,
+    "protein": 1.39791666666667,
+    "carbs": 18.8574166666667,
+    "fat": 0.359666666666667,
+    "sodium": 1.68233333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_192",
+    "name": "Cupuaçu, cru",
+    "calories": 49.4225587743719,
+    "protein": 1.16041666666667,
+    "carbs": 10.4335833333333,
+    "fat": 0.951333333333333,
+    "sodium": 3.196,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_193",
+    "name": "Cupuaçu, polpa, congelada",
+    "calories": 48.79689,
+    "protein": 0.84375,
+    "carbs": 11.3869166666667,
+    "fat": 0.593666666666667,
+    "sodium": 0.689,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_194",
+    "name": "Figo, cru",
+    "calories": 41.4471260869565,
+    "protein": 0.967391304347826,
+    "carbs": 10.2459420289855,
+    "fat": 0.156666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_195",
+    "name": "Figo, enlatado, em calda",
+    "calories": 184.360717391304,
+    "protein": 0.561594202898551,
+    "carbs": 50.3384057971015,
+    "fat": 0.15,
+    "sodium": 6.87,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_196",
+    "name": "Fruta-pão, crua",
+    "calories": 67.04562,
+    "protein": 1.08125,
+    "carbs": 17.1744166666667,
+    "fat": 0.189333333333333,
+    "sodium": 0.799333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_197",
+    "name": "Goiaba, branca, com casca, crua",
+    "calories": 51.737747826087,
+    "protein": 0.898550724637681,
+    "carbs": 12.4014492753623,
+    "fat": 0.486666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_198",
+    "name": "Goiaba, doce em pasta",
+    "calories": 268.959826086957,
+    "protein": 0.579710144927536,
+    "carbs": 74.1236231884058,
+    "fat": 0,
+    "sodium": 3.7,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_199",
+    "name": "Goiaba, doce, cascão",
+    "calories": 285.587792439004,
+    "protein": 0.414583333333333,
+    "carbs": 78.70275,
+    "fat": 0.103333333333333,
+    "sodium": 11.0293333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_200",
+    "name": "Goiaba, vermelha, com casca, crua",
+    "calories": 54.1699304347826,
+    "protein": 1.08695652173913,
+    "carbs": 13.0097101449275,
+    "fat": 0.44,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_201",
+    "name": "Graviola, crua",
+    "calories": 61.6218983766636,
+    "protein": 0.845833333333333,
+    "carbs": 15.8395,
+    "fat": 0.21,
+    "sodium": 4.16,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_202",
+    "name": "Graviola, polpa, congelada",
+    "calories": 38.27387,
+    "protein": 0.566666666666667,
+    "carbs": 9.78266666666666,
+    "fat": 0.137666666666667,
+    "sodium": 3.04633333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_203",
+    "name": "Jabuticaba, crua",
+    "calories": 58.05315,
+    "protein": 0.6125,
+    "carbs": 15.2558333333333,
+    "fat": 0.128333333333333,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_204",
+    "name": "Jaca, crua",
+    "calories": 87.92035,
+    "protein": 1.40208333333333,
+    "carbs": 22.4975833333333,
+    "fat": 0.265,
+    "sodium": 1.80166666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_205",
+    "name": "Jambo, cru",
+    "calories": 26.9123,
+    "protein": 0.885416666666667,
+    "carbs": 6.49425,
+    "fat": 0.066666666666667,
+    "sodium": 21.656,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_206",
+    "name": "Jamelão, cru",
+    "calories": 41.0097089167039,
+    "protein": 0.545833333333333,
+    "carbs": 10.6271666666667,
+    "fat": 0.109666666666667,
+    "sodium": 1.36633333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_207",
+    "name": "Kiwi, cru",
+    "calories": 51.1363304347826,
+    "protein": 1.33695652173913,
+    "carbs": 11.4997101449275,
+    "fat": 0.626666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_208",
+    "name": "Laranja, baía, crua",
+    "calories": 45.4381173913043,
+    "protein": 0.978260869565218,
+    "carbs": 11.4684057971015,
+    "fat": 0.103333333333333,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_209",
+    "name": "Laranja, baía, suco",
+    "calories": 36.6494826086956,
+    "protein": 0.652173913043478,
+    "carbs": 8.69782608695652,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_210",
+    "name": "Laranja, da terra, crua",
+    "calories": 51.4711286392808,
+    "protein": 1.07708333333333,
+    "carbs": 12.8605833333333,
+    "fat": 0.185666666666667,
+    "sodium": 0.83,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_211",
+    "name": "Laranja, da terra, suco",
+    "calories": 40.9560073108673,
+    "protein": 0.666666666666667,
+    "carbs": 9.57333333333334,
+    "fat": 0.142,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_212",
+    "name": "Laranja, lima, crua",
+    "calories": 45.7010387806296,
+    "protein": 1.05625,
+    "carbs": 11.53375,
+    "fat": 0.075333333333333,
+    "sodium": 1.111,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_213",
+    "name": "Laranja, lima, suco",
+    "calories": 39.3360939441324,
+    "protein": 0.714583333333333,
+    "carbs": 9.16741666666668,
+    "fat": 0.119333333333333,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_214",
+    "name": "Laranja, pêra, crua",
+    "calories": 36.7737652173913,
+    "protein": 1.04347826086957,
+    "carbs": 8.94652173913044,
+    "fat": 0.126666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_215",
+    "name": "Laranja, pêra, suco",
+    "calories": 32.7097536231884,
+    "protein": 0.739130434782609,
+    "carbs": 7.55420289855072,
+    "fat": 0.073333333333333,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_216",
+    "name": "Laranja, valência, crua",
+    "calories": 46.109628783385,
+    "protein": 0.766666666666667,
+    "carbs": 11.723,
+    "fat": 0.159,
+    "sodium": 0.629,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_217",
+    "name": "Laranja, valência, suco",
+    "calories": 36.1963505876859,
+    "protein": 0.483333333333333,
+    "carbs": 8.554,
+    "fat": 0.124333333333333,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_218",
+    "name": "Limão, cravo, suco",
+    "calories": 14.1037333993117,
+    "protein": 0.325,
+    "carbs": 5.24666666666666,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_219",
+    "name": "Limão, galego, suco",
+    "calories": 22.2250434782609,
+    "protein": 0.565217391304348,
+    "carbs": 7.32144927536232,
+    "fat": 0.066666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_220",
+    "name": "Limão, tahiti, cru",
+    "calories": 31.8181534301639,
+    "protein": 0.939583333333333,
+    "carbs": 11.0844166666667,
+    "fat": 0.14,
+    "sodium": 1.24833333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_221",
+    "name": "Maçã, Argentina, com casca, crua",
+    "calories": 62.5318183662891,
+    "protein": 0.225,
+    "carbs": 16.588,
+    "fat": 0.246,
+    "sodium": 1.318,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_222",
+    "name": "Maçã, Fuji, com casca, crua",
+    "calories": 55.5152000000001,
+    "protein": 0.286666666666667,
+    "carbs": 15.1533333333333,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_223",
+    "name": "Macaúba, crua",
+    "calories": 404.281876666667,
+    "protein": 2.0829,
+    "carbs": 13.9454333333333,
+    "fat": 40.6566666666667,
+    "sodium": 0.654333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_224",
+    "name": "Mamão, doce em calda, drenado",
+    "calories": 195.627474821786,
+    "protein": 0.19375,
+    "carbs": 54.0035833333333,
+    "fat": 0.067333333333333,
+    "sodium": 2.91433333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_225",
+    "name": "Mamão, Formosa, cru",
+    "calories": 45.3407478260869,
+    "protein": 0.815217391304348,
+    "carbs": 11.5547826086956,
+    "fat": 0.12,
+    "sodium": 3.25666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_226",
+    "name": "Mamão, Papaia, cru",
+    "calories": 40.1567689422966,
+    "protein": 0.45625,
+    "carbs": 10.43975,
+    "fat": 0.124333333333333,
+    "sodium": 1.63033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_227",
+    "name": "Mamão verde, doce em calda, drenado",
+    "calories": 209.376254458904,
+    "protein": 0.316666666666667,
+    "carbs": 57.6366666666667,
+    "fat": 0.098,
+    "sodium": 4.74,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_228",
+    "name": "Manga, Haden, crua",
+    "calories": 63.5003183387915,
+    "protein": 0.408333333333333,
+    "carbs": 16.6626666666667,
+    "fat": 0.256,
+    "sodium": 0.551333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_229",
+    "name": "Manga, Palmer, crua",
+    "calories": 72.4867380916873,
+    "protein": 0.410416666666667,
+    "carbs": 19.35225,
+    "fat": 0.172,
+    "sodium": 1.86366666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_230",
+    "name": "Manga, polpa, congelada",
+    "calories": 48.30588,
+    "protein": 0.38125,
+    "carbs": 12.5184166666667,
+    "fat": 0.234,
+    "sodium": 6.73333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_231",
+    "name": "Manga, Tommy Atkins, crua",
+    "calories": 50.6921826086956,
+    "protein": 0.855072463768116,
+    "carbs": 12.7715942028985,
+    "fat": 0.22,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_232",
+    "name": "Maracujá, cru",
+    "calories": 68.4395086956521,
+    "protein": 1.98913043478261,
+    "carbs": 12.2642028985507,
+    "fat": 2.10333333333333,
+    "sodium": 1.58,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_233",
+    "name": "Maracujá, polpa, congelada",
+    "calories": 38.7597,
+    "protein": 0.8125,
+    "carbs": 9.59749999999999,
+    "fat": 0.176666666666667,
+    "sodium": 8.096,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_234",
+    "name": "Maracujá, suco concentrado, envasado",
+    "calories": 41.96732,
+    "protein": 0.766666666666667,
+    "carbs": 9.63599999999999,
+    "fat": 0.193333333333333,
+    "sodium": 21.6923333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_235",
+    "name": "Melancia, crua",
+    "calories": 32.6066260869565,
+    "protein": 0.884057971014493,
+    "carbs": 8.13927536231884,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_236",
+    "name": "Melão, cru",
+    "calories": 29.3693913043478,
+    "protein": 0.677536231884058,
+    "carbs": 7.52579710144927,
+    "fat": 0,
+    "sodium": 11.1666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_237",
+    "name": "Mexerica, Murcote, crua",
+    "calories": 57.5927784746488,
+    "protein": 0.883333333333333,
+    "carbs": 14.862,
+    "fat": 0.134,
+    "sodium": 1.16733333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_238",
+    "name": "Mexerica, Rio, crua",
+    "calories": 36.8713500000001,
+    "protein": 0.65,
+    "carbs": 9.33700000000001,
+    "fat": 0.128333333333333,
+    "sodium": 1.824,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_239",
+    "name": "Morango, cru",
+    "calories": 30.1479173913044,
+    "protein": 0.894927536231884,
+    "carbs": 6.81840579710146,
+    "fat": 0.31,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_240",
+    "name": "Nêspera, crua",
+    "calories": 42.5391988681952,
+    "protein": 0.308333333333333,
+    "carbs": 11.5286666666667,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_241",
+    "name": "Pequi, cru",
+    "calories": 204.96677,
+    "protein": 2.33541666666667,
+    "carbs": 12.9729166666667,
+    "fat": 17.971,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_242",
+    "name": "Pêra, Park, crua",
+    "calories": 60.58859,
+    "protein": 0.235416666666667,
+    "carbs": 16.0749166666667,
+    "fat": 0.230333333333333,
+    "sodium": 0.981666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_243",
+    "name": "Pêra, Williams, crua",
+    "calories": 53.3090478260869,
+    "protein": 0.565217391304348,
+    "carbs": 14.0247826086956,
+    "fat": 0.11,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_244",
+    "name": "Pêssego, Aurora, cru",
+    "calories": 36.3275990245342,
+    "protein": 0.825,
+    "carbs": 9.32100000000001,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_245",
+    "name": "Pêssego, enlatado, em calda",
+    "calories": 63.1424347826087,
+    "protein": 0.706521739130435,
+    "carbs": 16.8801449275362,
+    "fat": 0,
+    "sodium": 3.201,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_246",
+    "name": "Pinha, crua",
+    "calories": 88.4735276668668,
+    "protein": 1.48541666666667,
+    "carbs": 22.4479166666667,
+    "fat": 0.319,
+    "sodium": 1.33733333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_247",
+    "name": "Pitanga, crua",
+    "calories": 41.41553,
+    "protein": 0.929166666666667,
+    "carbs": 10.2441666666667,
+    "fat": 0.169,
+    "sodium": 1.704,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_248",
+    "name": "Pitanga, polpa, congelada",
+    "calories": 19.1054595023592,
+    "protein": 0.285416666666667,
+    "carbs": 4.75858333333333,
+    "fat": 0.121333333333333,
+    "sodium": 5.029,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_249",
+    "name": "Romã, crua",
+    "calories": 55.739,
+    "protein": 0.404166666666667,
+    "carbs": 15.1058333333333,
+    "fat": 0,
+    "sodium": 0.591333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_250",
+    "name": "Tamarindo, cru",
+    "calories": 275.695642694414,
+    "protein": 3.20625,
+    "carbs": 72.53175,
+    "fat": 0.455,
+    "sodium": 0.355333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_251",
+    "name": "Tangerina, Poncã, crua",
+    "calories": 37.8306,
+    "protein": 0.847826086956522,
+    "carbs": 9.60999999999999,
+    "fat": 0.073333333333333,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_252",
+    "name": "Tangerina, Poncã, suco",
+    "calories": 36.1088,
+    "protein": 0.521739130434783,
+    "carbs": 8.8,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_253",
+    "name": "Tucumã, cru",
+    "calories": 262.015195072393,
+    "protein": 2.09375,
+    "carbs": 26.4745833333333,
+    "fat": 19.0766666666667,
+    "sodium": 3.893,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_254",
+    "name": "Umbu, cru",
+    "calories": 37.01669,
+    "protein": 0.841666666666667,
+    "carbs": 9.39533333333333,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_255",
+    "name": "Umbu, polpa, congelada",
+    "calories": 33.94329,
+    "protein": 0.5125,
+    "carbs": 8.78683333333333,
+    "fat": 0.070333333333333,
+    "sodium": 5.771,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_256",
+    "name": "Uva, Itália, crua",
+    "calories": 52.8731000000001,
+    "protein": 0.746376811594203,
+    "carbs": 13.5733333333333,
+    "fat": 0.203333333333333,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_257",
+    "name": "Uva, Rubi, crua",
+    "calories": 49.06129,
+    "protein": 0.608333333333333,
+    "carbs": 12.6953333333333,
+    "fat": 0.157,
+    "sodium": 7.919,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_258",
+    "name": "Uva, suco concentrado, envasado",
+    "calories": 57.65536,
+    "protein": 0,
+    "carbs": 14.708,
+    "fat": 0,
+    "sodium": 9.58333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_259",
+    "name": "Azeite, de dendê",
+    "calories": 884,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 100,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_260",
+    "name": "Azeite, de oliva, extra virgem",
+    "calories": 884,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 100,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_261",
+    "name": "Manteiga, com sal",
+    "calories": 725.968926845999,
+    "protein": 0.41470000743866,
+    "carbs": 0.063299992561333,
+    "fat": 82.361,
+    "sodium": 578.694666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_262",
+    "name": "Manteiga, sem sal",
+    "calories": 757.540460725997,
+    "protein": 0.395560007095337,
+    "carbs": 0,
+    "fat": 86.0393333333333,
+    "sodium": 3.84866666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_263",
+    "name": "Margarina, com óleo hidrogenado, com sal (65% de lipídeos)",
+    "calories": 596.119516956329,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 67.4343333333333,
+    "sodium": 894.038666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_264",
+    "name": "Margarina, com óleo hidrogenado, sem sal (80% de lipídeos)",
+    "calories": 722.525625804901,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 81.7336666666667,
+    "sodium": 77.891,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_265",
+    "name": "Margarina, com óleo interesterificado, com sal (65%de lipídeos)",
+    "calories": 594.451693333333,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 67.2456666666667,
+    "sodium": 560.797666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_266",
+    "name": "Margarina, com óleo interesterificado, sem sal (65% de lipídeos)",
+    "calories": 593.13749023819,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 67.097,
+    "sodium": 33.1943333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_267",
+    "name": "Óleo, de babaçu",
+    "calories": 884,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 100,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_268",
+    "name": "Óleo, de canola",
+    "calories": 884,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 100,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_269",
+    "name": "Óleo, de girassol",
+    "calories": 884,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 100,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_270",
+    "name": "Óleo, de milho",
+    "calories": 884,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 100,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_271",
+    "name": "Óleo, de pequi",
+    "calories": 884,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 100,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_272",
+    "name": "Óleo, de soja",
+    "calories": 884,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 100,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_273",
+    "name": "Abadejo, filé, congelado, assado",
+    "calories": 111.615503451188,
+    "protein": 23.525,
+    "carbs": 0,
+    "fat": 1.23766666666667,
+    "sodium": 334.391333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_274",
+    "name": "Abadejo, filé, congelado,cozido",
+    "calories": 91.1035483955542,
+    "protein": 19.3458333333333,
+    "carbs": 0,
+    "fat": 0.942,
+    "sodium": 189.337666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_275",
+    "name": "Abadejo, filé, congelado, cru",
+    "calories": 59.1130332485835,
+    "protein": 13.0833333333333,
+    "carbs": 0,
+    "fat": 0.36,
+    "sodium": 78.515,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_276",
+    "name": "Abadejo, filé, congelado, grelhado",
+    "calories": 129.643525902867,
+    "protein": 27.6104166666667,
+    "carbs": 0,
+    "fat": 1.30233333333333,
+    "sodium": 305.093666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_277",
+    "name": "Atum, conserva em óleo",
+    "calories": 165.910560578903,
+    "protein": 26.1875,
+    "carbs": 0,
+    "fat": 5.99666666666667,
+    "sodium": 362.1465,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_278",
+    "name": "Atum, fresco, cru",
+    "calories": 117.501,
+    "protein": 25.68,
+    "carbs": 0,
+    "fat": 0.87,
+    "sodium": 30.3033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_279",
+    "name": "Bacalhau, salgado, cru",
+    "calories": 135.892966666667,
+    "protein": 29.0366666666667,
+    "carbs": 0,
+    "fat": 1.32,
+    "sodium": 13585.0566666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_280",
+    "name": "Bacalhau, salgado, refogado",
+    "calories": 139.66070105354,
+    "protein": 23.9791666666667,
+    "carbs": 1.22416666666668,
+    "fat": 3.60666666666667,
+    "sodium": 1256.27666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_281",
+    "name": "Cação, posta, com farinha de trigo, frita",
+    "calories": 208.332743725975,
+    "protein": 24.9520833333333,
+    "carbs": 3.10058333333333,
+    "fat": 9.95433333333333,
+    "sodium": 160.031666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_282",
+    "name": "Cação, posta, cozida",
+    "calories": 116.014480687658,
+    "protein": 25.5895833333333,
+    "carbs": 0,
+    "fat": 0.748,
+    "sodium": 114.905333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_283",
+    "name": "Cação, posta, crua",
+    "calories": 83.3330250195662,
+    "protein": 17.8541666666667,
+    "carbs": 0,
+    "fat": 0.786666666666667,
+    "sodium": 176.023666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_284",
+    "name": "Camarão, Rio Grande, grande, cozido",
+    "calories": 90.0136800963084,
+    "protein": 18.9666666666667,
+    "carbs": 0,
+    "fat": 1.00066666666667,
+    "sodium": 366.552,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_285",
+    "name": "Camarão, Rio Grande, grande, cru",
+    "calories": 47.1834367054304,
+    "protein": 9.99166666666667,
+    "carbs": 0,
+    "fat": 0.501,
+    "sodium": 201.128,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_286",
+    "name": "Camarão, Sete Barbas, sem cabeça, com casca, frito",
+    "calories": 231.246153850873,
+    "protein": 18.3875,
+    "carbs": 2.87983333333333,
+    "fat": 15.6203333333333,
+    "sodium": 99.055,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_287",
+    "name": "Caranguejo, cozido",
+    "calories": 82.7215015078386,
+    "protein": 18.4791666666667,
+    "carbs": 0,
+    "fat": 0.423,
+    "sodium": 360.105666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_288",
+    "name": "Corimba, cru",
+    "calories": 128.1554,
+    "protein": 17.3666666666667,
+    "carbs": -0.026666666666666,
+    "fat": 5.98666666666667,
+    "sodium": 47.01,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_289",
+    "name": "Corimbatá, assado",
+    "calories": 261.452439410567,
+    "protein": 19.8979166666667,
+    "carbs": 0,
+    "fat": 19.5663333333333,
+    "sodium": 40.426,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_290",
+    "name": "Corimbatá, cozido",
+    "calories": 238.696104867339,
+    "protein": 20.13125,
+    "carbs": 0,
+    "fat": 16.933,
+    "sodium": 37.1656666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_291",
+    "name": "Corvina de água doce, crua",
+    "calories": 101.009033333333,
+    "protein": 18.9166666666667,
+    "carbs": 0,
+    "fat": 2.24333333333333,
+    "sodium": 45.09,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_292",
+    "name": "Corvina do mar, crua",
+    "calories": 94,
+    "protein": 18.57,
+    "carbs": 0,
+    "fat": 1.58333333333333,
+    "sodium": 67.97,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_293",
+    "name": "Corvina grande, assada",
+    "calories": 146.528141125361,
+    "protein": 26.7666666666667,
+    "carbs": 0,
+    "fat": 3.57366666666667,
+    "sodium": 85.352,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_294",
+    "name": "Corvina grande, cozida",
+    "calories": 100.078124552965,
+    "protein": 23.4375,
+    "carbs": 0,
+    "fat": 2.56266666666667,
+    "sodium": 68.39,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_295",
+    "name": "Dourada de água doce, fresca",
+    "calories": 131.20831472377,
+    "protein": 18.8104166666667,
+    "carbs": 0,
+    "fat": 5.64166666666667,
+    "sodium": 40.2976666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_296",
+    "name": "Lambari, congelado, cru",
+    "calories": 130.840311009487,
+    "protein": 16.8125,
+    "carbs": 0,
+    "fat": 6.54666666666667,
+    "sodium": 47.92,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_297",
+    "name": "Lambari, congelado, frito",
+    "calories": 326.868399886608,
+    "protein": 28.425,
+    "carbs": 0,
+    "fat": 22.782,
+    "sodium": 64.5516666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_298",
+    "name": "Lambari, fresco,cru",
+    "calories": 151.598346503218,
+    "protein": 15.6520833333333,
+    "carbs": 0,
+    "fat": 9.39733333333333,
+    "sodium": 41.1093333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_299",
+    "name": "Manjuba, com farinha de trigo, frita",
+    "calories": 343.550458723068,
+    "protein": 23.45,
+    "carbs": 10.2403333333333,
+    "fat": 22.593,
+    "sodium": 36.52,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_300",
+    "name": "Manjuba, frita",
+    "calories": 349.325231455366,
+    "protein": 30.1395833333333,
+    "carbs": 0,
+    "fat": 24.46,
+    "sodium": 40.61,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_301",
+    "name": "Merluza, filé, assado",
+    "calories": 121.910218333333,
+    "protein": 26.6041666666667,
+    "carbs": 0,
+    "fat": 0.921333333333333,
+    "sodium": 119.948666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_302",
+    "name": "Merluza, filé, cru",
+    "calories": 89.1308666666667,
+    "protein": 16.6066666666667,
+    "carbs": 0,
+    "fat": 2.02,
+    "sodium": 79.5033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_303",
+    "name": "Merluza, filé, frito",
+    "calories": 191.627478375832,
+    "protein": 26.9291666666667,
+    "carbs": 0,
+    "fat": 8.49666666666667,
+    "sodium": 89.9613333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_304",
+    "name": "Pescada, branca, crua",
+    "calories": 110.8763,
+    "protein": 16.2633333333333,
+    "carbs": 0,
+    "fat": 4.59333333333333,
+    "sodium": 76.1666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_305",
+    "name": "Pescada, branca, frita",
+    "calories": 223.039732369304,
+    "protein": 27.35625,
+    "carbs": 0,
+    "fat": 11.777,
+    "sodium": 107.232666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_306",
+    "name": "Pescada, filé, com farinha de trigo, frito",
+    "calories": 283.425214431961,
+    "protein": 21.4354166666667,
+    "carbs": 5.03325000000001,
+    "fat": 19.115,
+    "sodium": 90.5066666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_307",
+    "name": "Pescada, filé, cru",
+    "calories": 107.205566666667,
+    "protein": 16.65,
+    "carbs": 0,
+    "fat": 4.00333333333333,
+    "sodium": 77.4966666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_308",
+    "name": "Pescada, filé, frito",
+    "calories": 154.270025,
+    "protein": 28.5875,
+    "carbs": 0,
+    "fat": 3.57,
+    "sodium": 114.905333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_309",
+    "name": "Pescada, filé, molho escabeche",
+    "calories": 141.958322875023,
+    "protein": 11.75,
+    "carbs": 5.01533333333334,
+    "fat": 8.024,
+    "sodium": 51.2876666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_310",
+    "name": "Pescadinha, crua",
+    "calories": 76.4089083333333,
+    "protein": 15.4791666666667,
+    "carbs": 0,
+    "fat": 1.14333333333333,
+    "sodium": 120.338666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_311",
+    "name": "Pintado, assado",
+    "calories": 191.559141127586,
+    "protein": 36.45,
+    "carbs": 0,
+    "fat": 3.982,
+    "sodium": 80.9526666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_312",
+    "name": "Pintado, cru",
+    "calories": 91.0832333333333,
+    "protein": 18.5566666666667,
+    "carbs": 0,
+    "fat": 1.31333333333333,
+    "sodium": 43.3366666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_313",
+    "name": "Pintado, grelhado",
+    "calories": 152.190088333333,
+    "protein": 30.7958333333333,
+    "carbs": 0,
+    "fat": 2.294,
+    "sodium": 53.0886666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_314",
+    "name": "Porquinho, cru",
+    "calories": 93.0245666666667,
+    "protein": 20.49,
+    "carbs": 0,
+    "fat": 0.613333333333333,
+    "sodium": 66.73,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_315",
+    "name": "Salmão, filé, com pele, fresco,  grelhado",
+    "calories": 228.731775135318,
+    "protein": 23.91875,
+    "carbs": 0,
+    "fat": 14.0353333333333,
+    "sodium": 85.135,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_316",
+    "name": "Salmão, sem pele, fresco, cru",
+    "calories": 169.781579910556,
+    "protein": 19.2520833333333,
+    "carbs": 0,
+    "fat": 9.709,
+    "sodium": 64.2416666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_317",
+    "name": "Salmão, sem pele, fresco, grelhado",
+    "calories": 242.706569487095,
+    "protein": 26.1416666666667,
+    "carbs": 0,
+    "fat": 14.5323333333333,
+    "sodium": 95.8113333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_318",
+    "name": "Sardinha, assada",
+    "calories": 164.350788333333,
+    "protein": 32.1791666666667,
+    "carbs": 0,
+    "fat": 2.98733333333333,
+    "sodium": 74.4683333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_319",
+    "name": "Sardinha, conserva em óleo",
+    "calories": 284.981004871249,
+    "protein": 15.9395833333333,
+    "carbs": 0,
+    "fat": 24.0486666666667,
+    "sodium": 665.840333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_320",
+    "name": "Sardinha, frita",
+    "calories": 257.0407,
+    "protein": 33.3833333333333,
+    "carbs": 0,
+    "fat": 12.6933333333333,
+    "sodium": 60.099,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_321",
+    "name": "Sardinha, inteira, crua",
+    "calories": 113.900366666667,
+    "protein": 21.0766666666667,
+    "carbs": 0,
+    "fat": 2.65,
+    "sodium": 60.3866666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_322",
+    "name": "Tucunaré, filé, congelado, cru",
+    "calories": 87.686483549277,
+    "protein": 17.9583333333333,
+    "carbs": -0.045000000000008,
+    "fat": 1.22,
+    "sodium": 56.5543333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_323",
+    "name": "Apresuntado",
+    "calories": 128.857255812009,
+    "protein": 13.45,
+    "carbs": 2.862,
+    "fat": 6.69066666666667,
+    "sodium": 942.933,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_324",
+    "name": "Caldo de carne, tablete",
+    "calories": 240.623333333333,
+    "protein": 7.82,
+    "carbs": 15.0533333333333,
+    "fat": 16.57,
+    "sodium": 22179.6666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_325",
+    "name": "Caldo de galinha, tablete",
+    "calories": 251.445666666667,
+    "protein": 6.27916666666667,
+    "carbs": 10.6455,
+    "fat": 20.4163333333333,
+    "sodium": 22299.9003333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_326",
+    "name": "Carne, bovina, acém, moído, cozido",
+    "calories": 212.4204,
+    "protein": 26.6866666666667,
+    "carbs": 0,
+    "fat": 10.9166666666667,
+    "sodium": 52.3566666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_327",
+    "name": "Carne, bovina, acém, moído, cru",
+    "calories": 136.562333333333,
+    "protein": 19.42,
+    "carbs": 0,
+    "fat": 5.94666666666667,
+    "sodium": 48.6133333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_328",
+    "name": "Carne, bovina, acém, sem gordura, cozido",
+    "calories": 214.610566666667,
+    "protein": 27.27,
+    "carbs": 0,
+    "fat": 10.8833333333333,
+    "sodium": 56.1733333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_329",
+    "name": "Carne, bovina, acém, sem gordura, cru",
+    "calories": 144.029433333333,
+    "protein": 20.8166666666667,
+    "carbs": 0,
+    "fat": 6.11333333333333,
+    "sodium": 49.8466666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_330",
+    "name": "Carne, bovina, almôndegas, cruas",
+    "calories": 189.256666666667,
+    "protein": 12.3125,
+    "carbs": 9.79416666666666,
+    "fat": 11.2033333333333,
+    "sodium": 621.251666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_331",
+    "name": "Carne, bovina, almôndegas, fritas",
+    "calories": 271.813,
+    "protein": 18.15625,
+    "carbs": 14.28675,
+    "fat": 15.7823333333333,
+    "sodium": 1030.25566666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_332",
+    "name": "Carne, bovina, bucho, cozido",
+    "calories": 133.022866666667,
+    "protein": 21.64,
+    "carbs": 0,
+    "fat": 4.50333333333333,
+    "sodium": 38.2033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_333",
+    "name": "Carne, bovina, bucho, cru",
+    "calories": 137.303166666667,
+    "protein": 20.53,
+    "carbs": 0,
+    "fat": 5.50333333333333,
+    "sodium": 45.0033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_334",
+    "name": "Carne, bovina, capa de contra-filé, com gordura, crua",
+    "calories": 216.908966666667,
+    "protein": 19.1966666666667,
+    "carbs": 0,
+    "fat": 14.96,
+    "sodium": 57.54,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_335",
+    "name": "Carne, bovina, capa de contra-filé, com gordura, grelhada",
+    "calories": 311.702666666667,
+    "protein": 30.6866666666667,
+    "carbs": 0,
+    "fat": 20.03,
+    "sodium": 80.5133333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_336",
+    "name": "Carne, bovina, capa de contra-filé, sem gordura, crua",
+    "calories": 131.062466666667,
+    "protein": 21.54,
+    "carbs": 0,
+    "fat": 4.33333333333333,
+    "sodium": 79.1733333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_337",
+    "name": "Carne, bovina, capa de contra-filé, sem gordura, grelhada",
+    "calories": 239.443633333333,
+    "protein": 35.0633333333333,
+    "carbs": -0.006666666666675,
+    "fat": 9.95,
+    "sodium": 82.75,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_338",
+    "name": "Carne, bovina, charque, cozido",
+    "calories": 262.780142262181,
+    "protein": 36.3645833333333,
+    "carbs": 0,
+    "fat": 11.9183333333333,
+    "sodium": 1442.701,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_339",
+    "name": "Carne, bovina, charque, cru",
+    "calories": 248.861018107454,
+    "protein": 22.7145833333333,
+    "carbs": 0,
+    "fat": 16.837,
+    "sodium": 5875.029,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_340",
+    "name": "Carne, bovina, contra-filé, à milanesa",
+    "calories": 351.592659198999,
+    "protein": 20.6125,
+    "carbs": 12.1745,
+    "fat": 23.998,
+    "sodium": 77.0933333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_341",
+    "name": "Carne, bovina, contra-filé de costela, cru",
+    "calories": 202.4374,
+    "protein": 19.8,
+    "carbs": 0,
+    "fat": 13.07,
+    "sodium": 38.5233333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_342",
+    "name": "Carne, bovina, contra-filé de costela, grelhado",
+    "calories": 274.914266666667,
+    "protein": 29.88,
+    "carbs": 0,
+    "fat": 16.3333333333333,
+    "sodium": 50.8833333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_343",
+    "name": "Carne, bovina, contra-filé, com gordura, cru",
+    "calories": 205.8567,
+    "protein": 21.15,
+    "carbs": 0,
+    "fat": 12.81,
+    "sodium": 44.133,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_344",
+    "name": "Carne, bovina, contra-filé, com gordura, grelhado",
+    "calories": 278.053566666667,
+    "protein": 32.3966666666667,
+    "carbs": 0,
+    "fat": 15.49,
+    "sodium": 57.0666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_345",
+    "name": "Carne, bovina, contra-filé, sem gordura, cru",
+    "calories": 156.615833333333,
+    "protein": 23.9966666666667,
+    "carbs": 0,
+    "fat": 6.00333333333333,
+    "sodium": 52.8933333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_346",
+    "name": "Carne, bovina, contra-filé, sem gordura, grelhado",
+    "calories": 193.691566666667,
+    "protein": 35.8833333333333,
+    "carbs": 0,
+    "fat": 4.48666666666667,
+    "sodium": 57.51,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_347",
+    "name": "Carne, bovina, costela, assada",
+    "calories": 373.038866666667,
+    "protein": 28.8066666666667,
+    "carbs": 0,
+    "fat": 27.72,
+    "sodium": 91.86,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_348",
+    "name": "Carne, bovina, costela, crua",
+    "calories": 357.722466666667,
+    "protein": 16.7066666666667,
+    "carbs": 0,
+    "fat": 31.75,
+    "sodium": 69.9966666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_349",
+    "name": "Carne, bovina, coxão duro, sem gordura, cozido",
+    "calories": 216.616066666667,
+    "protein": 31.88,
+    "carbs": 0,
+    "fat": 8.92333333333333,
+    "sodium": 41.1,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_350",
+    "name": "Carne, bovina, coxão duro, sem gordura, cru",
+    "calories": 147.966333333333,
+    "protein": 21.5133333333333,
+    "carbs": 0,
+    "fat": 6.22,
+    "sodium": 48.5466666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_351",
+    "name": "Carne, bovina, coxão mole, sem gordura, cozido",
+    "calories": 218.6751,
+    "protein": 32.3833333333333,
+    "carbs": 0,
+    "fat": 8.91333333333333,
+    "sodium": 43.5033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_352",
+    "name": "Carne, bovina, coxão mole, sem gordura, cru",
+    "calories": 169.065966666667,
+    "protein": 21.23,
+    "carbs": 0,
+    "fat": 8.69333333333333,
+    "sodium": 60.5333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_353",
+    "name": "Carne, bovina, cupim, assado",
+    "calories": 330.100290833333,
+    "protein": 28.63125,
+    "carbs": 0,
+    "fat": 23.0426666666667,
+    "sodium": 71.5866666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_354",
+    "name": "Carne, bovina, cupim, cru",
+    "calories": 221.3975,
+    "protein": 19.5366666666667,
+    "carbs": 0,
+    "fat": 15.2966666666667,
+    "sodium": 46.86,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_355",
+    "name": "Carne, bovina, fígado, cru",
+    "calories": 141.045866666667,
+    "protein": 20.7133333333333,
+    "carbs": 1.10666666666667,
+    "fat": 5.35666666666667,
+    "sodium": 75.92,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_356",
+    "name": "Carne, bovina, fígado, grelhado",
+    "calories": 225.0264,
+    "protein": 29.86,
+    "carbs": 4.2,
+    "fat": 9.01,
+    "sodium": 82.19,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_357",
+    "name": "Carne, bovina, filé mingnon, sem gordura, cru",
+    "calories": 142.864266666667,
+    "protein": 21.6,
+    "carbs": 0,
+    "fat": 5.61333333333333,
+    "sodium": 48.86,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_358",
+    "name": "Carne, bovina, filé mingnon, sem gordura, grelhado",
+    "calories": 219.7026,
+    "protein": 32.8,
+    "carbs": 0,
+    "fat": 8.83,
+    "sodium": 57.9066666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_359",
+    "name": "Carne, bovina, flanco, sem gordura, cozido",
+    "calories": 195.575366666667,
+    "protein": 29.3766666666667,
+    "carbs": 0,
+    "fat": 7.77,
+    "sodium": 41.68,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_360",
+    "name": "Carne, bovina, flanco, sem gordura, cru",
+    "calories": 141.4601,
+    "protein": 19.9966666666667,
+    "carbs": 0,
+    "fat": 6.21666666666667,
+    "sodium": 54.2233333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_361",
+    "name": "Carne, bovina, fraldinha, com gordura, cozida",
+    "calories": 338.445733333333,
+    "protein": 24.24,
+    "carbs": 0,
+    "fat": 26.0466666666667,
+    "sodium": 38.7833333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_362",
+    "name": "Carne, bovina, fraldinha, com gordura, crua",
+    "calories": 220.723766666667,
+    "protein": 17.5833333333333,
+    "carbs": 0,
+    "fat": 16.1466666666667,
+    "sodium": 51.2,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_363",
+    "name": "Carne, bovina, lagarto, cozido",
+    "calories": 222.468566666667,
+    "protein": 32.8633333333333,
+    "carbs": 0,
+    "fat": 9.10666666666667,
+    "sodium": 47.5433333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_364",
+    "name": "Carne, bovina, lagarto, cru",
+    "calories": 134.864566666667,
+    "protein": 20.5433333333333,
+    "carbs": 0,
+    "fat": 5.22666666666667,
+    "sodium": 53.5566666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_365",
+    "name": "Carne, bovina, língua, cozida",
+    "calories": 314.9016,
+    "protein": 21.3666666666667,
+    "carbs": 0,
+    "fat": 24.7966666666667,
+    "sodium": 59.0633333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_366",
+    "name": "Carne, bovina, língua, crua",
+    "calories": 215.249766666667,
+    "protein": 17.09,
+    "carbs": 0,
+    "fat": 15.7733333333333,
+    "sodium": 73.05,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_367",
+    "name": "Carne, bovina, maminha, crua",
+    "calories": 152.765866666667,
+    "protein": 20.9333333333333,
+    "carbs": 0,
+    "fat": 7.02666666666667,
+    "sodium": 37.4166666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_368",
+    "name": "Carne, bovina, maminha, grelhada",
+    "calories": 153.089675833333,
+    "protein": 30.7354166666667,
+    "carbs": 0,
+    "fat": 2.42233333333333,
+    "sodium": 58.12,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_369",
+    "name": "Carne, bovina, miolo de alcatra, sem gordura, cru",
+    "calories": 162.871233333333,
+    "protein": 21.61,
+    "carbs": 0,
+    "fat": 7.82666666666667,
+    "sodium": 43.0533333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_370",
+    "name": "Carne, bovina, miolo de alcatra, sem gordura, grelhado",
+    "calories": 241.363966666667,
+    "protein": 31.93,
+    "carbs": 0,
+    "fat": 11.6433333333333,
+    "sodium": 51.62,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_371",
+    "name": "Carne, bovina, músculo, sem gordura, cozido",
+    "calories": 193.800333333333,
+    "protein": 31.2333333333333,
+    "carbs": 0,
+    "fat": 6.7,
+    "sodium": 61.79,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_372",
+    "name": "Carne, bovina, músculo, sem gordura, cru",
+    "calories": 141.581,
+    "protein": 21.56,
+    "carbs": 0,
+    "fat": 5.49,
+    "sodium": 66.08,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_373",
+    "name": "Carne, bovina, paleta, com gordura, crua",
+    "calories": 158.7099,
+    "protein": 21.41,
+    "carbs": 0,
+    "fat": 7.46,
+    "sodium": 64.9,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_374",
+    "name": "Carne, bovina, paleta, sem gordura, cozida",
+    "calories": 193.6524,
+    "protein": 29.72,
+    "carbs": 0,
+    "fat": 7.4,
+    "sodium": 57.6233333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_375",
+    "name": "Carne, bovina, paleta, sem gordura, crua",
+    "calories": 140.9415,
+    "protein": 21.03,
+    "carbs": 0,
+    "fat": 5.67,
+    "sodium": 65.86,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_376",
+    "name": "Carne, bovina, patinho, sem gordura, cru",
+    "calories": 133.4689,
+    "protein": 21.7233333333333,
+    "carbs": 0,
+    "fat": 4.51333333333333,
+    "sodium": 49.13,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_377",
+    "name": "Carne, bovina, patinho, sem gordura, grelhado",
+    "calories": 219.259266666667,
+    "protein": 35.9,
+    "carbs": 0,
+    "fat": 7.31333333333333,
+    "sodium": 60.2933333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_378",
+    "name": "Carne, bovina, peito, sem gordura, cozido",
+    "calories": 338.473133333333,
+    "protein": 22.2466666666667,
+    "carbs": 0,
+    "fat": 26.9933333333333,
+    "sodium": 55.7066666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_379",
+    "name": "Carne, bovina, peito, sem gordura, cru",
+    "calories": 259.275633333333,
+    "protein": 17.5566666666667,
+    "carbs": 0,
+    "fat": 20.4333333333333,
+    "sodium": 63.7633333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_380",
+    "name": "Carne, bovina, picanha, com gordura, crua",
+    "calories": 212.879433333333,
+    "protein": 18.8233333333333,
+    "carbs": 0,
+    "fat": 14.69,
+    "sodium": 37.6233333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_381",
+    "name": "Carne, bovina, picanha, com gordura, grelhada",
+    "calories": 288.767091666667,
+    "protein": 26.4208333333333,
+    "carbs": 0,
+    "fat": 19.5066666666667,
+    "sodium": 60,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_382",
+    "name": "Carne, bovina, picanha, sem gordura, crua",
+    "calories": 133.522366666667,
+    "protein": 21.25,
+    "carbs": 0,
+    "fat": 4.74333333333333,
+    "sodium": 61.1466666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_383",
+    "name": "Carne, bovina, picanha, sem gordura, grelhada",
+    "calories": 238.468133333333,
+    "protein": 31.9066666666667,
+    "carbs": 0,
+    "fat": 11.3333333333333,
+    "sodium": 60.6566666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_384",
+    "name": "Carne, bovina, seca, cozida",
+    "calories": 312.799033691446,
+    "protein": 26.93125,
+    "carbs": 0,
+    "fat": 21.9293333333333,
+    "sodium": 1943.17933333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_385",
+    "name": "Carne, bovina, seca, crua",
+    "calories": 312.748427903652,
+    "protein": 19.6583333333333,
+    "carbs": 0,
+    "fat": 25.3666666666667,
+    "sodium": 4439.55,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_386",
+    "name": "Coxinha de frango, frita",
+    "calories": 283.048,
+    "protein": 9.61041666666667,
+    "carbs": 34.5205833333333,
+    "fat": 11.836,
+    "sodium": 532.129333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_387",
+    "name": "Croquete, de carne, cru",
+    "calories": 245.771925297141,
+    "protein": 12.04375,
+    "carbs": 13.9495833333333,
+    "fat": 15.561,
+    "sodium": 710.637333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_388",
+    "name": "Croquete, de carne, frito",
+    "calories": 346.742014647404,
+    "protein": 16.8625,
+    "carbs": 18.1461666666667,
+    "fat": 22.6733333333333,
+    "sodium": 916.411,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_389",
+    "name": "Empada de frango, pré-cozida, assada",
+    "calories": 358.191666666667,
+    "protein": 6.94375,
+    "carbs": 47.4929166666667,
+    "fat": 15.605,
+    "sodium": 524.933333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_390",
+    "name": "Empada, de frango, pré-cozida",
+    "calories": 377.479666666667,
+    "protein": 7.34375,
+    "carbs": 35.5289166666667,
+    "fat": 22.8876666666667,
+    "sodium": 770.725666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_391",
+    "name": "Frango, asa, com pele, crua",
+    "calories": 213.188333333333,
+    "protein": 18.1,
+    "carbs": 0,
+    "fat": 15.0666666666667,
+    "sodium": 96.3,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_392",
+    "name": "Frango, caipira, inteiro, com pele, cozido",
+    "calories": 242.889326666667,
+    "protein": 23.8833333333333,
+    "carbs": 0,
+    "fat": 15.6156666666667,
+    "sodium": 56.092,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_393",
+    "name": "Frango, caipira, inteiro, sem pele, cozido",
+    "calories": 195.760296666667,
+    "protein": 29.575,
+    "carbs": 0,
+    "fat": 7.70233333333333,
+    "sodium": 53.2433333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_394",
+    "name": "Frango, coração, cru",
+    "calories": 221.502833333333,
+    "protein": 12.5833333333333,
+    "carbs": 0,
+    "fat": 18.6,
+    "sodium": 95.06,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_395",
+    "name": "Frango, coração, grelhado",
+    "calories": 207.273643333333,
+    "protein": 22.4395833333333,
+    "carbs": 0.607416666666658,
+    "fat": 12.096,
+    "sodium": 128.242,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_396",
+    "name": "Frango, coxa, com pele, assada",
+    "calories": 215.11864753294,
+    "protein": 28.4916666666667,
+    "carbs": 0.05833333333334,
+    "fat": 10.3613333333333,
+    "sodium": 94.8423333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_397",
+    "name": "Frango, coxa, com pele, crua",
+    "calories": 161.474733333333,
+    "protein": 17.0933333333333,
+    "carbs": 0,
+    "fat": 9.81,
+    "sodium": 94.9566666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_398",
+    "name": "Frango, coxa, sem pele, cozida",
+    "calories": 167.428032164415,
+    "protein": 26.8583333333333,
+    "carbs": 0,
+    "fat": 5.84733333333333,
+    "sodium": 64.3393333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_399",
+    "name": "Frango, coxa, sem pele, crua",
+    "calories": 119.947466666667,
+    "protein": 17.8133333333333,
+    "carbs": 0.019999999999997,
+    "fat": 4.85666666666667,
+    "sodium": 98.3666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_400",
+    "name": "Frango, fígado, cru",
+    "calories": 106.484566666667,
+    "protein": 17.5866666666667,
+    "carbs": -0.023333333333338,
+    "fat": 3.49,
+    "sodium": 82.4333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_401",
+    "name": "Frango, filé, à milanesa",
+    "calories": 220.87278,
+    "protein": 28.4604166666667,
+    "carbs": 7.51291666666666,
+    "fat": 7.79066666666667,
+    "sodium": 122.332333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_402",
+    "name": "Frango, inteiro, com pele, cru",
+    "calories": 226.319166666667,
+    "protein": 16.4433333333333,
+    "carbs": 0,
+    "fat": 17.3066666666667,
+    "sodium": 62.8766666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_403",
+    "name": "Frango, inteiro, sem pele, assado",
+    "calories": 187.337796666667,
+    "protein": 28.025,
+    "carbs": 0,
+    "fat": 7.50233333333333,
+    "sodium": 70.2713333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_404",
+    "name": "Frango, inteiro, sem pele, cozido",
+    "calories": 170.389975833333,
+    "protein": 24.9854166666667,
+    "carbs": 0,
+    "fat": 7.06233333333333,
+    "sodium": 50.8903333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_405",
+    "name": "Frango, inteiro, sem pele, cru",
+    "calories": 129.0964,
+    "protein": 20.5866666666667,
+    "carbs": 0,
+    "fat": 4.56666666666667,
+    "sodium": 72.96,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_406",
+    "name": "Frango, peito, com pele, assado",
+    "calories": 211.683149530729,
+    "protein": 33.4166666666667,
+    "carbs": 0,
+    "fat": 7.649,
+    "sodium": 55.7026666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_407",
+    "name": "Frango, peito, com pele, cru",
+    "calories": 149.465266666667,
+    "protein": 20.78,
+    "carbs": 0,
+    "fat": 6.73333333333333,
+    "sodium": 62.3133333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_408",
+    "name": "Frango, peito, sem pele, cozido",
+    "calories": 162.874763346314,
+    "protein": 31.46875,
+    "carbs": 0,
+    "fat": 3.16,
+    "sodium": 36.1683333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_409",
+    "name": "Frango, peito, sem pele, cru",
+    "calories": 119.159266666667,
+    "protein": 21.5266666666667,
+    "carbs": 0,
+    "fat": 3.02,
+    "sodium": 56.14,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_410",
+    "name": "Frango, peito, sem pele, grelhado",
+    "calories": 159.185007192612,
+    "protein": 32.0333333333333,
+    "carbs": 0,
+    "fat": 2.48366666666667,
+    "sodium": 50.2493333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_411",
+    "name": "Frango, sobrecoxa, com pele, assada",
+    "calories": 259.604769166667,
+    "protein": 28.7020833333333,
+    "carbs": 0,
+    "fat": 15.1936666666667,
+    "sodium": 95.9353333333334,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_412",
+    "name": "Frango, sobrecoxa, com pele, crua",
+    "calories": 254.5322,
+    "protein": 15.46,
+    "carbs": 0,
+    "fat": 20.9,
+    "sodium": 68.2666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_413",
+    "name": "Frango, sobrecoxa, sem pele, assada",
+    "calories": 232.883396666667,
+    "protein": 29.175,
+    "carbs": 0,
+    "fat": 12.0073333333333,
+    "sodium": 106.079666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_414",
+    "name": "Frango, sobrecoxa, sem pele, crua",
+    "calories": 161.7963,
+    "protein": 17.57,
+    "carbs": 0,
+    "fat": 9.62,
+    "sodium": 79.7466666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_415",
+    "name": "Hambúrguer, bovino, cru",
+    "calories": 214.836,
+    "protein": 13.15625,
+    "carbs": 4.15375,
+    "fat": 16.1773333333333,
+    "sodium": 869.459,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_416",
+    "name": "Hambúrguer, bovino, frito",
+    "calories": 258.283,
+    "protein": 19.9729166666667,
+    "carbs": 6.32008333333333,
+    "fat": 17.0123333333333,
+    "sodium": 1251.801,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_417",
+    "name": "Hambúrguer, bovino, grelhado",
+    "calories": 209.831666666667,
+    "protein": 13.15625,
+    "carbs": 11.3334166666667,
+    "fat": 12.4303333333333,
+    "sodium": 1090.33433333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_418",
+    "name": "Lingüiça, frango, crua",
+    "calories": 218.108814166667,
+    "protein": 14.2395833333333,
+    "carbs": 0,
+    "fat": 17.4396666666667,
+    "sodium": 1125.81133333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_419",
+    "name": "Lingüiça, frango, frita",
+    "calories": 245.461006666667,
+    "protein": 18.3166666666667,
+    "carbs": 0,
+    "fat": 18.542,
+    "sodium": 1373.89366666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_420",
+    "name": "Lingüiça, frango, grelhada",
+    "calories": 243.6585675,
+    "protein": 18.1895833333333,
+    "carbs": 0,
+    "fat": 18.4023333333333,
+    "sodium": 1351.49366666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_421",
+    "name": "Lingüiça, porco, crua",
+    "calories": 227.203450833333,
+    "protein": 16.0645833333333,
+    "carbs": 0,
+    "fat": 17.584,
+    "sodium": 1175.72233333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_422",
+    "name": "Lingüiça, porco, frita",
+    "calories": 279.543589166667,
+    "protein": 20.4520833333333,
+    "carbs": 0,
+    "fat": 21.3096666666667,
+    "sodium": 1431.59366666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_423",
+    "name": "Lingüiça, porco, grelhada",
+    "calories": 296.489609166667,
+    "protein": 23.16875,
+    "carbs": 0,
+    "fat": 21.9023333333333,
+    "sodium": 1455.86033333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_424",
+    "name": "Mortadela",
+    "calories": 268.819989016732,
+    "protein": 11.9520833333333,
+    "carbs": 5.81591666666666,
+    "fat": 21.6493333333333,
+    "sodium": 1212.167,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_425",
+    "name": "Peru, congelado, assado",
+    "calories": 163.071397931377,
+    "protein": 26.2020833333333,
+    "carbs": 0,
+    "fat": 5.675,
+    "sodium": 627.875666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_426",
+    "name": "Peru, congelado, cru",
+    "calories": 93.7224338261286,
+    "protein": 18.0833333333333,
+    "carbs": 0,
+    "fat": 1.83,
+    "sodium": 710.683,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_427",
+    "name": "Porco, bisteca, crua",
+    "calories": 164.115336592992,
+    "protein": 21.5,
+    "carbs": 0,
+    "fat": 8.01666666666667,
+    "sodium": 54.29,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_428",
+    "name": "Porco, bisteca, frita",
+    "calories": 311.169045334856,
+    "protein": 33.7479166666667,
+    "carbs": 0,
+    "fat": 18.5216666666667,
+    "sodium": 63.027,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_429",
+    "name": "Porco, bisteca, grelhada",
+    "calories": 280.084034902771,
+    "protein": 28.8895833333333,
+    "carbs": 0,
+    "fat": 17.3753333333333,
+    "sodium": 51.445,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_430",
+    "name": "Porco, costela, assada",
+    "calories": 402.168447450837,
+    "protein": 30.2229166666667,
+    "carbs": 0,
+    "fat": 30.279,
+    "sodium": 62.6793333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_431",
+    "name": "Porco, costela, crua",
+    "calories": 255.606342061361,
+    "protein": 18,
+    "carbs": 0,
+    "fat": 19.8166666666667,
+    "sodium": 87.9816666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_432",
+    "name": "Porco, lombo, assado",
+    "calories": 210.234665579637,
+    "protein": 35.725,
+    "carbs": 0,
+    "fat": 6.39566666666667,
+    "sodium": 38.924,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_433",
+    "name": "Porco, lombo, cru",
+    "calories": 175.625195250114,
+    "protein": 22.6041666666667,
+    "carbs": 0,
+    "fat": 8.77,
+    "sodium": 53.0676666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_434",
+    "name": "Porco, orelha, salgada, crua",
+    "calories": 258.491758333333,
+    "protein": 18.5208333333333,
+    "carbs": 0,
+    "fat": 19.89,
+    "sodium": 615.602,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_435",
+    "name": "Porco, pernil, assado",
+    "calories": 262.259606666667,
+    "protein": 32.1333333333333,
+    "carbs": 0,
+    "fat": 13.8636666666667,
+    "sodium": 62.4063333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_436",
+    "name": "Porco, pernil, cru",
+    "calories": 186.05575,
+    "protein": 20.125,
+    "carbs": 0,
+    "fat": 11.1,
+    "sodium": 101.893333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_437",
+    "name": "Porco, rabo, salgado, cru",
+    "calories": 377.4152575,
+    "protein": 15.58125,
+    "carbs": 0,
+    "fat": 34.466,
+    "sodium": 1157.66533333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_438",
+    "name": "Presunto, com capa de gordura",
+    "calories": 127.849212665637,
+    "protein": 14.3708333333333,
+    "carbs": 1.3975,
+    "fat": 6.77133333333333,
+    "sodium": 1020.77166666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_439",
+    "name": "Presunto, sem capa de gordura",
+    "calories": 93.7432807208697,
+    "protein": 14.2916666666667,
+    "carbs": 2.14566666666667,
+    "fat": 2.70666666666667,
+    "sodium": 1039.185,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_440",
+    "name": "Quibe, assado",
+    "calories": 136.228876141588,
+    "protein": 14.59375,
+    "carbs": 12.86125,
+    "fat": 2.67633333333333,
+    "sodium": 39.893,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_441",
+    "name": "Quibe, cru",
+    "calories": 109.490669294755,
+    "protein": 12.3541666666667,
+    "carbs": 10.7741666666667,
+    "fat": 1.66766666666667,
+    "sodium": 38.766,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_442",
+    "name": "Quibe, frito",
+    "calories": 253.83130886964,
+    "protein": 14.8895833333333,
+    "carbs": 12.3374166666667,
+    "fat": 15.799,
+    "sodium": 835.825,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_443",
+    "name": "Salame",
+    "calories": 397.842506534934,
+    "protein": 25.8104166666667,
+    "carbs": 2.90625000000001,
+    "fat": 30.6413333333333,
+    "sodium": 1574.169,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_444",
+    "name": "Toucinho, cru",
+    "calories": 592.531175,
+    "protein": 11.4791666666667,
+    "carbs": 0,
+    "fat": 60.2566666666667,
+    "sodium": 49.5866666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_445",
+    "name": "Toucinho, frito",
+    "calories": 696.564006666667,
+    "protein": 27.2833333333333,
+    "carbs": 0,
+    "fat": 64.3086666666667,
+    "sodium": 124.850333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_446",
+    "name": "Bebida láctea, pêssego",
+    "calories": 55.1648333333333,
+    "protein": 2.13333333333333,
+    "carbs": 7.57000000000001,
+    "fat": 1.90666666666667,
+    "sodium": 46.263,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_447",
+    "name": "Creme de Leite",
+    "calories": 221.483541275133,
+    "protein": 1.50780669371287,
+    "carbs": 4.50952663962046,
+    "fat": 22.4793333333333,
+    "sodium": 51.724,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_448",
+    "name": "Iogurte, natural",
+    "calories": 51.4895333333333,
+    "protein": 4.06333333333333,
+    "carbs": 1.91666666666666,
+    "fat": 3.04,
+    "sodium": 51.6163333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_449",
+    "name": "Iogurte, natural, desnatado",
+    "calories": 41.4927112815583,
+    "protein": 3.83438006877899,
+    "carbs": 5.77395333333333,
+    "fat": 0.315666666666667,
+    "sodium": 59.6446666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_450",
+    "name": "Iogurte, sabor abacaxi",
+    "calories": 0,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_451",
+    "name": "Iogurte, sabor morango",
+    "calories": 69.5656,
+    "protein": 2.71,
+    "carbs": 9.69333333333334,
+    "fat": 2.33,
+    "sodium": 37.663,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_452",
+    "name": "Iogurte, sabor pêssego",
+    "calories": 67.8494,
+    "protein": 2.53,
+    "carbs": 9.43333333333334,
+    "fat": 2.33666666666667,
+    "sodium": 36.9636666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_453",
+    "name": "Leite, condensado",
+    "calories": 312.5726,
+    "protein": 7.67,
+    "carbs": 56.9966666666667,
+    "fat": 6.74,
+    "sodium": 93.8033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_454",
+    "name": "Leite, de cabra",
+    "calories": 66.4157418865433,
+    "protein": 3.0709067217509,
+    "carbs": 5.24609333333333,
+    "fat": 3.75433333333333,
+    "sodium": 73.947,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_455",
+    "name": "Leite, de vaca, achocolatado",
+    "calories": 82.8209962719936,
+    "protein": 2.09902003765106,
+    "carbs": 14.1583133333333,
+    "fat": 2.169,
+    "sodium": 71.7416666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_456",
+    "name": "Leite, de vaca, desnatado, pó",
+    "calories": 361.608,
+    "protein": 34.69,
+    "carbs": 53.0433333333333,
+    "fat": 0.933333333333333,
+    "sodium": 431.673333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_457",
+    "name": "Leite, de vaca, desnatado, UHT",
+    "calories": 0,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 0,
+    "sodium": 51.14,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_458",
+    "name": "Leite, de vaca, integral",
+    "calories": 0,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 0,
+    "sodium": 63.76,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_459",
+    "name": "Leite, de vaca, integral, pó",
+    "calories": 496.6503,
+    "protein": 25.42,
+    "carbs": 39.18,
+    "fat": 26.9033333333333,
+    "sodium": 323.203333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_460",
+    "name": "Leite, fermentado",
+    "calories": 69.621474,
+    "protein": 1.89486,
+    "carbs": 15.6744733333333,
+    "fat": 0.099,
+    "sodium": 33.4306666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_461",
+    "name": "Queijo, minas, frescal",
+    "calories": 264.273128,
+    "protein": 17.41102,
+    "carbs": 3.24031333333333,
+    "fat": 20.1806666666667,
+    "sodium": 31.2263333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_462",
+    "name": "Queijo, minas, meia cura",
+    "calories": 320.72181773326,
+    "protein": 21.2113737138112,
+    "carbs": 3.57295961952209,
+    "fat": 24.61,
+    "sodium": 501.165666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_463",
+    "name": "Queijo, mozarela",
+    "calories": 329.870718420887,
+    "protein": 22.6490004062653,
+    "carbs": 3.04933292706807,
+    "fat": 25.183,
+    "sodium": 581.357,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_464",
+    "name": "Queijo, parmesão",
+    "calories": 452.963755333333,
+    "protein": 35.5536133333333,
+    "carbs": 1.66072,
+    "fat": 33.5293333333333,
+    "sodium": 1844.081,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_465",
+    "name": "Queijo, pasteurizado",
+    "calories": 303.079803333333,
+    "protein": 9.35733333333333,
+    "carbs": 5.67633333333333,
+    "fat": 27.4353333333333,
+    "sodium": 780.426,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_466",
+    "name": "Queijo, petit suisse, morango",
+    "calories": 121.105954,
+    "protein": 5.78666,
+    "carbs": 18.4620066666667,
+    "fat": 2.83833333333333,
+    "sodium": 412.469,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_467",
+    "name": "Queijo, prato",
+    "calories": 359.880462405055,
+    "protein": 22.6617604064941,
+    "carbs": 1.87857292683919,
+    "fat": 29.1063333333333,
+    "sodium": 579.774,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_468",
+    "name": "Maria mole",
+    "calories": 256.578148666667,
+    "protein": 9.62954666666667,
+    "carbs": 2.43245333333333,
+    "fat": 23.441,
+    "sodium": 557.924666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_469",
+    "name": "Queijo, ricota",
+    "calories": 139.73178,
+    "protein": 12.6005,
+    "carbs": 3.78616666666667,
+    "fat": 8.10866666666667,
+    "sodium": 282.579,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_470",
+    "name": "Bebida isotônica, sabores variados",
+    "calories": 25.6133333333333,
+    "protein": 0,
+    "carbs": 6.40333333333334,
+    "fat": 0,
+    "sodium": 44.0833333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_471",
+    "name": "Café, infusão 10%",
+    "calories": 9.07086859961352,
+    "protein": 0.7125,
+    "carbs": 1.47866666666667,
+    "fat": 0.069333333333333,
+    "sodium": 1.02733333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_472",
+    "name": "Cana, aguardente 1",
+    "calories": 215.6616,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 0,
+    "sodium": 3.14566666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_473",
+    "name": "Cana, caldo de",
+    "calories": 65.3435982689857,
+    "protein": 0,
+    "carbs": 18.151,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_474",
+    "name": "Cerveja, pilsen 2",
+    "calories": 40.7201885506287,
+    "protein": 0.5625,
+    "carbs": 3.3175,
+    "fat": 0,
+    "sodium": 4.23033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_475",
+    "name": "Chá, erva-doce, infusão 5%",
+    "calories": 1.39705997387564,
+    "protein": 0,
+    "carbs": 0.391333333333321,
+    "fat": 0,
+    "sodium": 0.625333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_476",
+    "name": "Chá, mate, infusão 5%",
+    "calories": 2.73074995112414,
+    "protein": 0,
+    "carbs": 0.642999999999993,
+    "fat": 0.052,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_477",
+    "name": "Chá, preto, infusão 5%",
+    "calories": 2.24790995796521,
+    "protein": 0,
+    "carbs": 0.629666666666665,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_478",
+    "name": "Coco, água de",
+    "calories": 21.5085942405065,
+    "protein": 0,
+    "carbs": 5.28466666666667,
+    "fat": 0,
+    "sodium": 1.78233333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_479",
+    "name": "Refrigerante, tipo água tônica",
+    "calories": 30.7794,
+    "protein": 0,
+    "carbs": 7.95333333333334,
+    "fat": 0,
+    "sodium": 8.29033333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_480",
+    "name": "Refrigerante, tipo cola",
+    "calories": 33.5142,
+    "protein": 0,
+    "carbs": 8.66000000000001,
+    "fat": 0,
+    "sodium": 7.11933333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_481",
+    "name": "Refrigerante, tipo guaraná",
+    "calories": 38.7,
+    "protein": 0,
+    "carbs": 10,
+    "fat": 0,
+    "sodium": 9.00966666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_482",
+    "name": "Refrigerante, tipo laranja",
+    "calories": 45.6273,
+    "protein": 0,
+    "carbs": 11.79,
+    "fat": 0,
+    "sodium": 9.27166666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_483",
+    "name": "Refrigerante, tipo limão",
+    "calories": 39.7191,
+    "protein": 0,
+    "carbs": 10.2633333333333,
+    "fat": 0,
+    "sodium": 8.80333333333334,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_484",
+    "name": "Omelete, de queijo",
+    "calories": 268.006772182425,
+    "protein": 15.5708333333333,
+    "carbs": 0.437166666666668,
+    "fat": 22.0076666666667,
+    "sodium": 216.051,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_485",
+    "name": "Ovo, de codorna, inteiro, cru",
+    "calories": 176.8939,
+    "protein": 13.6875,
+    "carbs": 0.772499999999999,
+    "fat": 12.68,
+    "sodium": 128.987,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_486",
+    "name": "Ovo, de galinha, clara, cozida/10minutos",
+    "calories": 59.4356966666667,
+    "protein": 13.4479166666667,
+    "carbs": 0,
+    "fat": 0.089,
+    "sodium": 180.537666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_487",
+    "name": "Ovo, de galinha, gema, cozida/10minutos",
+    "calories": 352.67334,
+    "protein": 15.9,
+    "carbs": 1.56000000000001,
+    "fat": 30.777,
+    "sodium": 44.9086666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_488",
+    "name": "Ovo, de galinha, inteiro, cozido/10minutos",
+    "calories": 145.70017,
+    "protein": 13.29375,
+    "carbs": 0.614916666666674,
+    "fat": 9.47633333333333,
+    "sodium": 145.901,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_489",
+    "name": "Ovo, de galinha, inteiro, cru",
+    "calories": 143.111733333333,
+    "protein": 13.03,
+    "carbs": 1.63666666666667,
+    "fat": 8.9,
+    "sodium": 167.91,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_490",
+    "name": "Ovo, de galinha, inteiro, frito",
+    "calories": 240.187224009117,
+    "protein": 15.6166666666667,
+    "carbs": 1.19366666666666,
+    "fat": 18.5926666666667,
+    "sodium": 166.112333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_491",
+    "name": "Achocolatado, pó",
+    "calories": 401.02,
+    "protein": 4.20333333333333,
+    "carbs": 91.1766666666667,
+    "fat": 2.16666666666667,
+    "sodium": 64.7866666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_492",
+    "name": "Açúcar, cristal",
+    "calories": 386.845724,
+    "protein": 0.32,
+    "carbs": 99.61,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_493",
+    "name": "Açúcar, mascavo",
+    "calories": 368.554822524389,
+    "protein": 0.758333333333333,
+    "carbs": 94.45,
+    "fat": 0.092,
+    "sodium": 25.204,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_494",
+    "name": "Açúcar, refinado",
+    "calories": 386.574824,
+    "protein": 0.32,
+    "carbs": 99.54,
+    "fat": 0,
+    "sodium": 12.16,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_495",
+    "name": "Chocolate, ao leite",
+    "calories": 539.586666666667,
+    "protein": 7.22,
+    "carbs": 59.5766666666667,
+    "fat": 30.2666666666667,
+    "sodium": 77.1,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_496",
+    "name": "Chocolate, ao leite, com castanha do Pará",
+    "calories": 558.876333333333,
+    "protein": 7.4125,
+    "carbs": 55.3768333333333,
+    "fat": 34.191,
+    "sodium": 64.05,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_497",
+    "name": "Chocolate, ao leite, dietético",
+    "calories": 556.824333333333,
+    "protein": 6.89791666666667,
+    "carbs": 56.3234166666667,
+    "fat": 33.771,
+    "sodium": 84.7083333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_498",
+    "name": "Chocolate, meio amargo",
+    "calories": 474.917769973274,
+    "protein": 4.86244343217214,
+    "carbs": 62.4228899011612,
+    "fat": 29.8566666666667,
+    "sodium": 8.867,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_499",
+    "name": "Cocada branca",
+    "calories": 448.84545242331,
+    "protein": 1.12183337370555,
+    "carbs": 81.3831666262945,
+    "fat": 13.587,
+    "sodium": 28.9923333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_500",
+    "name": "Doce, de abóbora, cremoso",
+    "calories": 198.936063049634,
+    "protein": 0.916666666666667,
+    "carbs": 54.6133333333333,
+    "fat": 0.206666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_501",
+    "name": "Doce, de leite, cremoso",
+    "calories": 306.310130231059,
+    "protein": 5.47829343159994,
+    "carbs": 59.4933732350667,
+    "fat": 5.993,
+    "sodium": 120.088666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_502",
+    "name": "Geléia, mocotó, natural",
+    "calories": 106.086666666667,
+    "protein": 2.125,
+    "carbs": 24.2316666666667,
+    "fat": 0.073333333333333,
+    "sodium": 42.6803333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_503",
+    "name": "Glicose de milho",
+    "calories": 292.118405299187,
+    "protein": 0,
+    "carbs": 79.38,
+    "fat": 0,
+    "sodium": 58.9296666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_504",
+    "name": "Maria mole",
+    "calories": 301.235887537,
+    "protein": 3.81285013103485,
+    "carbs": 73.5534832022985,
+    "fat": 0.19,
+    "sodium": 15.3093333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_505",
+    "name": "Maria mole, coco queimado",
+    "calories": 306.631896997019,
+    "protein": 3.93495013523102,
+    "carbs": 75.0593831981023,
+    "fat": 0.089333333333333,
+    "sodium": 14.2873333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_506",
+    "name": "Marmelada",
+    "calories": 257.241473193804,
+    "protein": 0.4,
+    "carbs": 70.7633333333333,
+    "fat": 0.137333333333333,
+    "sodium": 10.8836666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_507",
+    "name": "Mel, de abelha",
+    "calories": 309.242666666667,
+    "protein": 0,
+    "carbs": 84.0333333333333,
+    "fat": 0,
+    "sodium": 6.04,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_508",
+    "name": "Melado",
+    "calories": 296.506491231918,
+    "protein": 0,
+    "carbs": 76.6166666666667,
+    "fat": 0,
+    "sodium": 4.01,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_509",
+    "name": "Quindim",
+    "calories": 411.348721570849,
+    "protein": 4.7375,
+    "carbs": 46.2988333333333,
+    "fat": 24.425,
+    "sodium": 27.366,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_510",
+    "name": "Rapadura",
+    "calories": 351.958122101545,
+    "protein": 0.989583333333333,
+    "carbs": 90.7924166666667,
+    "fat": 0.070666666666667,
+    "sodium": 21.7106666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_511",
+    "name": "Café, pó, torrado",
+    "calories": 418.618666666667,
+    "protein": 14.7,
+    "carbs": 65.7533333333333,
+    "fat": 11.9466666666667,
+    "sodium": 1.13333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_512",
+    "name": "Capuccino, pó",
+    "calories": 417.406666666667,
+    "protein": 11.3125,
+    "carbs": 73.6141666666667,
+    "fat": 8.63333333333333,
+    "sodium": 382.286666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_513",
+    "name": "Fermento em pó, químico",
+    "calories": 89.7220666511218,
+    "protein": 0.475333318710327,
+    "carbs": 43.9113333479563,
+    "fat": 0.073333333333333,
+    "sodium": 10052.4113333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_514",
+    "name": "Fermento, biológico, levedura, tablete",
+    "calories": 89.7948670305889,
+    "protein": 16.9569994783401,
+    "carbs": 7.69866718832652,
+    "fat": 1.51766666666667,
+    "sodium": 39.6106666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_515",
+    "name": "Gelatina, sabores variados, pó",
+    "calories": 380.2229,
+    "protein": 8.88666666666667,
+    "carbs": 89.2233333333333,
+    "fat": 0,
+    "sodium": 234.923333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_516",
+    "name": "Sal, dietético",
+    "calories": 0,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 0,
+    "sodium": 23431.5216666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_517",
+    "name": "Sal, grosso",
+    "calories": 0,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 0,
+    "sodium": 39943.203,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_518",
+    "name": "Shoyu",
+    "calories": 60.9277498753866,
+    "protein": 3.3125,
+    "carbs": 11.6475,
+    "fat": 0.326666666666667,
+    "sodium": 5024.20833333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_519",
+    "name": "Tempero a base de sal",
+    "calories": 21.33,
+    "protein": 2.66666666666667,
+    "carbs": 2.07333333333334,
+    "fat": 0.263333333333333,
+    "sodium": 32560,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_520",
+    "name": "Azeitona, preta, conserva",
+    "calories": 194.153847020984,
+    "protein": 1.1625,
+    "carbs": 5.5445,
+    "fat": 20.345,
+    "sodium": 1566.661,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_521",
+    "name": "Azeitona, verde, conserva",
+    "calories": 136.93643,
+    "protein": 0.947916666666667,
+    "carbs": 4.10175,
+    "fat": 14.2156666666667,
+    "sodium": 1347.17766666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_522",
+    "name": "Chantilly, spray, com gordura vegetal",
+    "calories": 314.956000266667,
+    "protein": 0.525,
+    "carbs": 16.8550000666667,
+    "fat": 27.2706666666667,
+    "sodium": 109.703666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_523",
+    "name": "Leite, de coco",
+    "calories": 166.160301615546,
+    "protein": 1.0140667031606,
+    "carbs": 2.19459996350605,
+    "fat": 18.3643333333333,
+    "sodium": 44.2946666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_524",
+    "name": "Maionese, tradicional com ovos",
+    "calories": 302.152677687824,
+    "protein": 0.58125,
+    "carbs": 7.89975,
+    "fat": 30.4976666666667,
+    "sodium": 786.827333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_525",
+    "name": "Acarajé",
+    "calories": 289.211666666667,
+    "protein": 8.34583333333334,
+    "carbs": 19.1138333333333,
+    "fat": 19.9303333333333,
+    "sodium": 304.888666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_526",
+    "name": "Arroz carreteiro",
+    "calories": 153.772,
+    "protein": 10.8291666666667,
+    "carbs": 11.5848333333333,
+    "fat": 7.124,
+    "sodium": 1621.728,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_527",
+    "name": "Baião de dois, arroz e feijão-de-corda",
+    "calories": 135.681333333333,
+    "protein": 6.23958333333333,
+    "carbs": 20.41775,
+    "fat": 3.228,
+    "sodium": 93.2996666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_528",
+    "name": "Barreado",
+    "calories": 164.975234047413,
+    "protein": 18.26875,
+    "carbs": 0.23625,
+    "fat": 9.534,
+    "sodium": 47.6273333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_529",
+    "name": "Bife à cavalo, com contra filé",
+    "calories": 291.229509244959,
+    "protein": 23.6604166666667,
+    "carbs": 0,
+    "fat": 21.1466666666667,
+    "sodium": 82.8746666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_530",
+    "name": "Bolinho de arroz",
+    "calories": 273.514333333333,
+    "protein": 8.03958333333333,
+    "carbs": 41.68275,
+    "fat": 8.29166666666667,
+    "sodium": 58.8573333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_531",
+    "name": "Camarão à baiana",
+    "calories": 100.783043004036,
+    "protein": 7.94166666666667,
+    "carbs": 3.17366666666667,
+    "fat": 5.96766666666667,
+    "sodium": 84.7866666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_532",
+    "name": "Charuto, de repolho",
+    "calories": 78.2347292222182,
+    "protein": 6.77916666666667,
+    "carbs": 10.1331666666667,
+    "fat": 1.11666666666667,
+    "sodium": 12.1006666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_533",
+    "name": "Cuscuz, de milho, cozido com sal",
+    "calories": 113.459481666667,
+    "protein": 2.15625,
+    "carbs": 25.2814166666667,
+    "fat": 0.679666666666667,
+    "sodium": 247.666,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_534",
+    "name": "Cuscuz, paulista",
+    "calories": 142.123,
+    "protein": 2.55833333333333,
+    "carbs": 22.5136666666667,
+    "fat": 4.64833333333333,
+    "sodium": 235.709666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_535",
+    "name": "Cuxá, molho",
+    "calories": 80.0916156365077,
+    "protein": 5.64375,
+    "carbs": 5.73891666666667,
+    "fat": 3.59266666666667,
+    "sodium": 1344.29466666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_536",
+    "name": "Dobradinha",
+    "calories": 124.500200833333,
+    "protein": 19.7729166666667,
+    "carbs": 0,
+    "fat": 4.44233333333333,
+    "sodium": 28.7736666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_537",
+    "name": "Estrogonofe de carne",
+    "calories": 173.141364318013,
+    "protein": 15.03125,
+    "carbs": 2.97541666666667,
+    "fat": 10.803,
+    "sodium": 122.848,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_538",
+    "name": "Estrogonofe de frango",
+    "calories": 156.806103013237,
+    "protein": 17.5520833333333,
+    "carbs": 2.59391666666666,
+    "fat": 7.96233333333333,
+    "sodium": 99.455,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_539",
+    "name": "Feijão tropeiro mineiro",
+    "calories": 151.561856830955,
+    "protein": 10.1708333333333,
+    "carbs": 19.5818333333333,
+    "fat": 6.79066666666667,
+    "sodium": 365.074333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_540",
+    "name": "Feijoada",
+    "calories": 116.933457311034,
+    "protein": 8.67083333333333,
+    "carbs": 11.6418333333333,
+    "fat": 6.47733333333333,
+    "sodium": 278.220333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_541",
+    "name": "Frango, com açafrão",
+    "calories": 112.783768841227,
+    "protein": 9.69791666666667,
+    "carbs": 4.06208333333333,
+    "fat": 6.17,
+    "sodium": 28.812,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_542",
+    "name": "Macarrão, molho bolognesa",
+    "calories": 119.53177144556,
+    "protein": 4.93429983488719,
+    "carbs": 22.5223668317795,
+    "fat": 0.889666666666667,
+    "sodium": 8.93933333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_543",
+    "name": "Maniçoba",
+    "calories": 134.222893400987,
+    "protein": 9.95833333333333,
+    "carbs": 3.41933333333333,
+    "fat": 8.69933333333333,
+    "sodium": 406.704333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_544",
+    "name": "Quibebe",
+    "calories": 86.349230299592,
+    "protein": 8.55625,
+    "carbs": 6.64408333333332,
+    "fat": 2.672,
+    "sodium": 246.614,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_545",
+    "name": "Salada, de legumes, com maionese",
+    "calories": 96.1035883984566,
+    "protein": 1.05,
+    "carbs": 8.92399999999999,
+    "fat": 7.039,
+    "sodium": 228.425666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_546",
+    "name": "Salada, de legumes, cozida no vapor",
+    "calories": 35.4081042984724,
+    "protein": 2.00625,
+    "carbs": 7.08908333333334,
+    "fat": 0.311666666666667,
+    "sodium": 2.50966666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_547",
+    "name": "Salpicão, de frango",
+    "calories": 147.864596134027,
+    "protein": 13.925,
+    "carbs": 4.56899999999999,
+    "fat": 7.84066666666667,
+    "sodium": 248.345666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_548",
+    "name": "Sarapatel",
+    "calories": 122.981858212431,
+    "protein": 18.4729166666667,
+    "carbs": 1.09408333333334,
+    "fat": 4.42,
+    "sodium": 215.622666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_549",
+    "name": "Tabule",
+    "calories": 57.4534766884806,
+    "protein": 2.04632997322083,
+    "carbs": 10.5810033601125,
+    "fat": 1.208,
+    "sodium": 1.192,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_550",
+    "name": "Tacacá",
+    "calories": 46.8891771512032,
+    "protein": 6.95833333333334,
+    "carbs": 3.39,
+    "fat": 0.359666666666667,
+    "sodium": 1349.06266666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_551",
+    "name": "Tapioca, com manteiga",
+    "calories": 347.826556257824,
+    "protein": 0.089583333333333,
+    "carbs": 63.59175,
+    "fat": 10.9083333333333,
+    "sodium": 157.524333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_552",
+    "name": "Tucupi, com pimenta-de-cheiro",
+    "calories": 27.1837984027266,
+    "protein": 2.05625,
+    "carbs": 4.73774999999999,
+    "fat": 0.283666666666667,
+    "sodium": 5.131,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_553",
+    "name": "Vaca atolada",
+    "calories": 144.89697968479,
+    "protein": 5.12291666666667,
+    "carbs": 10.0614166666667,
+    "fat": 9.322,
+    "sodium": 25.6336666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_554",
+    "name": "Vatapá",
+    "calories": 254.893285724155,
+    "protein": 5.99783354918162,
+    "carbs": 9.74849978415172,
+    "fat": 23.2263333333333,
+    "sodium": 879.850666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_555",
+    "name": "Virado à paulista",
+    "calories": 306.94678645132,
+    "protein": 10.18125,
+    "carbs": 14.1090833333333,
+    "fat": 25.5906666666667,
+    "sodium": 345.526,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_556",
+    "name": "Yakisoba",
+    "calories": 112.802041253408,
+    "protein": 7.51666666666667,
+    "carbs": 18.2513333333333,
+    "fat": 2.607,
+    "sodium": 793.762,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_557",
+    "name": "Amendoim, grão, cru",
+    "calories": 544.052655799433,
+    "protein": 27.1908001899719,
+    "carbs": 20.3135333333333,
+    "fat": 43.85,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_558",
+    "name": "Amendoim, torrado, salgado",
+    "calories": 605.781092917019,
+    "protein": 22.4751801570257,
+    "carbs": 18.702486509641,
+    "fat": 53.9633333333333,
+    "sodium": 375.732666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_559",
+    "name": "Ervilha, em vagem",
+    "calories": 88.0935819997785,
+    "protein": 7.45208333333333,
+    "carbs": 14.2275833333333,
+    "fat": 0.471,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_560",
+    "name": "Ervilha, enlatada, drenada",
+    "calories": 73.8447043478261,
+    "protein": 4.59782608695652,
+    "carbs": 13.4421739130435,
+    "fat": 0.38,
+    "sodium": 372.109666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_561",
+    "name": "Feijão, carioca, cozido",
+    "calories": 76.4240856666667,
+    "protein": 4.775,
+    "carbs": 13.5910333333333,
+    "fat": 0.542333333333333,
+    "sodium": 1.759,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_562",
+    "name": "Feijão, carioca, cru",
+    "calories": 329.026736231884,
+    "protein": 19.981884057971,
+    "carbs": 61.2214492753623,
+    "fat": 1.25666666666667,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_563",
+    "name": "Feijão, fradinho, cozido",
+    "calories": 78.0088966666667,
+    "protein": 5.09375,
+    "carbs": 13.4995833333333,
+    "fat": 0.644,
+    "sodium": 0.982,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_564",
+    "name": "Feijão, fradinho, cru",
+    "calories": 339.164766666667,
+    "protein": 20.2083333333333,
+    "carbs": 61.24,
+    "fat": 2.365,
+    "sodium": 10.3136666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_565",
+    "name": "Feijão, jalo, cozido",
+    "calories": 92.73992,
+    "protein": 6.14375,
+    "carbs": 16.49525,
+    "fat": 0.512,
+    "sodium": 0.520333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_566",
+    "name": "Feijão, jalo, cru",
+    "calories": 327.905266666667,
+    "protein": 20.1041666666667,
+    "carbs": 61.4791666666667,
+    "fat": 0.946666666666667,
+    "sodium": 24.5803333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_567",
+    "name": "Feijão, preto, cozido",
+    "calories": 77.0272666666667,
+    "protein": 4.47916666666667,
+    "carbs": 14.0051666666667,
+    "fat": 0.535666666666667,
+    "sodium": 1.854,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_568",
+    "name": "Feijão, preto, cru",
+    "calories": 323.565711594203,
+    "protein": 21.3442028985507,
+    "carbs": 58.752463768116,
+    "fat": 1.24,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_569",
+    "name": "Feijão, rajado, cozido",
+    "calories": 84.7018527334929,
+    "protein": 5.5375,
+    "carbs": 15.2675,
+    "fat": 0.4,
+    "sodium": 0.687,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_570",
+    "name": "Feijão, rajado, cru",
+    "calories": 325.844411162734,
+    "protein": 17.2708333333333,
+    "carbs": 62.9291666666667,
+    "fat": 1.17,
+    "sodium": 13.6503333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_571",
+    "name": "Feijão, rosinha, cozido",
+    "calories": 67.8662287714283,
+    "protein": 4.53958333333333,
+    "carbs": 11.82275,
+    "fat": 0.477333333333333,
+    "sodium": 2.08066666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_572",
+    "name": "Feijão, rosinha, cru",
+    "calories": 336.961911127567,
+    "protein": 20.9166666666667,
+    "carbs": 62.2233333333333,
+    "fat": 1.33,
+    "sodium": 24.1143333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_573",
+    "name": "Feijão, roxo, cozido",
+    "calories": 76.8933823179006,
+    "protein": 5.72083333333333,
+    "carbs": 12.9081666666667,
+    "fat": 0.538333333333333,
+    "sodium": 1.457,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_574",
+    "name": "Feijão, roxo, cru",
+    "calories": 331.414977456729,
+    "protein": 22.1666666666667,
+    "carbs": 59.9866666666667,
+    "fat": 1.23666666666667,
+    "sodium": 9.75766666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_575",
+    "name": "Grão-de-bico, cru",
+    "calories": 354.7028765891,
+    "protein": 21.2291666666667,
+    "carbs": 57.8841666666667,
+    "fat": 5.43,
+    "sodium": 5.194,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_576",
+    "name": "Guandu, cru",
+    "calories": 344.133651284993,
+    "protein": 18.9645833333333,
+    "carbs": 64.0004166666667,
+    "fat": 2.132,
+    "sodium": 1.617,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_577",
+    "name": "Lentilha, cozida",
+    "calories": 92.6387662522992,
+    "protein": 6.31041666666667,
+    "carbs": 16.30225,
+    "fat": 0.524666666666667,
+    "sodium": 1.17633333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_578",
+    "name": "Lentilha, crua",
+    "calories": 339.141240203553,
+    "protein": 23.1521739130435,
+    "carbs": 62.0044927536232,
+    "fat": 0.77,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_579",
+    "name": "Paçoca, amendoim",
+    "calories": 486.927086464524,
+    "protein": 15.9958333333333,
+    "carbs": 52.3761666666667,
+    "fat": 26.0753333333333,
+    "sodium": 166.840666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_580",
+    "name": "Pé-de-moleque, amendoim",
+    "calories": 503.190365839956,
+    "protein": 13.1622400919596,
+    "carbs": 54.730426574707,
+    "fat": 28.0483333333333,
+    "sodium": 16.3453333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_581",
+    "name": "Soja, farinha",
+    "calories": 403.955845810399,
+    "protein": 36.0301002407074,
+    "carbs": 38.4398997592926,
+    "fat": 14.6333333333333,
+    "sodium": 5.75366666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_582",
+    "name": "Soja, extrato solúvel, natural, fluido",
+    "calories": 39.1048552753508,
+    "protein": 2.38107001590729,
+    "carbs": 4.27526333333334,
+    "fat": 1.606,
+    "sodium": 56.528,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_583",
+    "name": "Soja, extrato solúvel, pó",
+    "calories": 458.895729437868,
+    "protein": 35.6875002384186,
+    "carbs": 28.4828333333333,
+    "fat": 26.181,
+    "sodium": 83.471,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_584",
+    "name": "Soja, queijo (tofu)",
+    "calories": 64.4850940738902,
+    "protein": 6.55317671044668,
+    "carbs": 2.12682333333333,
+    "fat": 3.95333333333333,
+    "sodium": 1.21366666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_585",
+    "name": "Tremoço, cru",
+    "calories": 381.278173960129,
+    "protein": 33.575,
+    "carbs": 43.7863333333333,
+    "fat": 10.342,
+    "sodium": 3.29066666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_586",
+    "name": "Tremoço, em conserva",
+    "calories": 120.642585344871,
+    "protein": 11.1083333333333,
+    "carbs": 12.3893333333333,
+    "fat": 3.784,
+    "sodium": 1808.75766666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_587",
+    "name": "Amêndoa, torrada, salgada",
+    "calories": 580.746954556071,
+    "protein": 18.5547593851089,
+    "carbs": 29.54724,
+    "fat": 47.3243333333333,
+    "sodium": 278.522666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_588",
+    "name": "Castanha-de-caju, torrada, salgada",
+    "calories": 570.167626501619,
+    "protein": 18.5093673327764,
+    "carbs": 29.134966000557,
+    "fat": 46.2796666666667,
+    "sodium": 125,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_589",
+    "name": "Castanha-do-Brasil, crua",
+    "calories": 642.963071681069,
+    "protein": 14.53634010156,
+    "carbs": 15.07865989844,
+    "fat": 63.459,
+    "sodium": 0.654,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_590",
+    "name": "Coco, cru",
+    "calories": 406.48735310781,
+    "protein": 3.69183412310697,
+    "carbs": 10.401665876893,
+    "fat": 41.9763333333333,
+    "sodium": 15.32,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_591",
+    "name": "Coco, verde, cru",
+    "calories": 0,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 0,
+    "sodium": 0,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_592",
+    "name": "Farinha, de mesocarpo de babaçu, crua",
+    "calories": 328.771400244834,
+    "protein": 1.40626671727498,
+    "carbs": 79.1730666160584,
+    "fat": 0.198,
+    "sodium": 12.463,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_593",
+    "name": "Gergelim, semente",
+    "calories": 583.54671475455,
+    "protein": 21.1646674283346,
+    "carbs": 21.6176659049988,
+    "fat": 50.4326666666667,
+    "sodium": 2.575,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_594",
+    "name": "Linhaça, semente",
+    "calories": 495.096113843651,
+    "protein": 14.0838671735128,
+    "carbs": 43.3121994931539,
+    "fat": 32.2529333333333,
+    "sodium": 8.67333333333333,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_595",
+    "name": "Pinhão, cozido",
+    "calories": 174.369902,
+    "protein": 2.98036666666667,
+    "carbs": 43.9176333333333,
+    "fat": 0.747,
+    "sodium": 0.862666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_596",
+    "name": "Pupunha, cozida",
+    "calories": 218.533880876601,
+    "protein": 2.52291666666667,
+    "carbs": 29.5694166666667,
+    "fat": 12.7616666666667,
+    "sodium": 0.908666666666667,
+    "unit_weight": 100
+  },
+  {
+    "id": "taco_597",
+    "name": "Noz, crua",
+    "calories": 620.060019790567,
+    "protein": 13.9708005027771,
+    "carbs": 18.3638661638896,
+    "fat": 59.3596666666667,
+    "sodium": 4.57066666666667,
+    "unit_weight": 100
+  }
+]

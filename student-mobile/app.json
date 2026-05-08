@@ -37,6 +37,9 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
         "android.permission.SCHEDULE_EXACT_ALARM"
       ]
     },
@@ -70,6 +73,12 @@
       "eas": {
         "projectId": "4b43fac9-1a1e-44f2-af06-2713a3e3e1b0"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4b43fac9-1a1e-44f2-af06-2713a3e3e1b0"
     }
   }
 }
