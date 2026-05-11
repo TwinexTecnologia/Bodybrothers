@@ -27,7 +27,7 @@
     },
     "android": {
       "package": "com.twinex.fitbodypro",
-      "versionCode": 10,
+      "versionCode": 14,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
