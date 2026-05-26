@@ -1,7 +1,9 @@
 
+import tacoData from './taco.json';
+
 // Tabela TACO / USDA simplificada para alimentos naturais comuns
 // Valores por 100g
-export const commonFoods = [
+const basicFoods = [
     // Frutas (Sódio estimado: ~1mg/100g)
     { id: 'local_banana_prata', name: 'Banana Prata', calories: 98, protein: 1.3, carbs: 26.0, fat: 0.1, unit_weight: 80, sodium: 1 }, 
     { id: 'local_banana_nanica', name: 'Banana Nanica', calories: 92, protein: 1.4, carbs: 23.8, fat: 0.1, unit_weight: 100, sodium: 1 },
@@ -104,3 +106,18 @@ export const commonFoods = [
     { id: 'local_whey', name: 'Whey Protein (Padrão)', calories: 400, protein: 80.0, carbs: 10.0, fat: 5.0, unit_weight: 30, sodium: 150 }, // Varia
     { id: 'local_creatina', name: 'Creatina Monohidratada', calories: 0, protein: 0.0, carbs: 0.0, fat: 0.0, unit_weight: 5, sodium: 0 },
 ]
+
+export const commonFoods = [
+    ...basicFoods,
+    ...tacoData.map(food => ({
+        id: food.id,
+        name: food.name,
+        calories: food.calories,
+        protein: food.protein,
+        carbs: food.carbs,
+        fat: food.fat,
+        sodium: food.sodium,
+        unit_weight: food.unit_weight,
+        source: 'taco'
+    }))
+];

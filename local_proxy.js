@@ -37,20 +37,22 @@ const server = http.createServer(async (req, res) => {
 
                 // CORREÇÃO DEFINITIVA DA ASSINATURA OAUTH 1.0 (RFC 3986)
                 
+                // 1. Função rigorosa de Encoding RFC 3986
                 function fixedEncodeURIComponent(str) {
+                    if (str === null || str === undefined) return '';
                     return encodeURIComponent(str).replace(/[!'()*]/g, function(c) {
-                        return '%' + c.charCodeAt(0).toString(16).toUpperCase();
+                      return '%' + c.charCodeAt(0).toString(16).toUpperCase();
                     });
                 }
 
-                // Parâmetros base
+                // 1. Definir parâmetros OAuth 1.0
                 const oauthParams = {
+                    format: 'json',
                     oauth_consumer_key: CLIENT_ID,
                     oauth_nonce: crypto.randomBytes(16).toString('hex'),
                     oauth_signature_method: 'HMAC-SHA1',
                     oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-                    oauth_version: '1.0',
-                    format: 'json' // Format deve participar da assinatura
+                    oauth_version: '1.0'
                 };
 
                 // Adiciona parâmetros específicos
@@ -66,38 +68,34 @@ const server = http.createServer(async (req, res) => {
                 // 1. Sort Keys e Encoding (Parameter String)
                 // A ordem alfabética é CRUCIAL
                 const sortedKeys = Object.keys(oauthParams).sort();
-                const encodedParams = sortedKeys.map(key => {
-                    return fixedEncodeURIComponent(key) + '=' + fixedEncodeURIComponent(oauthParams[key]);
-                });
-                const paramString = encodedParams.join('&');
+                const paramString = sortedKeys
+                    .map(key => fixedEncodeURIComponent(key) + '=' + fixedEncodeURIComponent(oauthParams[key]))
+                    .join('&');
 
-                // 2. Base String Construction
-                // POST&url_encoded&params_encoded
-                const methodHttp = 'POST';
-                const baseUrl = 'https://platform.fatsecret.com/rest/server.api';
-
-                const baseString = methodHttp.toUpperCase() + '&' + 
-                                   fixedEncodeURIComponent(baseUrl) + '&' + 
-                                   fixedEncodeURIComponent(paramString);
+                // 3. Montar Base String
+                // Formato exigido: HTTP_METHOD & URL_ENCODED & PARAM_STRING_ENCODED
+                const httpMethod = 'POST';
+                const baseUrl = 'http://platform.fatsecret.com/rest/server.api';
+                const baseString = [
+                    httpMethod,
+                    fixedEncodeURIComponent(baseUrl),
+                    fixedEncodeURIComponent(paramString)
+                ].join('&');
 
                 // 3. Signing Key
                 // Consumer Secret + & + Token Secret (vazio neste caso)
                 const signingKey = fixedEncodeURIComponent(CLIENT_SECRET) + '&';
 
-                // 4. Calculate Signature
-                const hmac = crypto.createHmac('sha1', signingKey);
-                hmac.update(baseString);
-                const signature = hmac.digest('base64');
-
-                // 5. Adicionar assinatura aos parâmetros para envio
-                // A assinatura NÃO entra na base string, apenas no envio final
-                const finalParams = { ...oauthParams, oauth_signature: signature };
+                // 4. Gerar Assinatura (HMAC-SHA1)
+                const signature = crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
+                
+                // 5. Adicionar assinatura aos parâmetros
+                oauthParams.oauth_signature = signature;
 
                 // 6. Preparar corpo da requisição (x-www-form-urlencoded)
-                const bodyParams = new URLSearchParams();
-                for (const [key, value] of Object.entries(finalParams)) {
-                    bodyParams.append(key, value);
-                }
+                const bodyStr = Object.keys(oauthParams)
+                    .map(key => fixedEncodeURIComponent(key) + '=' + fixedEncodeURIComponent(oauthParams[key]))
+                    .join('&');
 
                 console.log('[Proxy] BaseString:', baseString);
                 console.log('[Proxy] Signature:', signature);
@@ -108,25 +106,11 @@ const server = http.createServer(async (req, res) => {
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
                     },
-                    body: bodyParams
+                    body: bodyStr
                 });
-
-                if (!response.ok) {
-                    throw new Error(`FatSecret API Error: ${response.status} ${response.statusText}`);
-                }
-
-                const data = await response.json();
                 
-                // Log da resposta (resumido)
-                if (data.error) {
-                    console.error('[Proxy] Erro da API FatSecret:', data.error.message);
-                } else if (data.foods) {
-                    console.log(`[Proxy] Sucesso! Encontrados ${data.foods.total_results || 0} alimentos.`);
-                } else if (data.food) {
-                    console.log(`[Proxy] Sucesso! Detalhes de ${data.food.food_name} obtidos.`);
-                } else {
-                    console.log('[Proxy] Resposta inesperada:', JSON.stringify(data).substring(0, 100));
-                }
+                const data = await response.json();
+                console.log('[Proxy] Resultado do FatSecret:', JSON.stringify(data).substring(0, 100) + '...');
                 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(data));

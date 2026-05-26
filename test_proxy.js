@@ -3,7 +3,8 @@ const http = require('http');
 
 const data = JSON.stringify({
   method: 'foods.search',
-  search_expression: 'batata'
+  search_expression: 'Pão',
+  max_results: 50
 });
 
 const options = {

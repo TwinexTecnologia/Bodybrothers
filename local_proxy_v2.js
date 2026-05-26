@@ -9,6 +9,7 @@ const CONSUMER_SECRET = 'a14bfc4a3d6042a99157ff329b0537ea';
 
 // Função de Encode RFC 3986 Estrita
 function percentEncode(str) {
+  if (str === null || str === undefined) return '';
   return encodeURIComponent(str)
     .replace(/!/g, '%21')
     .replace(/\*/g, '%2A')
@@ -63,8 +64,8 @@ const server = http.createServer(async (req, res) => {
                     .join('&');
 
                 // 3. Base String
-                const method = 'POST';
-                const url = 'https://platform.fatsecret.com/rest/server.api';
+                const method = 'GET';
+                const url = 'http://platform.fatsecret.com/rest/server.api';
                 const baseString = `${method}&${percentEncode(url)}&${percentEncode(paramString)}`;
 
                 // 4. Signing Key
@@ -77,20 +78,17 @@ const server = http.createServer(async (req, res) => {
 
                 params.oauth_signature = signature;
 
-                // 6. Send
-                const postData = new URLSearchParams();
-                for (const key in params) {
-                    postData.append(key, params[key]);
-                }
-                const postDataStr = postData.toString();
+                // 6. Send via Query String to test
+                const queryStr = Object.keys(params)
+                  .map(key => `${percentEncode(key)}=${percentEncode(params[key])}`)
+                  .join('&');
 
-                console.log('[Proxy] Sending to FatSecret...');
+                console.log('[Proxy] Sending to FatSecret via Query String...');
 
-                const apiReq = https.request('https://platform.fatsecret.com/rest/server.api', {
-                    method: 'POST',
+                const apiReq = http.request(`http://platform.fatsecret.com/rest/server.api?${queryStr}`, {
+                    method: 'GET',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'Content-Length': Buffer.byteLength(postDataStr)
+                        'Content-Type': 'application/json'
                     }
                 }, (apiRes) => {
                     let apiBody = '';
@@ -108,7 +106,6 @@ const server = http.createServer(async (req, res) => {
                     res.end(JSON.stringify({ error: e.message }));
                 });
 
-                apiReq.write(postDataStr);
                 apiReq.end();
 
             } catch (e) {

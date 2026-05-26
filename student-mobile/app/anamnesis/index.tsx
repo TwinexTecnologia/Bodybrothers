@@ -25,10 +25,14 @@ type AnamnesisModel = {
 
 type AnamnesisResponse = {
   id: string
+  title: string
   created_at: string
+  personal_id?: string
   data: {
     modelId: string
     answers: Record<string, any>
+    modelTitle?: string
+    questions?: Question[]
   }
   renew_in_days?: number
 }
@@ -87,7 +91,9 @@ export default function AnamnesisList() {
 
         setResponses((responsesData || []).map(d => ({
             id: d.id,
+            title: d.title,
             created_at: d.created_at,
+            personal_id: d.personal_id,
             data: d.data,
             renew_in_days: d.renew_in_days
         })));
@@ -120,6 +126,15 @@ export default function AnamnesisList() {
 
   const handleViewResponse = (responseId: string, modelId: string) => {
       router.push({ pathname: '/anamnesis/view', params: { responseId, modelId } });
+  };
+
+  const getResponseTitle = (response: AnamnesisResponse) => {
+      return (
+          models.find(m => m.id === response.data.modelId)?.title ||
+          response.data.modelTitle ||
+          response.title?.replace(/^Resposta:\s*/i, '') ||
+          'Anamnese'
+      );
   };
 
   return (
@@ -231,7 +246,7 @@ export default function AnamnesisList() {
                  </View>
              ) : (
                  responses.map(r => {
-                     const modelTitle = models.find(m => m.id === r.data.modelId)?.title || 'Anamnese (Modelo removido)';
+                     const modelTitle = getResponseTitle(r);
                      return (
                         <TouchableOpacity 
                             key={r.id} 

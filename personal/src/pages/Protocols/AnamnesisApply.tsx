@@ -89,7 +89,17 @@ export default function AnamnesisApply() {
       }
     }
     
-    await addResponse({ personalId, studentId, modelId: currentModel.id, answers, renewEveryDays, countFromDate: countFromDate || undefined, dueDate })
+    await addResponse({
+      personalId,
+      studentId,
+      modelId: currentModel.id,
+      modelTitle: currentModel.name,
+      questions: currentModel.questions,
+      answers,
+      renewEveryDays,
+      countFromDate: countFromDate || undefined,
+      dueDate
+    })
     
     setMsg('Anamnese registrada com sucesso!')
     setAnswers({})
@@ -101,7 +111,10 @@ export default function AnamnesisApply() {
   }
 
   // Helper para buscar nome do modelo na lista (evita request extra)
-  const getModelName = (id: string) => models.find(m => m.id === id)?.name || 'Modelo desconhecido'
+  const getModelName = (response: AnamnesisResponse) =>
+    models.find(m => m.id === response.modelId)?.name ||
+    response.modelTitle ||
+    'Modelo desconhecido'
 
   if (loading) return <div>Carregando...</div>
 
@@ -326,7 +339,7 @@ export default function AnamnesisApply() {
               <div key={r.id} className="form-card" style={{ padding: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <strong>{getModelName(r.modelId)}</strong>
+                    <strong>{getModelName(r)}</strong>
                     <div style={{ color: '#64748b' }}>Aplicada em: {new Date(r.createdAt).toLocaleString()}</div>
                     {r.dueDate && <div style={{ color: '#dc2626', fontSize: 12 }}>Vence em: {new Date(r.dueDate).toLocaleDateString()}</div>}
                   </div>

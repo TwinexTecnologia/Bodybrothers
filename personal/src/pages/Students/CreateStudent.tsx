@@ -3,20 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { addStudent } from '../../store/students'
 import { listPlans, type PlanRecord } from '../../store/plans'
 import { supabase } from '../../lib/supabase'
-import { createClient } from '@supabase/supabase-js'
-
-// Cria um cliente secundário ISOLADO para não deslogar o personal ao criar aluno
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-// Cliente descartável que não salva sessão no localStorage
-const supabaseCreator = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: false, // Isso impede que o login do novo aluno sobrescreva o do personal!
-    autoRefreshToken: false,
-    detectSessionInUrl: false
-  }
-})
+import { createStudentAuthUser } from '../../lib/studentAuth'
 
 export default function CreateStudent() {
   const [searchParams] = useSearchParams()
@@ -78,89 +65,45 @@ export default function CreateStudent() {
   const save = async () => {
     if (!name.trim() || !email.trim()) return setMsg('Preencha nome e email')
     if (!personalId) return setMsg('Erro: Personal não identificado.')
+    if (tempPassword && tempPassword.length < 6) return setMsg('A senha deve ter no mínimo 6 caracteres.')
 
     setLoading(true)
     setMsg('')
 
     try {
-       console.log('Tentando criar usuário:', { email, personalId })
-       
-       // Usa o cliente ISOLADO para criar o usuário
-       const { data, error } = await supabaseCreator.auth.signUp({
-            email,
-            password: tempPassword || 'mudar123',
-            options: {
-                data: {
-                    full_name: name,
-                    role: 'aluno',
-                    personal_id: personalId,
-                    created_by: personalId
-                }
+        const passwordToUse = tempPassword.trim() || 'mudar123'
+
+        await createStudentAuthUser({
+            personalId,
+            name: name.trim(),
+            email: email.trim(),
+            password: passwordToUse,
+            profileData: {
+                email: email.trim(),
+                whatsapp,
+                address: { cep, street, neighborhood, city, state, number, complement },
+                planId: planId || undefined,
+                tempPassword: passwordToUse
             }
         })
 
-        console.log('Resposta do signUp:', { data, error })
-
-        if (error) throw error
-
-        if (data.user) {
-            console.log('Usuário Auth criado com ID:', data.user.id)
-            
-            // O cliente principal (Personal) ainda está logado e tem permissão para editar profiles
-            // Atualiza os dados extras do aluno recém-criado
-            const updates = {
-                data: {
-                    email: email, // Salva o email no JSON também para facilitar listagem
-                    whatsapp: whatsapp,
-                    address: { cep, street, neighborhood, city, state, number, complement },
-                    planId: planId || undefined,
-                    tempPassword: tempPassword
-                }
-            }
-            
-            // Tenta atualizar o profile. 
-            // O trigger handle_new_user DEVE ter criado o profile automaticamente.
-            
-            // Tenta criar/atualizar o profile MANUALMENTE para garantir
-            // Como o RLS está desativado, isso vai funcionar.
-            // Usamos upsert para cobrir tanto o caso de criação quanto atualização.
-            const { error: upsertError } = await supabase.from('profiles').upsert({
-                id: data.user.id,
-                full_name: name,
-                role: 'aluno',
-                personal_id: personalId,
-                data: updates.data
-            })
-            
-            if (upsertError) {
-                 console.error('Erro ao criar/atualizar profile:', upsertError)
-                 setMsg(`Aluno criado no Auth! (Erro no perfil: ${upsertError.message})`)
-            } else {
-                 setMsg('Aluno criado com sucesso!')
-                 // Limpa form apenas se deu tudo certo
-                 setName('')
-                 setEmail('')
-                 setWhatsapp('')
-                 setTempPassword('')
-                 setCep('')
-                 setStreet('')
-                 setNeighborhood('')
-                 setCity('')
-                 setState('')
-                 setNumber('')
-                 setComplement('')
-                 setPlanId('')
-            }
-        } else {
-            // Se data.user for null, pode ser que o signUp exija confirmação de email e não retornou sessão?
-            // Normalmente retorna user mesmo assim, mas com identity unverified.
-            console.warn('SignUp retornou sucesso mas sem data.user?')
-            setMsg('Aviso: Solicitação enviada, mas usuário não retornado imediatamente. Verifique seu email.')
-        }
+        setMsg('Aluno criado com sucesso!')
+        setName('')
+        setEmail('')
+        setWhatsapp('')
+        setTempPassword('')
+        setCep('')
+        setStreet('')
+        setNeighborhood('')
+        setCity('')
+        setState('')
+        setNumber('')
+        setComplement('')
+        setPlanId('')
 
     } catch (err: any) {
         console.error('Erro geral:', err)
-        if (err.message && err.message.includes('already registered')) {
+        if (err.message && (err.message.includes('already registered') || err.message.includes('already been registered'))) {
             setMsg('Erro: Este email já está cadastrado.')
         } else {
             setMsg(`Erro ao criar aluno: ${err.message || JSON.stringify(err)}`)
