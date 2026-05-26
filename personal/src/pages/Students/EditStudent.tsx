@@ -12,6 +12,7 @@ import { isStudentOverdue } from '../../lib/finance_utils'
 import Modal from '../../components/Modal'
 import { supabase } from '../../lib/supabase'
 import { generateDietPdf } from '../../lib/pdf'
+import { updateStudentAuthCredentials } from '../../lib/studentAuth'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -28,6 +29,8 @@ export default function EditStudent() {
   const [email, setEmail] = useState('')
   const [whatsapp, setWhatsapp] = useState('') // Adicionado estado para WhatsApp
   const [tempPassword, setTempPassword] = useState('')
+  const [initialTempPassword, setInitialTempPassword] = useState('')
+  const [initialEmail, setInitialEmail] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [cep, setCep] = useState('')
   const [street, setStreet] = useState('')
@@ -272,8 +275,10 @@ export default function EditStudent() {
         if (s) {
             setName(s.name)
             setEmail(s.email)
+            setInitialEmail(s.email)
             setWhatsapp(s.whatsapp || '') // Carrega whatsapp do campo raiz
             setTempPassword(s.tempPassword || '')
+            setInitialTempPassword(s.tempPassword || '')
             setCep(s.address?.cep || '')
             setStreet(s.address?.street || '')
             setNeighborhood(s.address?.neighborhood || '')
@@ -785,7 +790,7 @@ export default function EditStudent() {
 
     const newData = {
         name: name.trim(),
-        email: email,
+        email: email.trim(),
         whatsapp: whatsapp,
         planId: planId || undefined,
         planStartDate: planStartDate || undefined,
@@ -796,6 +801,23 @@ export default function EditStudent() {
 
     const changes: any = {}
     if (newData.name !== oldData.name) changes.name = { old: oldData.name, new: newData.name }
+
+    const trimmedPassword = tempPassword.trim()
+    const passwordChanged = Boolean(trimmedPassword) && trimmedPassword !== initialTempPassword
+    const emailChanged = newData.email !== initialEmail
+
+    if (passwordChanged && trimmedPassword.length < 6) {
+        setMsg('A senha deve ter no mínimo 6 caracteres.')
+        return
+    }
+
+    if (emailChanged || passwordChanged) {
+        await updateStudentAuthCredentials({
+            studentId: selectedId,
+            ...(emailChanged ? { email: newData.email } : {}),
+            ...(passwordChanged ? { password: trimmedPassword } : {}),
+        })
+    }
     
     // Converte para campos reais e JSON
     await updateStudent(selectedId, {
@@ -809,7 +831,7 @@ export default function EditStudent() {
       dietIds: newData.dietIds,
       workoutIds: orderedWorkoutIds,
       workoutSchedule,
-      tempPassword
+      ...(passwordChanged ? { tempPassword: trimmedPassword } : {})
     })
 
     // Atualiza também as colunas reais na tabela profiles para garantir compatibilidade
@@ -834,6 +856,8 @@ export default function EditStudent() {
     }
 
     setMsg('Aluno atualizado com sucesso!')
+    setInitialEmail(newData.email)
+    if (passwordChanged) setInitialTempPassword(trimmedPassword)
     setStudents(prev => prev.map(s => s.id === selectedId ? { ...s, name, email } : s))
   }
 
