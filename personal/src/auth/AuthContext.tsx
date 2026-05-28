@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = async () => {
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
     localStorage.removeItem('personal_branding') // Limpa branding ao sair
     localStorage.removeItem('personal_prefs')    // Limpa preferências ao sair (opcional, mas recomendado)
     setAuth(false)
