@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { listStudentsByPersonal } from '../../store/students'
 import { useNavigate } from 'react-router-dom'
 import { Toast, type ToastType } from '../../components/Toast'
+import { reviewAndReapplyAnamnesis } from '../../store/anamnesis'
 
 type PendingItem = {
     student: any;
@@ -17,6 +18,11 @@ type ReviewItem = {
     data: any;
 }
 
+type AnamnesisOption = {
+    id: string;
+    title: string;
+}
+
 export default function AnamnesisPending() {
     const navigate = useNavigate()
     const [pendingItems, setPendingItems] = useState<PendingItem[]>([])
@@ -25,12 +31,15 @@ export default function AnamnesisPending() {
     const [markingId, setMarkingId] = useState<string | null>(null)
     const [isReviewRequired, setIsReviewRequired] = useState(false)
     const [toast, setToast] = useState<{ msg: string, type: ToastType } | null>(null)
+    const [libraryModels, setLibraryModels] = useState<AnamnesisOption[]>([])
+    const [modelsById, setModelsById] = useState<Record<string, AnamnesisOption>>({})
     
     // Estados do Modal de Confirmação
-    const [confirmModal, setConfirmModal] = useState<{ open: boolean, item: ReviewItem | null, days: number }>({ 
+    const [confirmModal, setConfirmModal] = useState<{ open: boolean, item: ReviewItem | null, days: number, nextModelId: string }>({ 
         open: false, 
         item: null, 
-        days: 90 
+        days: 90,
+        nextModelId: ''
     })
 
     useEffect(() => {
@@ -60,6 +69,26 @@ export default function AnamnesisPending() {
                 const allModels = modelsRes.data || []
                 const allResponses = responsesRes.data || []
                 const activeStudents = students.filter(s => s.status === 'ativo')
+                const activeModelOptions = allModels
+                    .filter((model: any) => (model.status ?? 'active') === 'active')
+                    .map((model: any) => ({
+                        id: model.id,
+                        title: model.title || 'Sem título'
+                    }))
+                const libraryModelOptions = allModels
+                    .filter((model: any) => !model.student_id && (model.status ?? 'active') === 'active')
+                    .map((model: any) => ({
+                        id: model.id,
+                        title: model.title || 'Sem título'
+                    }))
+
+                setLibraryModels(libraryModelOptions)
+                setModelsById(
+                    activeModelOptions.reduce((acc: Record<string, AnamnesisOption>, model: AnamnesisOption) => {
+                        acc[model.id] = model
+                        return acc
+                    }, {})
+                )
                 
                 const resultPending: PendingItem[] = []
                 const resultReview: ReviewItem[] = []
@@ -151,15 +180,43 @@ export default function AnamnesisPending() {
 
     const handleOpenConfirm = (item: ReviewItem) => {
         const currentRenew = item.data.renew_in_days || 90
-        setConfirmModal({ open: true, item, days: currentRenew })
+        const currentModelId = item.data?.modelId
+        const hasCurrentOption = currentModelId && modelsById[currentModelId]
+        const nextModelId = hasCurrentOption
+            ? currentModelId
+            : (libraryModels[0]?.id || '')
+
+        if (!nextModelId) {
+            setToast({ msg: 'Nenhuma anamnese disponível para reaplicar.', type: 'error' })
+            return
+        }
+
+        setConfirmModal({ open: true, item, days: currentRenew, nextModelId })
+    }
+
+    const getSelectableModels = (item: ReviewItem | null) => {
+        if (!item) return libraryModels
+
+        const currentModelId = item.data?.modelId
+        const currentModel = currentModelId ? modelsById[currentModelId] : null
+
+        if (!currentModel) return libraryModels
+        if (libraryModels.some(model => model.id === currentModel.id)) return libraryModels
+
+        return [currentModel, ...libraryModels]
     }
 
     const handleConfirmReview = async () => {
-        const { item, days } = confirmModal
+        const { item, days, nextModelId } = confirmModal
         if (!item) return
 
         if (days <= 0) {
             setToast({ msg: 'Por favor, insira um número válido de dias.', type: 'error' })
+            return
+        }
+
+        if (!nextModelId) {
+            setToast({ msg: 'Selecione qual anamnese será reaplicada.', type: 'error' })
             return
         }
         
@@ -167,48 +224,30 @@ export default function AnamnesisPending() {
         setMarkingId(item.id)
         
         try {
-            // 1. Busca dados atuais do banco para garantir integridade
-            const { data: currentProtocol, error: fetchError } = await supabase
-                .from('protocols')
-                .select('data')
-                .eq('id', item.id)
-                .single()
-            
-            if (fetchError) throw fetchError
+            const result = await reviewAndReapplyAnamnesis({
+                responseId: item.id,
+                nextModelId,
+                daysValid: days
+            })
 
-            // 2. Prepara novo objeto data
-            const currentData = currentProtocol?.data || {}
-            const newData = { 
-                ...currentData, 
-                reviewed_at: new Date().toISOString(),
-                renew_in_days: days 
+            if (!result.success) {
+                throw new Error(result.message || 'Erro ao concluir a anamnese.')
             }
-            
-            // 3. Atualiza
-            console.log('Enviando update para o banco:', newData)
-            const { error } = await supabase
-                .from('protocols')
-                .update({ 
-                    data: newData
-                })
-                .eq('id', item.id)
 
-            if (error) throw error
-            
-            console.log('Update sucesso!')
-            // Remove da lista localmente
             setReviewItems(prev => prev.filter(i => i.id !== item.id))
-            setToast({ msg: `Anamnese concluída! Renovação em ${days} dias.`, type: 'success' })
+            setToast({ msg: `Anamnese concluída e nova aplicação agendada para ${days} dias.`, type: 'success' })
         } catch (err: any) {
             console.error('Erro ao confirmar:', err)
             setToast({ msg: 'Erro ao atualizar: ' + err.message, type: 'error' })
         } finally {
             setMarkingId(null)
-            setConfirmModal({ open: false, item: null, days: 90 })
+            setConfirmModal({ open: false, item: null, days: 90, nextModelId: '' })
         }
     }
 
     if (loading) return <div>Carregando...</div>
+
+    const selectableModels = getSelectableModels(confirmModal.item)
 
     return (
         <div>
@@ -277,12 +316,32 @@ export default function AnamnesisPending() {
                         }}>
                             <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', color: '#0f172a' }}>Confirmar Conclusão</h3>
                             <p style={{ margin: '0 0 20px 0', color: '#64748b', fontSize: '0.95rem' }}>
-                                A anamnese de <strong>{confirmModal.item.student.name}</strong> será marcada como analisada.
+                                A anamnese de <strong>{confirmModal.item.student.name}</strong> será marcada como analisada e uma nova anamnese será aplicada automaticamente.
                             </p>
+
+                            <label style={{ display: 'block', marginBottom: 16 }}>
+                                <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+                                    Qual anamnese deseja aplicar agora?
+                                </span>
+                                <select
+                                    value={confirmModal.nextModelId}
+                                    onChange={e => setConfirmModal(prev => ({ ...prev, nextModelId: e.target.value }))}
+                                    style={{
+                                        width: '100%', padding: '10px 12px', borderRadius: 8,
+                                        border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none',
+                                        background: '#fff'
+                                    }}
+                                >
+                                    <option value="">Selecione uma anamnese</option>
+                                    {selectableModels.map(model => (
+                                        <option key={model.id} value={model.id}>{model.title}</option>
+                                    ))}
+                                </select>
+                            </label>
 
                             <label style={{ display: 'block', marginBottom: 20 }}>
                                 <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: 6 }}>
-                                    Renovar novamente em quantos dias?
+                                    Em quantos dias essa nova anamnese vence?
                                 </span>
                                 <input 
                                     type="number"

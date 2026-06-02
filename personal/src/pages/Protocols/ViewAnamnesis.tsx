@@ -5,6 +5,12 @@ import { getWorkoutById } from '../../store/workouts'
 import { Toast, type ToastType } from '../../components/Toast'
 import Modal from '../../components/Modal'
 import { ArrowLeft, Calendar, User } from 'lucide-react'
+import { reviewAndReapplyAnamnesis } from '../../store/anamnesis'
+
+type AnamnesisOption = {
+    id: string
+    title: string
+}
 
 export default function ViewAnamnesis() {
     const { id } = useParams()
@@ -12,9 +18,11 @@ export default function ViewAnamnesis() {
     const [data, setData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [marking, setMarking] = useState(false)
-    const [confirmModal, setConfirmModal] = useState<{ open: boolean, days: number }>({ open: false, days: 90 })
+    const [confirmModal, setConfirmModal] = useState<{ open: boolean, days: number, nextModelId: string }>({ open: false, days: 90, nextModelId: '' })
     const [toast, setToast] = useState<{ msg: string, type: ToastType } | null>(null)
     const [previewImage, setPreviewImage] = useState<string | null>(null)
+    const [libraryModels, setLibraryModels] = useState<AnamnesisOption[]>([])
+    const [modelsById, setModelsById] = useState<Record<string, AnamnesisOption>>({})
 
     useEffect(() => {
         if (!id) return
@@ -132,6 +140,33 @@ export default function ViewAnamnesis() {
             
             console.log('Protocolo Final:', finalProtocol)
 
+            const { data: allModels } = await supabase
+                .from('protocols')
+                .select('id, title, student_id, status')
+                .eq('personal_id', protocol.personal_id)
+                .eq('type', 'anamnesis_model')
+
+            const activeModelOptions = (allModels || [])
+                .filter((model: any) => (model.status ?? 'active') === 'active')
+                .map((model: any) => ({
+                    id: model.id,
+                    title: model.title || 'Sem título'
+                }))
+            const libraryModelOptions = (allModels || [])
+                .filter((model: any) => !model.student_id && (model.status ?? 'active') === 'active')
+                .map((model: any) => ({
+                    id: model.id,
+                    title: model.title || 'Sem título'
+                }))
+
+            setLibraryModels(libraryModelOptions)
+            setModelsById(
+                activeModelOptions.reduce((acc: Record<string, AnamnesisOption>, model: AnamnesisOption) => {
+                    acc[model.id] = model
+                    return acc
+                }, {})
+            )
+
             // Monta o objeto final
             setData({ ...finalProtocol, profiles: { full_name: studentName } })
 
@@ -147,38 +182,57 @@ export default function ViewAnamnesis() {
     const handleOpenConfirm = () => {
         const currentData = data.content || {}
         const currentRenew = currentData.renew_in_days || 90
-        setConfirmModal({ open: true, days: currentRenew })
+        const currentModelId = currentData.modelId
+        const hasCurrentOption = currentModelId && modelsById[currentModelId]
+        const nextModelId = hasCurrentOption
+            ? currentModelId
+            : (libraryModels[0]?.id || '')
+
+        if (!nextModelId) {
+            setToast({ msg: 'Nenhuma anamnese disponível para reaplicar.', type: 'error' })
+            return
+        }
+
+        setConfirmModal({ open: true, days: currentRenew, nextModelId })
+    }
+
+    const getSelectableModels = () => {
+        const currentModelId = data?.content?.modelId
+        const currentModel = currentModelId ? modelsById[currentModelId] : null
+
+        if (!currentModel) return libraryModels
+        if (libraryModels.some(model => model.id === currentModel.id)) return libraryModels
+
+        return [currentModel, ...libraryModels]
     }
 
     const handleConfirmReview = async () => {
-        const { days } = confirmModal
+        const { days, nextModelId } = confirmModal
 
         if (days <= 0) {
             setToast({ msg: 'Por favor, insira um número válido.', type: 'error' })
             return
         }
 
+        if (!nextModelId) {
+            setToast({ msg: 'Selecione qual anamnese será reaplicada.', type: 'error' })
+            return
+        }
+
         setConfirmModal(prev => ({ ...prev, open: false }))
         setMarking(true)
         try {
-            const currentData = data.content || {}
-            const newData = { 
-                ...currentData, 
-                reviewed_at: new Date().toISOString(),
-                renew_in_days: days
+            const result = await reviewAndReapplyAnamnesis({
+                responseId: id || '',
+                nextModelId,
+                daysValid: days
+            })
+
+            if (!result.success) {
+                throw new Error(result.message || 'Erro ao concluir a anamnese.')
             }
-            
-            // CORREÇÃO: Remove 'content'
-            const { error } = await supabase
-                .from('protocols')
-                .update({ 
-                    data: newData
-                })
-                .eq('id', id)
 
-            if (error) throw error
-
-            setToast({ msg: `Anamnese concluída!`, type: 'success' })
+            setToast({ msg: `Anamnese concluída e nova aplicação criada.`, type: 'success' })
             setTimeout(() => navigate(-1), 1500)
         } catch (err: any) {
             setToast({ msg: 'Erro: ' + err.message, type: 'error' })
@@ -191,6 +245,7 @@ export default function ViewAnamnesis() {
     if (!data) return <div style={{ padding: 20 }}>Anamnese não encontrada.</div>
 
     const content = data.content || {}
+    const selectableModels = getSelectableModels()
     // Adaptação para diferentes estruturas de dados
     const questions = Array.isArray(content) ? content : (content.questions || [])
     const answers = content.answers || {}
@@ -311,12 +366,32 @@ export default function ViewAnamnesis() {
                     }}>
                         <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', color: '#0f172a' }}>Confirmar Conclusão</h3>
                         <p style={{ margin: '0 0 20px 0', color: '#64748b', fontSize: '0.95rem' }}>
-                            A anamnese será marcada como analisada e a data de validade será atualizada.
+                            A anamnese será marcada como analisada e uma nova anamnese será aplicada automaticamente para este aluno.
                         </p>
+
+                        <label style={{ display: 'block', marginBottom: 16 }}>
+                            <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+                                Qual anamnese deseja aplicar agora?
+                            </span>
+                            <select
+                                value={confirmModal.nextModelId}
+                                onChange={e => setConfirmModal(prev => ({ ...prev, nextModelId: e.target.value }))}
+                                style={{
+                                    width: '100%', padding: '10px 12px', borderRadius: 8,
+                                    border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none',
+                                    background: '#fff'
+                                }}
+                            >
+                                <option value="">Selecione uma anamnese</option>
+                                {selectableModels.map(model => (
+                                    <option key={model.id} value={model.id}>{model.title}</option>
+                                ))}
+                            </select>
+                        </label>
 
                         <label style={{ display: 'block', marginBottom: 20 }}>
                             <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: 6 }}>
-                                Renovar novamente em quantos dias?
+                                Em quantos dias essa nova anamnese vence?
                             </span>
                             <input 
                                 type="number"
