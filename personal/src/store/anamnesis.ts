@@ -254,6 +254,76 @@ export async function duplicateModel(originalId: string, studentId: string, days
   return mapModelFromDb(data)
 }
 
+export async function reviewAndReapplyAnamnesis(params: {
+  responseId: string
+  nextModelId: string
+  daysValid: number
+}): Promise<{ success: boolean; message?: string }> {
+  const { responseId, nextModelId, daysValid } = params
+
+  if (!responseId || !nextModelId) {
+    return { success: false, message: 'Dados incompletos para concluir a anamnese.' }
+  }
+
+  if (daysValid <= 0) {
+    return { success: false, message: 'Informe um prazo de renovação válido.' }
+  }
+
+  const { data: responseProtocol, error: responseError } = await supabase
+    .from('protocols')
+    .select('*')
+    .eq('id', responseId)
+    .single()
+
+  if (responseError || !responseProtocol) {
+    return { success: false, message: 'Resposta de anamnese não encontrada.' }
+  }
+
+  const currentData = responseProtocol.data || responseProtocol.content || {}
+  const answeredModelId = currentData.modelId || responseProtocol.model_id
+
+  if (!responseProtocol.student_id) {
+    return { success: false, message: 'Aluno não encontrado para esta resposta.' }
+  }
+
+  const reviewedData = {
+    ...currentData,
+    reviewed_at: new Date().toISOString(),
+    renew_in_days: daysValid
+  }
+
+  const { error: reviewError } = await supabase
+    .from('protocols')
+    .update({
+      data: reviewedData
+    })
+    .eq('id', responseId)
+
+  if (reviewError) {
+    return { success: false, message: reviewError.message }
+  }
+
+  const duplicated = await duplicateModel(nextModelId, responseProtocol.student_id, daysValid)
+  if (!duplicated) {
+    return { success: false, message: 'Não foi possível aplicar a nova anamnese.' }
+  }
+
+  if (answeredModelId) {
+    const { error: deleteError } = await supabase
+      .from('protocols')
+      .delete()
+      .eq('id', answeredModelId)
+      .eq('type', 'anamnesis_model')
+      .eq('student_id', responseProtocol.student_id)
+
+    if (deleteError) {
+      return { success: false, message: deleteError.message }
+    }
+  }
+
+  return { success: true }
+}
+
 export async function listStudentModels(personalId: string, studentId: string): Promise<AnamnesisModel[]> {
   const { data, error } = await supabase
     .from('protocols')
