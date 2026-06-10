@@ -4,6 +4,7 @@ import { addStudent } from '../../store/students'
 import { listPlans, type PlanRecord } from '../../store/plans'
 import { supabase } from '../../lib/supabase'
 import { createStudentAuthUser } from '../../lib/studentAuth'
+import Modal from '../../components/Modal'
 
 export default function CreateStudent() {
   const [searchParams] = useSearchParams()
@@ -23,6 +24,15 @@ export default function CreateStudent() {
   const [planId, setPlanId] = useState('')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
+  const [validationModal, setValidationModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+  }>({
+    isOpen: false,
+    title: '',
+    message: ''
+  })
 
   useEffect(() => {
     // Carrega Personal e Planos
@@ -63,7 +73,27 @@ export default function CreateStudent() {
   }
 
   const save = async () => {
-    if (!name.trim() || !email.trim()) return setMsg('Preencha nome e email')
+    const safeName = typeof name === 'string' ? name.trim() : ''
+    const safeEmail = typeof email === 'string' ? email.trim() : ''
+
+    if (!safeName) {
+      setValidationModal({
+        isOpen: true,
+        title: 'Nome obrigatorio',
+        message: 'Informe o nome do aluno para concluir o cadastro.'
+      })
+      return
+    }
+
+    if (!safeEmail) {
+      setValidationModal({
+        isOpen: true,
+        title: 'Email obrigatorio',
+        message: 'Todo novo aluno precisa ser cadastrado com email. Preencha o email para continuar.'
+      })
+      return
+    }
+
     if (!personalId) return setMsg('Erro: Personal não identificado.')
     if (tempPassword && tempPassword.length < 6) return setMsg('A senha deve ter no mínimo 6 caracteres.')
 
@@ -75,11 +105,11 @@ export default function CreateStudent() {
 
         await createStudentAuthUser({
             personalId,
-            name: name.trim(),
-            email: email.trim(),
+            name: safeName,
+            email: safeEmail,
             password: passwordToUse,
             profileData: {
-                email: email.trim(),
+                email: safeEmail,
                 whatsapp,
                 address: { cep, street, neighborhood, city, state, number, complement },
                 planId: planId || undefined,
@@ -131,12 +161,14 @@ export default function CreateStudent() {
           </label>
           <label className="label">
             Email
+            <span style={{ color: '#dc2626', marginLeft: 4 }}>*</span>
             <input 
                 className="input" 
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)} 
                 autoComplete="off"
                 name="student_email_field"
+                placeholder="Email obrigatorio"
             />
           </label>
           <label className="label">
@@ -218,6 +250,29 @@ export default function CreateStudent() {
           <button className="btn" onClick={save} disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</button>
         </div>
       </div>
+
+      <Modal
+        isOpen={validationModal.isOpen}
+        onClose={() => setValidationModal(prev => ({ ...prev, isOpen: false }))}
+        title={validationModal.title}
+        type="danger"
+        footer={
+          <button
+            className="btn"
+            style={{ background: '#0f172a', color: '#fff' }}
+            onClick={() => setValidationModal(prev => ({ ...prev, isOpen: false }))}
+          >
+            Entendi
+          </button>
+        }
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '2.4rem', fontWeight: 700, marginBottom: 12, color: '#dc2626' }}>!</div>
+          <p style={{ margin: 0, fontSize: '1rem', color: '#475569' }}>
+            {validationModal.message}
+          </p>
+        </div>
+      </Modal>
     </div>
   )
 }
