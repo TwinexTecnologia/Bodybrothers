@@ -4,7 +4,7 @@
   --personal-sidebar-bg: #0a0f1e;
   --personal-sidebar-hover: #162038;
   --personal-sidebar-accent: #8b5cf6;
-  --personal-sidebar-card: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  --personal-sidebar-card: rgba(255, 255, 255, 0.04);
   --personal-primary: #10b981;
   --personal-accent: #60a5fa;
   --personal-border: #e5e7eb;
@@ -28,7 +28,8 @@ body { margin: 0; background: var(--personal-bg); color: var(--personal-text); f
   padding: 12px;
   border-radius: 14px;
   background: var(--personal-sidebar-card);
-  box-shadow: 0 18px 30px -22px rgba(139, 92, 246, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  box-shadow: 0 16px 28px -24px rgba(15, 23, 42, 0.9);
 }
 .sidebar-quick-card-title {
   display: flex;
@@ -46,7 +47,7 @@ body { margin: 0; background: var(--personal-bg); color: var(--personal-text); f
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
 }
 .sidebar-quick-actions {
   display: grid;
@@ -86,9 +87,9 @@ body { margin: 0; background: var(--personal-bg); color: var(--personal-text); f
   transform: translateX(1px);
 }
 .sidebar-link.active {
-  background: rgba(139, 92, 246, 0.22);
+  background: rgba(255, 255, 255, 0.06);
   color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.32);
+  box-shadow: 0 10px 22px -18px rgba(15, 23, 42, 0.95), inset 0 0 0 1px rgba(148, 163, 184, 0.14);
 }
 .sidebar-link svg {
   flex-shrink: 0;
@@ -107,7 +108,7 @@ body { margin: 0; background: var(--personal-bg); color: var(--personal-text); f
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 .accent-link {
-  color: #c4b5fd;
+  color: #d8b4fe;
 }
 .sidebar-group-system {
   padding-top: 4px;
