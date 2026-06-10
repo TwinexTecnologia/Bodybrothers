@@ -796,6 +796,10 @@ export default function EditStudent() {
 
     try {
         const { data: { user } } = await supabase.auth.getUser()
+        const safeName = typeof name === 'string' ? name.trim() : ''
+        const safeEmail = typeof email === 'string' ? email.trim() : ''
+        const safeWhatsapp = typeof whatsapp === 'string' ? whatsapp : ''
+        const trimmedPassword = typeof tempPassword === 'string' ? tempPassword.trim() : ''
         
         const currentStudent = students.find(s => s.id === selectedId)
         const oldData = currentStudent ? {
@@ -807,9 +811,9 @@ export default function EditStudent() {
         } : {}
 
         const newData = {
-            name: name.trim(),
-            email: email.trim(),
-            whatsapp: whatsapp,
+            name: safeName,
+            email: safeEmail,
+            whatsapp: safeWhatsapp,
             planId: planId || undefined,
             planStartDate: planStartDate || undefined,
             dueDay: dueDay ? parseInt(dueDay) : undefined,
@@ -820,7 +824,6 @@ export default function EditStudent() {
         const changes: any = {}
         if (newData.name !== oldData.name) changes.name = { old: oldData.name, new: newData.name }
 
-        const trimmedPassword = tempPassword.trim()
         const passwordChanged = Boolean(trimmedPassword) && trimmedPassword !== initialTempPassword
         const emailChanged = newData.email !== initialEmail
 
@@ -873,7 +876,7 @@ export default function EditStudent() {
         setMsg('Aluno atualizado com sucesso!')
         setInitialEmail(newData.email)
         if (passwordChanged) setInitialTempPassword(trimmedPassword)
-        setStudents(prev => prev.map(s => s.id === selectedId ? { ...s, name, email } : s))
+        setStudents(prev => prev.map(s => s.id === selectedId ? { ...s, name: newData.name, email: newData.email } : s))
         setSaveModal({
             open: true,
             status: 'success',
@@ -886,7 +889,7 @@ export default function EditStudent() {
             )
         }, 1400)
     } catch (error: any) {
-        const errorMessage = error?.message || 'Não foi possível salvar as alterações do aluno.'
+        const errorMessage = getFriendlySaveErrorMessage(error)
         console.error('Erro ao salvar aluno:', error)
         setMsg(errorMessage)
         setSaveModal({
@@ -933,6 +936,27 @@ export default function EditStudent() {
       minWidth: 0 // Previne overflow em grids
   }
   const msgIsError = /erro|falha|não foi possível|mínimo/i.test(msg)
+
+  const getFriendlySaveErrorMessage = (error: any) => {
+      const rawMessage = String(error?.message || '').trim()
+      const normalized = rawMessage.toLowerCase()
+
+      if (!rawMessage) return 'Nao foi possivel salvar as alteracoes do aluno. Tente novamente.'
+      if (normalized.includes('reading \'trim\'') || normalized.includes('cannot read properties of null')) {
+          return 'Alguns dados do aluno vieram incompletos. Atualize a pagina e tente salvar novamente.'
+      }
+      if (normalized.includes('minimum 6 characters') || normalized.includes('minimo 6 caracteres')) {
+          return 'A senha deve ter no minimo 6 caracteres.'
+      }
+      if (normalized.includes('duplicate key') || normalized.includes('already registered') || normalized.includes('already been registered')) {
+          return 'Este e-mail ja esta em uso por outro cadastro.'
+      }
+      if (normalized.includes('invalid email')) {
+          return 'Informe um e-mail valido para o aluno.'
+      }
+
+      return 'Nao foi possivel salvar as alteracoes do aluno. Tente novamente.'
+  }
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', paddingBottom: 100 }}>
