@@ -1,7 +1,33 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { X } from 'lucide-react'
+import {
+  X,
+  Plus,
+  Dumbbell,
+  Utensils,
+  FilePlus2,
+  Home,
+  PieChart,
+  TrendingUp,
+  Users,
+  ClipboardList,
+  CreditCard,
+  ListChecks,
+  CirclePlay,
+  Archive,
+  BookOpen,
+  List,
+  Apple,
+  FileText,
+  Wallet,
+  UserCircle2,
+  Palette,
+  SlidersHorizontal,
+  Camera,
+  LogOut,
+  type LucideIcon,
+} from 'lucide-react'
 
 type Branding = { brandTitle?: string; brandLogoUrl?: string }
 
@@ -10,15 +36,14 @@ interface SidebarProps {
     onClose?: () => void
 }
 
+type MenuItem = {
+  label: string
+  to: string
+  icon: LucideIcon
+  accent?: boolean
+}
+
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
-  const [open, setOpen] = useState<Record<string, boolean>>({
-    dashboard: true,
-    students: true,
-    protocols: true,
-    chat: true,
-    finance: true,
-    account: true,
-  })
   const [branding, setBranding] = useState<Branding>(() => {
     try {
       const raw = localStorage.getItem('personal_branding')
@@ -72,6 +97,88 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       return perms[key] !== false
   }
 
+  const quickActions = useMemo<MenuItem[]>(() => ([
+    { label: 'Novo Treino', to: '/protocols/workout-create', icon: Dumbbell },
+    { label: 'Nova Dieta', to: '/protocols/diet-create', icon: Utensils },
+    { label: 'Novo Plano', to: '/protocols/plan-create', icon: FilePlus2 },
+  ]), [])
+
+  const dashboardItems = useMemo<MenuItem[]>(() => ([
+    { label: 'Dashboard', to: '/dashboard/overview', icon: Home },
+    { label: 'Visão Geral', to: '/crm/dashboard', icon: PieChart },
+    { label: 'CRM • Vendas', to: '/crm', icon: TrendingUp, accent: true },
+  ]), [])
+
+  const studentItems = useMemo<MenuItem[]>(() => {
+    const items: MenuItem[] = [
+      { label: 'Gerenciar Alunos', to: '/students/list', icon: Users },
+      { label: 'Anamneses', to: '/protocols/anamnesis-pending', icon: ClipboardList },
+      { label: 'Mensalidades', to: '/financial', icon: CreditCard },
+    ]
+
+    if (evolutionMode === 'standalone') {
+      items.push({ label: 'Evolução Fotográfica', to: '/evolution/central', icon: Camera })
+    }
+
+    return items
+  }, [evolutionMode])
+
+  const workoutItems = useMemo<MenuItem[]>(() => ([
+    { label: 'Criar Treino', to: '/protocols/workout-create', icon: Dumbbell },
+    { label: 'Todos os Treinos', to: '/protocols/workouts-active', icon: ListChecks },
+    { label: 'Treinos Ativos', to: '/protocols/workouts-active', icon: CirclePlay },
+    { label: 'Treinos Arquivados', to: '/protocols/workouts-archived', icon: Archive },
+    { label: 'Biblioteca de Exercícios', to: '/protocols/exercises', icon: BookOpen },
+  ]), [])
+
+  const dietItems = useMemo<MenuItem[]>(() => ([
+    { label: 'Criar Dieta', to: '/protocols/diet-create', icon: Utensils },
+    { label: 'Todas as Dietas', to: '/protocols/diets-active', icon: List },
+    { label: 'Dietas Ativas', to: '/protocols/diets-active', icon: Apple },
+    { label: 'Dietas Arquivadas', to: '/protocols/diets-archived', icon: Archive },
+  ]), [])
+
+  const planItems = useMemo<MenuItem[]>(() => ([
+    { label: 'Criar Plano', to: '/protocols/plan-create', icon: FilePlus2 },
+    { label: 'Gerenciar Planos', to: '/protocols/plans', icon: FileText },
+  ]), [])
+
+  const financeItems = useMemo<MenuItem[]>(() => ([
+    { label: 'Financeiro', to: '/financial', icon: Wallet },
+  ]), [])
+
+  const settingsItems = useMemo<MenuItem[]>(() => {
+    const items: MenuItem[] = [
+      { label: 'Perfil do Personal', to: '/account/profile', icon: UserCircle2 },
+      { label: 'Identidade Visual', to: '/account/branding', icon: Palette },
+      { label: 'Preferências', to: '/account/preferences', icon: SlidersHorizontal },
+    ]
+
+    if (evolutionMode === 'standalone') {
+      items.push({ label: 'Configurar Evolução', to: '/account/profile', icon: Camera })
+    }
+
+    return items
+  }, [evolutionMode])
+
+  const renderMenuItem = (item: MenuItem, compact = false) => {
+    const Icon = item.icon
+
+    return (
+      <NavLink
+        key={`${item.to}-${item.label}`}
+        to={item.to}
+        className={({ isActive }) =>
+          `sidebar-link ${compact ? 'sidebar-link-compact' : ''} ${isActive ? 'active' : ''} ${item.accent ? 'accent-link' : ''}`
+        }
+        onClick={onClose}
+      >
+        <Icon size={compact ? 15 : 17} strokeWidth={2} />
+        <span>{item.label}</span>
+      </NavLink>
+    )
+  }
+
   useEffect(() => {
     const onBrandingChanged = () => {
       try {
@@ -108,115 +215,86 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <X size={24} />
         </button>
       </div>
+      <div className="sidebar-quick-card">
+        <div className="sidebar-quick-card-title">
+          <div className="sidebar-quick-card-badge">
+            <Plus size={14} />
+          </div>
+          <span>Novo</span>
+        </div>
+        <div className="sidebar-quick-actions">
+          {quickActions.map(item => renderMenuItem(item, true))}
+        </div>
+      </div>
       <nav className="menu">
         {canAccess('dashboard') && (
-        <div className="menu-section">
-          <button className="menu-button" onClick={() => setOpen({ ...open, dashboard: !open.dashboard })}>
-            <span>Dashboard</span>
-            <span>{open.dashboard ? '▾' : '▸'}</span>
-          </button>
-          {open.dashboard && (
-            <div className="submenu">
-              <NavLink to="/dashboard/overview">Visão Geral</NavLink>
-              <NavLink to="/crm" style={{ color: '#8b5cf6' }}>CRM • Vendas</NavLink>
+          <div className="sidebar-group">
+            <div className="sidebar-group-title">Dashboard</div>
+            <div className="sidebar-group-links">
+              {dashboardItems.map(item => renderMenuItem(item))}
             </div>
-          )}
-        </div>
+          </div>
         )}
 
         {canAccess('students') && (
-        <div className="menu-section">
-          <button className="menu-button" onClick={() => setOpen({ ...open, students: !open.students })}>
-            <span>Alunos</span>
-            <span>{open.students ? '▾' : '▸'}</span>
-          </button>
-          {open.students && (
-            <div className="submenu">
-              <NavLink to="/students/list">Gerenciar Alunos</NavLink>
-              {evolutionMode === 'standalone' && (
-                  <>
-                    <NavLink to="/evolution/central" style={{ color: '#0ea5e9' }}>📸 Evolução Fotográfica</NavLink>
-                    <NavLink to="/account/profile" style={{ fontSize: '0.85rem', paddingLeft: 24, opacity: 0.8 }}>⚙️ Configurar Evolução</NavLink>
-                  </>
-              )}
+          <div className="sidebar-group">
+            <div className="sidebar-group-title">Alunos</div>
+            <div className="sidebar-group-links">
+              {studentItems.map(item => renderMenuItem(item))}
             </div>
-          )}
-        </div>
+          </div>
         )}
 
         {canAccess('protocols') && (
-        <div className="menu-section">
-          <button className="menu-button" onClick={() => setOpen({ ...open, protocols: !open.protocols })}>
-            <span>Protocolos</span>
-            <span>{open.protocols ? '▾' : '▸'}</span>
-          </button>
-          {open.protocols && (
-            <div className="submenu">
-              <NavLink to="/protocols/workout-create">Criar Treino</NavLink>
-              <NavLink to="/protocols/workouts-active">Treinos Ativos</NavLink>
-              <NavLink to="/protocols/workouts-archived">Treinos Inativos/Arquivados</NavLink>
-              <NavLink to="/protocols/exercises">Biblioteca de Exercícios</NavLink>
-              <NavLink to="/protocols/diet-create">Criar Dieta</NavLink>
-              <NavLink to="/protocols/diets-active">Dietas Ativas</NavLink>
-              <NavLink to="/protocols/diets-archived">Dietas Arquivadas</NavLink>
-              <NavLink to="/protocols/anamnesis-models">Anamnese (Modelos)</NavLink>
-              <NavLink to="/protocols/plan-create">Criar Plano</NavLink>
-              <NavLink to="/protocols/plans">Planos</NavLink>
+          <>
+            <div className="sidebar-group">
+              <div className="sidebar-group-title">Treinos</div>
+              <div className="sidebar-group-links">
+                {workoutItems.map(item => renderMenuItem(item))}
+              </div>
             </div>
-          )}
-        </div>
-        )}
 
-        {/* Chat Section Commented Out
-        {canAccess('chat') && (
-        <div className="menu-section">
-          <button className="menu-button" onClick={() => setOpen({ ...open, chat: !open.chat })}>
-            <span>Chat</span>
-            <span>{open.chat ? '▾' : '▸'}</span>
-          </button>
-          {open.chat && (
-            <div className="submenu">
-              <NavLink to="/chat/conversations">Chats com Alunos</NavLink>
-              <NavLink to="/chat/history">Histórico de Conversas</NavLink>
+            <div className="sidebar-group">
+              <div className="sidebar-group-title">Dietas</div>
+              <div className="sidebar-group-links">
+                {dietItems.map(item => renderMenuItem(item))}
+              </div>
             </div>
-          )}
-        </div>
+
+            <div className="sidebar-group">
+              <div className="sidebar-group-title">Planos</div>
+              <div className="sidebar-group-links">
+                {planItems.map(item => renderMenuItem(item))}
+              </div>
+            </div>
+          </>
         )}
-        */}
 
         {canAccess('finance') && (
-        <div className="menu-section">
-          <button className="menu-button" onClick={() => setOpen({ ...open, finance: !open.finance })}>
-            <span>Financeiro do Aluno</span>
-            <span>{open.finance ? '▾' : '▸'}</span>
-          </button>
-          {open.finance && (
-            <div className="submenu">
-              <NavLink to="/financial">Mensalidades</NavLink>
+          <div className="sidebar-group">
+            <div className="sidebar-group-title">Financeiro</div>
+            <div className="sidebar-group-links">
+              {financeItems.map(item => renderMenuItem(item))}
             </div>
-          )}
-        </div>
+          </div>
         )}
 
         {canAccess('account') && (
-        <div className="menu-section">
-          <button className="menu-button" onClick={() => setOpen({ ...open, account: !open.account })}>
-            <span>Minha Conta</span>
-            <span>{open.account ? '▾' : '▸'}</span>
-          </button>
-          {open.account && (
-            <div className="submenu">
-              <NavLink to="/account/profile">Perfil do Personal</NavLink>
-              <NavLink to="/account/branding">Identidade Visual</NavLink>
-              <NavLink to="/account/preferences">Preferências</NavLink>
+          <div className="sidebar-group">
+            <div className="sidebar-group-title">Configurações</div>
+            <div className="sidebar-group-links">
+              {settingsItems.map(item => renderMenuItem(item))}
             </div>
-          )}
-        </div>
+          </div>
         )}
 
-        <div className="menu-section">
-          <div className="submenu">
-            <NavLink to="/logout">Sair</NavLink>
+        <div className="sidebar-group sidebar-group-system">
+          <div className="sidebar-group-title">Sistema</div>
+          <div className="sidebar-group-links">
+            <NavLink to="/logout" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} onClick={onClose}>
+              <LogOut size={17} strokeWidth={2} />
+              <span>Sair</span>
+            </NavLink>
           </div>
         </div>
       </nav>

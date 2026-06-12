@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Camera } from 'lucide-react'
+import { Camera, CheckCircle2, LoaderCircle, Save } from 'lucide-react'
 import { listStudentsByPersonal, updateStudent, getStudent, toggleStudentActive, type StudentRecord } from '../../store/students'
 import { listActiveDiets, type DietRecord, listStudentDiets, duplicateDiet, updateDiet, deleteDietIfPersonalized } from '../../store/diets'
 import { listActiveWorkouts, duplicateWorkout, updateWorkout, setWorkoutStatus, type WorkoutRecord } from '../../store/workouts'
@@ -86,6 +86,16 @@ export default function EditStudent() {
 
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saveModal, setSaveModal] = useState<{
+      open: boolean
+      status: 'loading' | 'success' | 'error'
+      message: string
+  }>({
+      open: false,
+      status: 'loading',
+      message: ''
+  })
   const [checkingFinancial, setCheckingFinancial] = useState(false)
   const [blockModalOpen, setBlockModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('') // Estado para busca
@@ -777,88 +787,119 @@ export default function EditStudent() {
 
   const save = async () => {
     if (!selectedId) return
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    const currentStudent = students.find(s => s.id === selectedId)
-    const oldData = currentStudent ? {
-        name: currentStudent.name,
-        email: currentStudent.email,
-        planId: currentStudent.planId,
-        dietIds: currentStudent.dietIds || [],
-        address: currentStudent.address
-    } : {}
-
-    const newData = {
-        name: name.trim(),
-        email: email.trim(),
-        whatsapp: whatsapp,
-        planId: planId || undefined,
-        planStartDate: planStartDate || undefined,
-        dueDay: dueDay ? parseInt(dueDay) : undefined,
-        dietIds: selectedDietIds,
-        address: { cep, street, neighborhood, city, state: stateUf, number, complement }
-    }
-
-    const changes: any = {}
-    if (newData.name !== oldData.name) changes.name = { old: oldData.name, new: newData.name }
-
-    const trimmedPassword = tempPassword.trim()
-    const passwordChanged = Boolean(trimmedPassword) && trimmedPassword !== initialTempPassword
-    const emailChanged = newData.email !== initialEmail
-
-    if (passwordChanged && trimmedPassword.length < 6) {
-        setMsg('A senha deve ter no mínimo 6 caracteres.')
-        return
-    }
-
-    if (emailChanged || passwordChanged) {
-        await updateStudentAuthCredentials({
-            studentId: selectedId,
-            ...(emailChanged ? { email: newData.email } : {}),
-            ...(passwordChanged ? { password: trimmedPassword } : {}),
-        })
-    }
-    
-    // Converte para campos reais e JSON
-    await updateStudent(selectedId, {
-      name: newData.name,
-      email: newData.email,
-      whatsapp: newData.whatsapp,
-      address: newData.address,
-      planId: newData.planId, // Isso vai atualizar o JSON data->planId
-      planStartDate: newData.planStartDate,
-      dueDay: newData.dueDay,
-      dietIds: newData.dietIds,
-      workoutIds: orderedWorkoutIds,
-      workoutSchedule,
-      ...(passwordChanged ? { tempPassword: trimmedPassword } : {})
+    setSaving(true)
+    setSaveModal({
+        open: true,
+        status: 'loading',
+        message: 'Salvando alterações do aluno...'
     })
 
-    // Atualiza também as colunas reais na tabela profiles para garantir compatibilidade
-    const { error: profileError } = await supabase.from('profiles').update({
-        plan_id: newData.planId,
-        due_day: newData.dueDay
-    }).eq('id', selectedId)
+    try {
+        const { data: { user } } = await supabase.auth.getUser()
+        const safeName = typeof name === 'string' ? name.trim() : ''
+        const safeEmail = typeof email === 'string' ? email.trim() : ''
+        const safeWhatsapp = typeof whatsapp === 'string' ? whatsapp : ''
+        const trimmedPassword = typeof tempPassword === 'string' ? tempPassword.trim() : ''
+        
+        const currentStudent = students.find(s => s.id === selectedId)
+        const oldData = currentStudent ? {
+            name: currentStudent.name,
+            email: currentStudent.email,
+            planId: currentStudent.planId,
+            dietIds: currentStudent.dietIds || [],
+            address: currentStudent.address
+        } : {}
 
-    if (profileError) console.error('Erro ao atualizar colunas reais:', profileError)
+        const newData = {
+            name: safeName,
+            email: safeEmail,
+            whatsapp: safeWhatsapp,
+            planId: planId || undefined,
+            planStartDate: planStartDate || undefined,
+            dueDay: dueDay ? parseInt(dueDay) : undefined,
+            dietIds: selectedDietIds,
+            address: { cep, street, neighborhood, city, state: stateUf, number, complement }
+        }
 
-    if (user && Object.keys(changes).length > 0) {
-        await supabase.from('audit_logs').insert({
-            user_id: user.id,
-            target_id: selectedId,
-            target_table: 'profiles',
-            action: 'UPDATE',
-            details: {
-                changed_at: new Date().toISOString(),
-                changes: changes 
-            }
+        const changes: any = {}
+        if (newData.name !== oldData.name) changes.name = { old: oldData.name, new: newData.name }
+
+        const passwordChanged = Boolean(trimmedPassword) && trimmedPassword !== initialTempPassword
+        const emailChanged = newData.email !== initialEmail
+
+        if (passwordChanged && trimmedPassword.length < 6) {
+            throw new Error('A senha deve ter no mínimo 6 caracteres.')
+        }
+
+        if (emailChanged || passwordChanged) {
+            await updateStudentAuthCredentials({
+                studentId: selectedId,
+                ...(emailChanged ? { email: newData.email } : {}),
+                ...(passwordChanged ? { password: trimmedPassword } : {}),
+            })
+        }
+        
+        await updateStudent(selectedId, {
+          name: newData.name,
+          email: newData.email,
+          whatsapp: newData.whatsapp,
+          address: newData.address,
+          planId: newData.planId,
+          planStartDate: newData.planStartDate,
+          dueDay: newData.dueDay,
+          dietIds: newData.dietIds,
+          workoutIds: orderedWorkoutIds,
+          workoutSchedule,
+          ...(passwordChanged ? { tempPassword: trimmedPassword } : {})
         })
-    }
 
-    setMsg('Aluno atualizado com sucesso!')
-    setInitialEmail(newData.email)
-    if (passwordChanged) setInitialTempPassword(trimmedPassword)
-    setStudents(prev => prev.map(s => s.id === selectedId ? { ...s, name, email } : s))
+        const { error: profileError } = await supabase.from('profiles').update({
+            plan_id: newData.planId,
+            due_day: newData.dueDay
+        }).eq('id', selectedId)
+
+        if (profileError) console.error('Erro ao atualizar colunas reais:', profileError)
+
+        if (user && Object.keys(changes).length > 0) {
+            await supabase.from('audit_logs').insert({
+                user_id: user.id,
+                target_id: selectedId,
+                target_table: 'profiles',
+                action: 'UPDATE',
+                details: {
+                    changed_at: new Date().toISOString(),
+                    changes: changes 
+                }
+            })
+        }
+
+        setMsg('Aluno atualizado com sucesso!')
+        setInitialEmail(newData.email)
+        if (passwordChanged) setInitialTempPassword(trimmedPassword)
+        setStudents(prev => prev.map(s => s.id === selectedId ? { ...s, name: newData.name, email: newData.email } : s))
+        setSaveModal({
+            open: true,
+            status: 'success',
+            message: 'Aluno atualizado com sucesso!'
+        })
+        window.setTimeout(() => {
+            setSaveModal(prev => prev.status === 'success'
+                ? { ...prev, open: false }
+                : prev
+            )
+        }, 1400)
+    } catch (error: any) {
+        const errorMessage = getFriendlySaveErrorMessage(error)
+        console.error('Erro ao salvar aluno:', error)
+        setMsg(errorMessage)
+        setSaveModal({
+            open: true,
+            status: 'error',
+            message: errorMessage
+        })
+    } finally {
+        setSaving(false)
+    }
   }
 
   if (loading) return <div>Carregando...</div>
@@ -894,6 +935,28 @@ export default function EditStudent() {
       gap: '24px', // Garante espaçamento entre cards verticais
       minWidth: 0 // Previne overflow em grids
   }
+  const msgIsError = /erro|falha|não foi possível|mínimo/i.test(msg)
+
+  const getFriendlySaveErrorMessage = (error: any) => {
+      const rawMessage = String(error?.message || '').trim()
+      const normalized = rawMessage.toLowerCase()
+
+      if (!rawMessage) return 'Nao foi possivel salvar as alteracoes do aluno. Tente novamente.'
+      if (normalized.includes('reading \'trim\'') || normalized.includes('cannot read properties of null')) {
+          return 'Alguns dados do aluno vieram incompletos. Atualize a pagina e tente salvar novamente.'
+      }
+      if (normalized.includes('minimum 6 characters') || normalized.includes('minimo 6 caracteres')) {
+          return 'A senha deve ter no minimo 6 caracteres.'
+      }
+      if (normalized.includes('duplicate key') || normalized.includes('already registered') || normalized.includes('already been registered')) {
+          return 'Este e-mail ja esta em uso por outro cadastro.'
+      }
+      if (normalized.includes('invalid email')) {
+          return 'Informe um e-mail valido para o aluno.'
+      }
+
+      return 'Nao foi possivel salvar as alteracoes do aluno. Tente novamente.'
+  }
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', paddingBottom: 100 }}>
@@ -922,6 +985,52 @@ export default function EditStudent() {
              </select>
           </div>
       </div>
+
+      {selectedId && (
+        <div style={{
+            position: 'sticky',
+            top: 12,
+            zIndex: 80,
+            marginBottom: 24,
+            background: 'rgba(255,255,255,0.96)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid #e2e8f0',
+            borderRadius: 14,
+            padding: '14px 18px',
+            boxShadow: '0 10px 30px -20px rgba(15, 23, 42, 0.35)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 16,
+            flexWrap: 'wrap'
+        }}>
+            <div>
+                <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>Salvar alterações do aluno</div>
+                <div style={{ color: msg ? (msgIsError ? '#dc2626' : '#059669') : '#64748b', fontSize: '0.95rem' }}>
+                    {msg || 'As alterações desta tela podem ser salvas por aqui a qualquer momento.'}
+                </div>
+            </div>
+            <button
+                className="btn"
+                onClick={save}
+                disabled={saving}
+                style={{
+                    padding: '12px 24px',
+                    fontSize: '1rem',
+                    background: saving ? '#94a3b8' : 'var(--personal-primary)',
+                    minWidth: 220,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 10,
+                    border: 'none'
+                }}
+            >
+                {saving ? <LoaderCircle size={18} /> : <Save size={18} />}
+                {saving ? 'Salvando...' : 'Salvar Alterações'}
+            </button>
+        </div>
+      )}
 
       {selectedId && (
         <div style={gridContainerStyle}>
@@ -1283,22 +1392,6 @@ export default function EditStudent() {
         </div>
       )}
 
-      {/* FOOTER FIXO */}
-      {selectedId && (
-        <div style={{ 
-            position: 'fixed', bottom: 0, left: 0, right: 0, 
-            background: '#fff', padding: '16px', borderTop: '1px solid #e2e8f0', 
-            boxShadow: '0 -4px 6px -1px rgba(0,0,0,0.1)', 
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            zIndex: 100
-        }}>
-            <div style={{ color: '#059669', fontWeight: 600 }}>{msg}</div>
-            <button className="btn" onClick={save} style={{ padding: '12px 32px', fontSize: '1.1em', background: 'var(--personal-primary)' }}>
-                Salvar Alterações
-            </button>
-        </div>
-      )}
-
       {/* Modal de Bloqueio Financeiro */}
       <Modal
         isOpen={blockModalOpen}
@@ -1382,6 +1475,77 @@ export default function EditStudent() {
             </p>
         </div>
       </Modal>
+
+      {saveModal.open && (
+        <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            padding: 24
+        }}>
+            <div style={{
+                width: '100%',
+                maxWidth: 420,
+                background: '#fff',
+                borderRadius: 20,
+                boxShadow: '0 30px 60px -30px rgba(15, 23, 42, 0.45)',
+                padding: '32px 28px',
+                textAlign: 'center',
+                border: '1px solid #e2e8f0'
+            }}>
+                <div style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: '50%',
+                    margin: '0 auto 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: saveModal.status === 'success'
+                        ? '#dcfce7'
+                        : saveModal.status === 'error'
+                            ? '#fee2e2'
+                            : '#dbeafe',
+                    color: saveModal.status === 'success'
+                        ? '#16a34a'
+                        : saveModal.status === 'error'
+                            ? '#dc2626'
+                            : '#2563eb'
+                }}>
+                    {saveModal.status === 'success' ? (
+                        <CheckCircle2 size={34} />
+                    ) : (
+                        <LoaderCircle size={34} />
+                    )}
+                </div>
+                <h3 style={{ margin: '0 0 10px 0', color: '#0f172a', fontSize: '1.35rem' }}>
+                    {saveModal.status === 'loading'
+                        ? 'Salvando aluno'
+                        : saveModal.status === 'success'
+                            ? 'Tudo certo'
+                            : 'Não foi possível salvar'}
+                </h3>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '1rem', lineHeight: 1.5 }}>
+                    {saveModal.message}
+                </p>
+                {saveModal.status === 'error' && (
+                    <div style={{ marginTop: 20 }}>
+                        <button
+                            className="btn"
+                            style={{ background: '#0f172a', color: '#fff' }}
+                            onClick={() => setSaveModal(prev => ({ ...prev, open: false }))}
+                        >
+                            Fechar
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+      )}
     </div>
   )
 }
