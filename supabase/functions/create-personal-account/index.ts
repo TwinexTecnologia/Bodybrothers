@@ -27,7 +27,14 @@ type RequestMode =
 const DEFAULT_EVOLUTION_MODE = "standalone";
 const DEFAULT_ANAMNESIS_REVIEW_REQUIRED = true;
 const DEFAULT_PLAN_SLUG = "free";
-const DEFAULT_STUDENT_LIMIT = 1;
+const PLAN_CONFIGS: Record<string, { studentLimit: number; paid: boolean }> = {
+  free: { studentLimit: 1, paid: false },
+  starter: { studentLimit: 10, paid: true },
+  pro: { studentLimit: 30, paid: true },
+  premium: { studentLimit: 30, paid: true },
+  elite: { studentLimit: 999999, paid: true },
+  unlimited: { studentLimit: 999999, paid: true },
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -165,8 +172,28 @@ async function createPersonalAccount({
     ? getBoolean(body, ["anamnesisReviewRequired"], DEFAULT_ANAMNESIS_REVIEW_REQUIRED)
     : DEFAULT_ANAMNESIS_REVIEW_REQUIRED;
 
-  const planSlug = DEFAULT_PLAN_SLUG;
-  const studentLimit = DEFAULT_STUDENT_LIMIT;
+  const requestedPlan = getPlanSlug(body, ["plan", "planSlug"]);
+  const planSlug = requestedPlan || DEFAULT_PLAN_SLUG;
+  const planConfig = PLAN_CONFIGS[planSlug];
+
+  if (!planConfig) {
+    throw new Error("Plano informado é inválido.");
+  }
+
+  const paymentStatus = getString(body, ["paymentStatus"]).toLowerCase();
+  const paymentProvider = getString(body, ["paymentProvider"]).toLowerCase();
+  const paymentId = getString(body, ["paymentId"]);
+  const studentLimit = planConfig.studentLimit;
+
+  if (requestMode.mode === "landing" && planConfig.paid) {
+    if (paymentStatus !== "approved") {
+      throw new Error("Plano pago só pode criar a conta após pagamento aprovado.");
+    }
+
+    if (!paymentProvider || !paymentId) {
+      throw new Error("Dados do pagamento são obrigatórios para planos pagos.");
+    }
+  }
 
   const { data: createdUser, error: createError } = await supabase.auth.admin.createUser({
     email,
@@ -188,6 +215,9 @@ async function createPersonalAccount({
       saas: {
         plan: planSlug,
         studentLimit,
+        paymentStatus: planConfig.paid ? paymentStatus || "approved" : "free",
+        paymentProvider: paymentProvider || null,
+        paymentId: paymentId || null,
       },
     },
   });
@@ -212,6 +242,9 @@ async function createPersonalAccount({
       studentLimit,
       status: "active",
       createdAt: new Date().toISOString(),
+      paymentStatus: planConfig.paid ? paymentStatus || "approved" : "free",
+      paymentProvider: paymentProvider || null,
+      paymentId: paymentId || null,
     },
   };
 
@@ -271,6 +304,11 @@ function getString(body: Record<string, unknown>, keys: string[]) {
 }
 
 function getEmail(body: Record<string, unknown>, keys: string[]) {
+  const value = getString(body, keys);
+  return value.toLowerCase();
+}
+
+function getPlanSlug(body: Record<string, unknown>, keys: string[]) {
   const value = getString(body, keys);
   return value.toLowerCase();
 }
