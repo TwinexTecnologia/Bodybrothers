@@ -1,19 +1,5 @@
 import { useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
-
-// Cria um cliente secundário ISOLADO para não deslogar o owner
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-// Cliente descartável que não salva sessão no localStorage
-const supabaseCreator = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false
-  }
-})
 
 function validEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
@@ -99,75 +85,48 @@ export default function CreatePersonal() {
 
     try {
         console.log('Tentando criar personal:', { email })
-
-        // 1. Criar Usuário no Auth (Cliente Isolado)
-        const { data: authData, error: authError } = await supabaseCreator.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: name,
-                    role: 'personal', // Importante: Metadado que o trigger usa
-                    phone: phone,
-                    branding: {
-                        brandName,
-                        logoUrl
-                    },
-                    config: {
-                        evolutionMode,
-                        anamnesisReviewRequired
-                    }
-                }
+        const { data, error: invokeError } = await supabase.functions.invoke('create-personal-account', {
+            body: {
+                fullName: name,
+                email,
+                password,
+                phone,
+                brandName,
+                logoUrl,
+                source: 'owner',
+                evolutionMode,
+                anamnesisReviewRequired
             }
         })
 
-        if (authError) throw authError
+        if (invokeError) throw invokeError
 
-        if (authData.user) {
-            console.log('Usuário Auth criado com ID:', authData.user.id)
-
-            // 2. Garantir Perfil (Tentativa direta via tabela profiles)
-            // O Owner DEVE ter permissão RLS para fazer isso.
-            const { error: profileError } = await supabase.from('profiles').upsert({
-                id: authData.user.id,
-                email: email,
-                role: 'personal',
-                full_name: name,
-                data: {
-                    phone: phone,
-                    branding: {
-                        brandName,
-                        logoUrl
-                    }
-                }
-            })
-
-            if (profileError) {
-                console.error('Erro ao criar perfil:', profileError)
-                // Se der erro de permissão (42501), significa que o Owner não tem permissão de INSERT no banco.
-                // Nesse caso, só resolvendo no banco. Mas vamos tentar.
-                setError('Erro ao salvar perfil: ' + profileError.message + ' (Código: ' + profileError.code + ')')
-                return
-            }
-
-            setMsg(`Personal criado com sucesso! ID: ${authData.user.id}`)
-            // Limpar form
-            setName('')
-            setEmail('')
-            setPassword('')
-            setPhone('')
-            setBrandName('')
-            setLogoUrl('')
-        } else {
-            setError('Usuário criado, mas sem confirmação. Verifique se o email requer confirmação.')
+        if (!data?.success || !data?.personalId) {
+            throw new Error(data?.error || 'Não foi possível criar o personal.')
         }
+
+        setMsg(`Personal criado com sucesso! ID: ${data.personalId}`)
+        // Limpar form
+        setName('')
+        setEmail('')
+        setPassword('')
+        setPhone('')
+        setBrandName('')
+        setLogoUrl('')
+        setEvolutionMode('anamnesis')
+        setAnamnesisReviewRequired(false)
 
     } catch (err: any) {
         console.error(err)
-        if (err.message?.includes('User already registered') || err.message?.includes('already registered')) {
+        let message = err?.message || ''
+        if (err?.context && typeof err.context.json === 'function') {
+            const payload = await err.context.json().catch(() => null)
+            message = payload?.error || payload?.message || message
+        }
+        if (message.includes('User already registered') || message.includes('already registered')) {
             setError('Este email já está cadastrado no sistema.')
         } else {
-            setError(err.message || 'Erro ao criar personal.')
+            setError(message || 'Erro ao criar personal.')
         }
     } finally {
         setLoading(false)
