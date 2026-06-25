@@ -147,6 +147,10 @@ export default function CreateStudent() {
     }
   }
 
+  const isErrorMessage =
+    msg.includes('Erro') ||
+    msg === 'Este e-mail já está cadastrado em outro acesso, tente outro email.'
+
   return (
     <div style={{ maxWidth: 860 }}>
       <h1>Alunos • Criar Aluno</h1>
@@ -249,7 +253,7 @@ export default function CreateStudent() {
           </label>
         </div>
 
-        {msg && <div className={`form-${msg.includes('Erro') ? 'error' : 'success'}`}>{msg}</div>}
+        {msg && <div className={`form-${isErrorMessage ? 'error' : 'success'}`}>{msg}</div>}
         <div className="form-actions">
           <button className="btn" onClick={save} disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</button>
         </div>
