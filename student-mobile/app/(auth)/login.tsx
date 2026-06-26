@@ -41,7 +41,7 @@ export default function Login() {
       if (error) throw error;
 
       if (data.user) {
-        router.replace("/(tabs)/dashboard");
+        router.replace("/");
       }
     } catch (error: any) {
       Alert.alert(
