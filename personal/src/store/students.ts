@@ -29,6 +29,60 @@ export type StudentRecord = {
   lastAccess?: string
 }
 
+type StudentToggleResult = {
+  success: boolean
+  error?: string
+}
+
+type PersonalSubscriptionRow = {
+  student_limit?: number | null
+}
+
+type PersonalProfileRow = {
+  data?: {
+    saas?: {
+      studentLimit?: number
+    }
+  } | null
+}
+
+function normalizeStudentStatus(status: unknown): 'ativo' | 'inativo' {
+  return status === 'inativo' ? 'inativo' : 'ativo'
+}
+
+async function getPersonalStudentLimit(personalId: string): Promise<number | null> {
+  const { data: subscriptionData } = await supabase
+    .from('personal_subscriptions')
+    .select('student_limit')
+    .eq('personal_id', personalId)
+    .maybeSingle<PersonalSubscriptionRow>()
+
+  if (typeof subscriptionData?.student_limit === 'number') {
+    return subscriptionData.student_limit
+  }
+
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select('data')
+    .eq('id', personalId)
+    .maybeSingle<PersonalProfileRow>()
+
+  const fallbackLimit = profileData?.data?.saas?.studentLimit
+  return typeof fallbackLimit === 'number' ? fallbackLimit : null
+}
+
+async function countActiveStudentsByPersonal(personalId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, data')
+    .eq('personal_id', personalId)
+    .eq('role', 'aluno')
+
+  if (error) throw error
+
+  return (data || []).filter((student: any) => normalizeStudentStatus(student?.data?.status) === 'ativo').length
+}
+
 export async function listStudentsByPersonal(personalId: string): Promise<StudentRecord[]> {
   const { data, error } = await supabase
     .from('profiles')
@@ -46,7 +100,7 @@ export async function listStudentsByPersonal(personalId: string): Promise<Studen
     personalId: d.personal_id,
     name: d.full_name || '',
     email: d.email || d.data?.email || '',
-    status: d.data?.status || 'ativo',
+    status: normalizeStudentStatus(d.data?.status),
     createdAt: d.created_at,
     lastAccess: d.data?.last_app_access_at,
     address: d.data?.address,
@@ -122,7 +176,7 @@ export async function getStudent(id: string): Promise<StudentRecord | undefined>
     name: data.full_name,
     email: data.email,
     whatsapp: data.data?.whatsapp,
-    status: data.data?.status || 'ativo',
+    status: normalizeStudentStatus(data.data?.status),
     createdAt: data.created_at,
     lastAccess: data.data?.last_app_access_at,
     address: data.data?.address,
@@ -137,14 +191,34 @@ export async function getStudent(id: string): Promise<StudentRecord | undefined>
   }
 }
 
-export async function toggleStudentActive(id: string, newStatus: 'ativo' | 'inativo'): Promise<boolean> {
+export async function toggleStudentActive(id: string, newStatus: 'ativo' | 'inativo'): Promise<StudentToggleResult> {
   const { data: current, error: fetchErr } = await supabase
       .from('profiles')
-      .select('data')
+      .select('personal_id, data')
       .eq('id', id)
       .single()
   
-  if (fetchErr) return false
+  if (fetchErr) {
+    return { success: false, error: 'Não foi possível localizar o aluno.' }
+  }
+
+  const currentStatus = normalizeStudentStatus(current?.data?.status)
+  const personalId = typeof current?.personal_id === 'string' ? current.personal_id : ''
+
+  if (newStatus === 'ativo' && currentStatus !== 'ativo' && personalId) {
+    const studentLimit = await getPersonalStudentLimit(personalId)
+
+    if (typeof studentLimit === 'number') {
+      const activeStudents = await countActiveStudentsByPersonal(personalId)
+
+      if (activeStudents >= studentLimit) {
+        return {
+          success: false,
+          error: `Seu plano atual permite até ${studentLimit} alunos ativos. Faça upgrade para ativar mais alunos.`
+        }
+      }
+    }
+  }
 
   const newData = {
       ...current.data,
@@ -156,7 +230,11 @@ export async function toggleStudentActive(id: string, newStatus: 'ativo' | 'inat
       .update({ data: newData })
       .eq('id', id)
   
-  return !error
+  if (error) {
+    return { success: false, error: 'Não foi possível atualizar o status do aluno.' }
+  }
+
+  return { success: true }
 }
 
 export async function getStudentsWeeklyFrequency(studentIds: string[]): Promise<Record<string, number>> {

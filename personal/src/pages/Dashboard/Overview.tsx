@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import type { StudentRecord } from '../../store/students'
@@ -6,6 +6,21 @@ import type { PlanRecord } from '../../store/plans'
 import type { DebitRecord } from '../../store/financial'
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts'
+
+function getMonthsToDistribute(frequency?: string | null) {
+  switch (frequency) {
+    case 'bimonthly':
+      return 2
+    case 'quarterly':
+      return 3
+    case 'semiannual':
+      return 6
+    case 'annual':
+      return 12
+    default:
+      return 1
+  }
+}
 
 export default function Overview() {
   const navigate = useNavigate()
@@ -20,8 +35,6 @@ export default function Overview() {
     plans: [] as PlanRecord[],
     payments: [] as DebitRecord[]
   })
-
-  const [chartData, setChartData] = useState<{ name: string, revenue: number }[]>([])
 
   const [stats, setStats] = useState({
     totalStudents: 0,
@@ -48,74 +61,51 @@ export default function Overview() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Recalcula gráfico quando filtros ou dados mudam
-  useEffect(() => {
-      if (stats.loading) return
+  const chartData = useMemo(() => {
+    if (stats.loading) return []
 
-      const { year, month } = filters
-      const { students, plans, payments } = rawData
-      
-      const newChartData = []
-      
-      // Inicializa acumuladores para os 12 meses do ano selecionado
-      const monthTotals = new Array(12).fill(0)
+    const { year, month } = filters
+    const { students, plans, payments } = rawData
+    const monthTotals = new Array(12).fill(0)
+    const studentPlanById = new Map(students.map(student => [student.id, student.planId]))
+    const planFrequencyById = new Map(plans.map(plan => [plan.id, plan.frequency]))
 
-      // Itera APENAS pagamentos recebidos (Caixa -> Competência)
-      payments.forEach(payment => {
-          if (!payment.paidAt && !payment.dueDate) return
-          // Filtra valores absurdos de teste que quebram o gráfico
-          if (payment.amount > 100000) return
+    payments.forEach(payment => {
+      if (!payment.paidAt && !payment.dueDate) return
+      if (payment.amount > 100000) return
 
-          const baseDate = new Date(payment.dueDate || payment.paidAt!)
-          
-          const student = students.find(s => s.id === payment.payerId)
-          let monthsToDistribute = 1
-          
-          if (student && student.planId) {
-              const plan = plans.find(p => p.id === student.planId)
-              if (plan) {
-                  switch (plan.frequency) {
-                      case 'weekly': monthsToDistribute = 1; break
-                      case 'monthly': monthsToDistribute = 1; break
-                      case 'bimonthly': monthsToDistribute = 2; break
-                      case 'quarterly': monthsToDistribute = 3; break
-                      case 'semiannual': monthsToDistribute = 6; break
-                      case 'annual': monthsToDistribute = 12; break
-                      default: monthsToDistribute = 1
-                  }
-              }
-          }
+      const baseDate = new Date(payment.dueDate || payment.paidAt!)
+      const planId = studentPlanById.get(payment.payerId)
+      const monthsToDistribute = getMonthsToDistribute(planId ? planFrequencyById.get(planId) : null)
+      const monthlyValue = payment.amount / monthsToDistribute
 
-          const monthlyValue = payment.amount / monthsToDistribute
-
-          for (let i = 0; i < monthsToDistribute; i++) {
-              const targetDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, 1)
-              if (targetDate.getFullYear() === year) {
-                  monthTotals[targetDate.getMonth()] += monthlyValue
-              }
-          }
-      })
-      
-      const startMonth = month === 'all' ? 0 : Number(month)
-      const endMonth = month === 'all' ? 11 : Number(month)
-      
-      for (let m = startMonth; m <= endMonth; m++) {
-          const monthStart = new Date(year, m, 1)
-          let total = monthTotals[m]
-          
-          // Trava de segurança final: Remove outliers extremos que quebram a escala do gráfico
-          if (total > 500000) total = 0
-
-          if (Math.round(total) > 0) {
-              newChartData.push({
-                  name: monthStart.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase(),
-                  revenue: Math.round(total)
-              })
-          }
+      for (let i = 0; i < monthsToDistribute; i++) {
+        const targetDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, 1)
+        if (targetDate.getFullYear() === year) {
+          monthTotals[targetDate.getMonth()] += monthlyValue
+        }
       }
-      
-      setChartData(newChartData)
+    })
 
+    const startMonth = month === 'all' ? 0 : Number(month)
+    const endMonth = month === 'all' ? 11 : Number(month)
+    const nextChartData: { name: string; revenue: number }[] = []
+
+    for (let m = startMonth; m <= endMonth; m++) {
+      const monthStart = new Date(year, m, 1)
+      let total = monthTotals[m]
+
+      if (total > 500000) total = 0
+
+      if (Math.round(total) > 0) {
+        nextChartData.push({
+          name: monthStart.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase(),
+          revenue: Math.round(total)
+        })
+      }
+    }
+
+    return nextChartData
   }, [filters, rawData, stats.loading])
 
   useEffect(() => {
@@ -135,15 +125,15 @@ export default function Overview() {
             profileRes, // NOVO
             anamnesisRes // NOVO
         ] = await Promise.all([
-            supabase.from('profiles').select('*').eq('personal_id', user.id).eq('role', 'aluno'),
-            supabase.from('plans').select('*').eq('personal_id', user.id),
-            supabase.from('debits').select('*').eq('receiver_id', user.id).eq('status', 'paid'),
+            supabase.from('profiles').select('id, personal_id, full_name, email, created_at, plan_id, due_day, data').eq('personal_id', user.id).eq('role', 'aluno'),
+            supabase.from('plans').select('id, frequency').eq('personal_id', user.id),
+            supabase.from('debits').select('id, payer_id, receiver_id, amount, due_date, paid_at, status, saas_ref_month').eq('receiver_id', user.id).eq('status', 'paid'),
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active'),
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active'),
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').eq('status', 'active'),
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').neq('status', 'active'),
             supabase.from('profiles').select('data').eq('id', user.id).single(),
-            supabase.from('protocols').select('*').eq('personal_id', user.id).eq('type', 'anamnesis')
+            supabase.from('protocols').select('student_id, data, content').eq('personal_id', user.id).eq('type', 'anamnesis')
         ])
 
         const studentsRaw = studentsRes.data || []
@@ -162,6 +152,8 @@ export default function Overview() {
 
         const totalStudents = students.length
         const activeStudentsList = students.filter(s => s.status !== 'inativo')
+        const activeStudentIds = new Set(activeStudentsList.map(student => student.id))
+        const activeStudentPlanById = new Map(activeStudentsList.map(student => [student.id, student.planId]))
         const activeStudents = activeStudentsList.length
         const inactiveStudents = totalStudents - activeStudents
 
@@ -171,18 +163,16 @@ export default function Overview() {
         
         if (showAnamnesisPending) {
             const allAnamnesis = anamnesisRes.data || []
-            // Filtra apenas de alunos ATIVOS e que NÃO foram revisadas
-            const activeStudentIds = activeStudentsList.map(s => s.id)
-            
-            pendingAnamnesisCount = allAnamnesis.filter(a => {
-                const isFromActiveStudent = activeStudentIds.includes(a.student_id)
-                const data = a.data || a.content || {}
-                const notReviewed = !data.reviewed_at
-                return isFromActiveStudent && notReviewed
-            }).length
+
+            pendingAnamnesisCount = allAnamnesis.reduce((count, anamnesis: any) => {
+                if (!activeStudentIds.has(anamnesis.student_id)) return count
+                const data = anamnesis.data || anamnesis.content || {}
+                return !data.reviewed_at ? count + 1 : count
+            }, 0)
         }
 
         const plans = (plansRes.data || []) as PlanRecord[]
+        const planFrequencyById = new Map(plans.map(plan => [plan.id, plan.frequency]))
         
         const paymentsRaw = paymentsRes.data || []
         const allPayments: DebitRecord[] = paymentsRaw.map((d: any) => ({
@@ -195,6 +185,21 @@ export default function Overview() {
             status: d.status,
             monthRef: d.saas_ref_month
         }))
+        const paymentsByStudentId = new Map<string, DebitRecord[]>()
+
+        allPayments.forEach(payment => {
+            const currentPayments = paymentsByStudentId.get(payment.payerId) || []
+            currentPayments.push(payment)
+            paymentsByStudentId.set(payment.payerId, currentPayments)
+        })
+
+        paymentsByStudentId.forEach(studentPayments => {
+            studentPayments.sort((a, b) => {
+                const dateA = new Date(a.paidAt || a.dueDate || 0).getTime()
+                const dateB = new Date(b.paidAt || b.dueDate || 0).getTime()
+                return dateB - dateA
+            })
+        })
 
         // Salva dados brutos
         setRawData({
@@ -228,22 +233,9 @@ export default function Overview() {
 
             // Calculo Competência (mantendo lógica anterior)
             const baseDate = new Date(payment.dueDate || payment.paidAt!)
-            const student = activeStudentsList.find(s => s.id === payment.payerId)
-            let monthsToDistribute = 1
-            if (student && student.planId) {
-                const plan = plans.find(p => p.id === student.planId)
-                if (plan) {
-                     switch (plan.frequency) {
-                      case 'weekly': monthsToDistribute = 1; break
-                      case 'monthly': monthsToDistribute = 1; break
-                      case 'bimonthly': monthsToDistribute = 2; break
-                      case 'quarterly': monthsToDistribute = 3; break
-                      case 'semiannual': monthsToDistribute = 6; break
-                      case 'annual': monthsToDistribute = 12; break
-                      default: monthsToDistribute = 1
-                  }
-                }
-            }
+            const monthsToDistribute = getMonthsToDistribute(
+              planFrequencyById.get(activeStudentPlanById.get(payment.payerId) || '')
+            )
             
             const monthlyValue = payment.amount / monthsToDistribute
             
@@ -257,26 +249,14 @@ export default function Overview() {
         
         // CALCULO FINANCEIRO (Quem deve REALMENTE)
         let pendingFinanceCount = 0
-        const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-        const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString()
-        // const now = new Date() // Já declarado
-
         activeStudentsList.forEach(student => {
             if (!student.planId || !student.planStartDate) return
-            const plan = plans.find(p => p.id === student.planId)
-            if (!plan) return
-            const studentPayments = allPayments.filter(p => p.payerId === student.id)
+            const planFrequency = planFrequencyById.get(student.planId)
+            if (!planFrequency) return
+            const studentPayments = paymentsByStudentId.get(student.id) || []
             // NOVA LÓGICA DE VENCIMENTO REAL (HISTÓRICO)
             // Não olha apenas o mês atual, mas sim se o último pagamento cobre o dia de hoje.
-            
-            // 1. Pega todos os pagamentos deste aluno ordenados por data (mais recente primeiro)
-            const myPayments = studentPayments.sort((a, b) => {
-                const dateA = new Date(a.paidAt || a.dueDate || 0).getTime()
-                const dateB = new Date(b.paidAt || b.dueDate || 0).getTime()
-                return dateB - dateA
-            })
-
-            const lastPayment = myPayments[0]
+            const lastPayment = studentPayments[0]
             
             // Se nunca pagou e já passou da data de início + tolerância, está devendo
             if (!lastPayment) {
@@ -295,7 +275,7 @@ export default function Overview() {
             const refDate = new Date(lastPayment.paidAt || lastPayment.dueDate || 0)
             let validityDays = 30 // Padrão mensal
 
-            switch (plan.frequency) {
+            switch (planFrequency) {
                 case 'weekly': validityDays = 7; break
                 case 'monthly': validityDays = 30; break
                 case 'bimonthly': validityDays = 60; break

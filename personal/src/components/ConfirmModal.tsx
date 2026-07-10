@@ -9,6 +9,9 @@ type ConfirmModalProps = {
   onConfirm: () => void
   onCancel: () => void
   isDanger?: boolean
+  stackActions?: boolean
+  confirmDisabled?: boolean
+  cancelDisabled?: boolean
 }
 
 export default function ConfirmModal({
@@ -19,7 +22,10 @@ export default function ConfirmModal({
   cancelText = 'Cancelar',
   onConfirm,
   onCancel,
-  isDanger = false
+  isDanger = false,
+  stackActions = false,
+  confirmDisabled = false,
+  cancelDisabled = false
 }: ConfirmModalProps) {
   if (!isOpen) return null
 
@@ -71,9 +77,15 @@ export default function ConfirmModal({
           {description}
         </p>
 
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: stackActions ? 'column' : 'row',
+          gap: '12px',
+          justifyContent: 'flex-end'
+        }}>
           <button
             onClick={onCancel}
+            disabled={cancelDisabled}
             style={{
               padding: '10px 16px',
               borderRadius: '6px',
@@ -81,17 +93,23 @@ export default function ConfirmModal({
               backgroundColor: 'white',
               color: '#374151',
               fontWeight: 500,
-              cursor: 'pointer',
+              cursor: cancelDisabled ? 'not-allowed' : 'pointer',
               fontSize: '0.95rem',
-              transition: 'background 0.2s'
+              transition: 'background 0.2s',
+              opacity: cancelDisabled ? 0.7 : 1
             }}
-            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-            onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
+            onMouseOver={(e) => {
+              if (!cancelDisabled) e.currentTarget.style.backgroundColor = '#f3f4f6'
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'white'
+            }}
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
+            disabled={confirmDisabled}
             style={{
               padding: '10px 16px',
               borderRadius: '6px',
@@ -99,13 +117,18 @@ export default function ConfirmModal({
               backgroundColor: isDanger ? '#dc2626' : '#2563eb',
               color: 'white',
               fontWeight: 500,
-              cursor: 'pointer',
+              cursor: confirmDisabled ? 'not-allowed' : 'pointer',
               fontSize: '0.95rem',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'opacity 0.2s'
+              transition: 'opacity 0.2s',
+              opacity: confirmDisabled ? 0.7 : 1
             }}
-            onMouseOver={(e) => e.currentTarget.style.opacity = '0.9'}
-            onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+            onMouseOver={(e) => {
+              if (!confirmDisabled) e.currentTarget.style.opacity = '0.9'
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.opacity = confirmDisabled ? '0.7' : '1'
+            }}
           >
             {confirmText}
           </button>

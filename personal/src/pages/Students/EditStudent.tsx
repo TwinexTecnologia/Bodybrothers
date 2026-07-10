@@ -778,7 +778,12 @@ export default function EditStudent() {
       }
 
       setLoading(true)
-      await toggleStudentActive(selectedId, newStatus)
+      const result = await toggleStudentActive(selectedId, newStatus)
+      if (!result.success) {
+          setLoading(false)
+          setMsg(result.error || 'Não foi possível alterar o status do aluno.')
+          return
+      }
       
       setStudents(prev => prev.map(s => s.id === selectedId ? { ...s, status: newStatus } : s))
       setLoading(false)

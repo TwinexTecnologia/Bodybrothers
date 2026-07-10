@@ -16,6 +16,10 @@ type ProfileRow = {
   data: Record<string, unknown> | null;
 };
 
+type PersonalSubscriptionRow = {
+  student_limit: number | null;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -132,6 +136,8 @@ async function handleCreateStudent({
   if (requesterRole === "personal" && personalId !== requesterId) {
     throw new Error("Você só pode criar alunos vinculados ao seu perfil.");
   }
+
+  await assertPersonalHasStudentCapacity({ supabase, personalId });
 
   const { data: createdUser, error: createError } = await supabase.auth.admin.createUser({
     email,
@@ -260,4 +266,86 @@ async function handleUpdateCredentials({
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     },
   );
+}
+
+async function assertPersonalHasStudentCapacity({
+  supabase,
+  personalId,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  personalId: string;
+}) {
+  const studentLimit = await getPersonalStudentLimit({ supabase, personalId });
+
+  if (typeof studentLimit !== "number") {
+    return;
+  }
+
+  const activeStudents = await countActiveStudents({ supabase, personalId });
+
+  if (activeStudents >= studentLimit) {
+    throw new Error(
+      `Seu plano atual permite até ${studentLimit} alunos ativos. Faça upgrade para cadastrar mais alunos.`,
+    );
+  }
+}
+
+async function getPersonalStudentLimit({
+  supabase,
+  personalId,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  personalId: string;
+}) {
+  const { data: subscription } = await supabase
+    .from("personal_subscriptions")
+    .select("student_limit")
+    .eq("personal_id", personalId)
+    .maybeSingle<PersonalSubscriptionRow>();
+
+  if (typeof subscription?.student_limit === "number") {
+    return subscription.student_limit;
+  }
+
+  const { data: personalProfile } = await supabase
+    .from("profiles")
+    .select("data")
+    .eq("id", personalId)
+    .maybeSingle<ProfileRow>();
+
+  const fallbackLimit = personalProfile?.data?.saas;
+
+  if (
+    typeof fallbackLimit === "object" &&
+    fallbackLimit !== null &&
+    typeof (fallbackLimit as Record<string, unknown>).studentLimit === "number"
+  ) {
+    return (fallbackLimit as Record<string, unknown>).studentLimit as number;
+  }
+
+  return null;
+}
+
+async function countActiveStudents({
+  supabase,
+  personalId,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  personalId: string;
+}) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("data")
+    .eq("personal_id", personalId)
+    .eq("role", "aluno");
+
+  if (error) throw error;
+
+  return (data ?? []).filter((student) => {
+    const rawStatus =
+      typeof student?.data === "object" && student.data !== null
+        ? (student.data as Record<string, unknown>).status
+        : undefined;
+    return rawStatus !== "inativo";
+  }).length;
 }

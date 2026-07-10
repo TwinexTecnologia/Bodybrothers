@@ -1,7 +1,103 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
+import ConfirmModal from '../../components/ConfirmModal'
+import MercadoPagoCardForm from '../../components/MercadoPagoCardForm'
+import { cancelSubscriptionDowngrade, chargeSavedCard, checkSubscriptionPaymentStatus, createRegularizationPayment, payWithCardToken, removeSavedPaymentMethod, requestSubscriptionDowngrade, saveCardToken } from '../../lib/subscription'
+import { useAuth } from '../../auth/useAuth'
 import { supabase } from '../../lib/supabase'
 
+type SubscriptionRow = {
+  id: string | null
+  plan_slug: string | null
+  student_limit: number | null
+  billing_cycle: 'monthly' | 'quarterly' | 'yearly' | null
+  status: string | null
+  amount: number | null
+  next_billing_at: string | null
+  scheduled_plan_slug: string | null
+  scheduled_change_at: string | null
+}
+
+type SubscriptionPaymentRow = {
+  id: string
+  status: 'pending' | 'approved' | 'failed' | 'canceled' | 'refunded'
+  amount: number
+  currency: string | null
+  provider: string | null
+  provider_payment_id: string | null
+  provider_reference: string | null
+  description: string | null
+  due_at: string | null
+  created_at: string
+  raw_payload: Record<string, unknown> | null
+}
+
+type SavedPaymentMethod = {
+  provider: 'mercadopago'
+  providerCustomerId: string
+  providerCardId: string
+  paymentMethodId: string | null
+  issuerId: string | null
+  brand: string | null
+  lastFour: string | null
+  firstPaymentProviderPaymentId: string | null
+  updatedAt: string | null
+}
+
+type StoredPaymentMethodRow = {
+  provider: string | null
+  provider_customer_id: string | null
+  provider_card_id: string | null
+  payment_method_id: string | null
+  issuer_id: string | null
+  brand: string | null
+  last_four: string | null
+  first_payment_provider_payment_id: string | null
+  updated_at: string | null
+}
+
+type CardChargeResponse = {
+  approved: boolean
+  status: SubscriptionPaymentRow['status']
+  statusDetail: string | null
+}
+
+const PLAN_LABELS: Record<string, string> = {
+  free: 'Free',
+  starter: 'Starter',
+  premium: 'Premium',
+  pro: 'Pro',
+  elite: 'Elite',
+  unlimited: 'Ilimitado',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  free: 'Free',
+  active: 'Ativo',
+  pending_payment: 'Aguardando pagamento',
+  past_due: 'Em atraso',
+  blocked: 'Bloqueado',
+  canceled: 'Cancelado',
+}
+
+const BILLING_CYCLE_LABELS: Record<string, string> = {
+  monthly: 'Mensal',
+  quarterly: 'Trimestral',
+  yearly: 'Anual',
+}
+
+const PLAN_CONFIGS: Record<string, { label: string; studentLimit: number; rank: number }> = {
+  free: { label: 'Free', studentLimit: 1, rank: 0 },
+  starter: { label: 'Starter', studentLimit: 10, rank: 1 },
+  pro: { label: 'Pro', studentLimit: 30, rank: 2 },
+  premium: { label: 'Premium', studentLimit: 30, rank: 2 },
+  elite: { label: 'Elite', studentLimit: 999999, rank: 3 },
+  unlimited: { label: 'Ilimitado', studentLimit: 999999, rank: 3 },
+}
+
 export default function Profile() {
+  const { refreshAuthState } = useAuth()
+  const mercadoPagoPublicKey = import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY || ''
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
@@ -9,21 +105,90 @@ export default function Profile() {
 
   // Dados do Perfil
   const [id, setId] = useState('')
+  const [personalAccountId, setPersonalAccountId] = useState('')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  
-  // Configuração de Evolução
-  const [evolutionMode, setEvolutionMode] = useState('anamnesis') // 'anamnesis' | 'standalone'
-  const [evolutionFields, setEvolutionFields] = useState<any[]>([]) 
+  const [subscription, setSubscription] = useState<SubscriptionRow | null>(null)
+  const [subscriptionAmount, setSubscriptionAmount] = useState(0)
+  const [savedPaymentMethod, setSavedPaymentMethod] = useState<SavedPaymentMethod | null>(null)
+  const [latestPayment, setLatestPayment] = useState<SubscriptionPaymentRow | null>(null)
+  const [activeStudents, setActiveStudents] = useState(0)
+  const [downgradeTargetPlan, setDowngradeTargetPlan] = useState('')
+  const [downgradeModalOpen, setDowngradeModalOpen] = useState(false)
+  const [showDowngradeOptions, setShowDowngradeOptions] = useState(false)
+  const [downgradeLoading, setDowngradeLoading] = useState(false)
+  const [cancelDowngradeLoading, setCancelDowngradeLoading] = useState(false)
+  const [copyPixMsg, setCopyPixMsg] = useState('')
+  const [paymentActionLoading, setPaymentActionLoading] = useState<'pix' | 'card' | 'check' | null>(null)
+  const [showCardForm, setShowCardForm] = useState(false)
+  const [cardFormMode, setCardFormMode] = useState<'regularization' | 'save-card' | null>(null)
+  const [cardFormAmount, setCardFormAmount] = useState<number | null>(null)
+  const [removeSavedCardModalOpen, setRemoveSavedCardModalOpen] = useState(false)
+  const [removeSavedCardLoading, setRemoveSavedCardLoading] = useState(false)
 
   // Dados de Senha
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
+  const canUpgrade = useMemo(() => {
+    const plan = subscription?.plan_slug || 'free'
+    return !['unlimited', 'elite'].includes(plan)
+  }, [subscription])
+
+  const canDowngrade = useMemo(() => {
+    const plan = subscription?.plan_slug || 'free'
+    return plan !== 'free'
+  }, [subscription])
+
+  const downgradeOptions = useMemo(() => {
+    const currentPlan = (subscription?.plan_slug || 'free').toLowerCase()
+    const currentRank = PLAN_CONFIGS[currentPlan]?.rank ?? 0
+
+    return Object.entries(PLAN_CONFIGS)
+      .filter(([plan, config]) => config.rank < currentRank && plan !== currentPlan)
+      .sort(([, a], [, b]) => b.rank - a.rank)
+  }, [subscription])
+
+  const selectedDowngradeConfig = downgradeTargetPlan ? PLAN_CONFIGS[downgradeTargetPlan] : null
+  const studentsToInactivate = selectedDowngradeConfig
+    ? Math.max(activeStudents - selectedDowngradeConfig.studentLimit, 0)
+    : 0
+  const paymentActionData = useMemo(() => extractPaymentActionData(latestPayment?.raw_payload), [latestPayment])
+  const canCopyPix = Boolean(paymentActionData.pixCode)
+  const needsRegularization = subscription?.status === 'blocked' || subscription?.status === 'past_due'
+  const hasSavedPaymentMethod = Boolean(savedPaymentMethod?.providerCardId)
+  const savedPaymentMethodValidated = Boolean(savedPaymentMethod?.firstPaymentProviderPaymentId)
+  const cardPaymentAmount = useMemo(() => {
+    const explicitCardAmount = normalizeMoneyValue(cardFormAmount)
+    if (explicitCardAmount > 0) return explicitCardAmount
+
+    const latestPaymentAmount = normalizeMoneyValue(latestPayment?.amount)
+    if (latestPaymentAmount > 0) return latestPaymentAmount
+
+    if (subscriptionAmount > 0) return subscriptionAmount
+
+    const subscriptionAmountFromObject = normalizeMoneyValue(subscription?.amount)
+    if (subscriptionAmountFromObject > 0) return subscriptionAmountFromObject
+
+    return 0
+  }, [cardFormAmount, latestPayment, subscription, subscriptionAmount])
+
   useEffect(() => {
     loadProfile()
   }, [])
+
+  useEffect(() => {
+    if (!downgradeOptions.length) {
+      setDowngradeTargetPlan('')
+      return
+    }
+
+    const hasCurrentOption = downgradeOptions.some(([plan]) => plan === downgradeTargetPlan)
+    if (!hasCurrentOption) {
+      setDowngradeTargetPlan(downgradeOptions[0][0])
+    }
+  }, [downgradeOptions, downgradeTargetPlan])
 
   async function loadProfile() {
     try {
@@ -42,11 +207,75 @@ export default function Profile() {
         .eq('id', user.id)
         .single()
 
+      if (error) throw error
+
       if (profile) {
         setName(profile.full_name || '')
         setPhone(profile.data?.phone || '')
-        setEvolutionMode(profile.data?.config?.evolutionMode || 'anamnesis')
-        setEvolutionFields(profile.data?.config?.evolutionFields || [])
+      }
+
+      const resolvedPersonalAccountId = typeof profile?.personal_id === 'string' && profile.personal_id
+        ? profile.personal_id
+        : user.id
+
+      setPersonalAccountId(resolvedPersonalAccountId)
+
+      const [paymentMethodResult, subscriptionResult, studentsResult] = await Promise.all([
+        supabase
+          .from('personal_payment_methods')
+          .select('provider, provider_customer_id, provider_card_id, payment_method_id, issuer_id, brand, last_four, first_payment_provider_payment_id, updated_at')
+          .eq('personal_id', resolvedPersonalAccountId)
+          .eq('status', 'active')
+          .maybeSingle<StoredPaymentMethodRow>(),
+        supabase
+          .from('personal_subscriptions')
+          .select('id, plan_slug, student_limit, billing_cycle, status, amount, next_billing_at, scheduled_plan_slug, scheduled_change_at')
+          .eq('personal_id', resolvedPersonalAccountId)
+          .maybeSingle<SubscriptionRow>(),
+        supabase
+          .from('profiles')
+          .select('id, data')
+          .eq('personal_id', resolvedPersonalAccountId)
+          .eq('role', 'aluno')
+      ])
+
+      if (paymentMethodResult.error) {
+        console.error('Erro ao carregar personal_payment_methods:', paymentMethodResult.error)
+      }
+
+      if (subscriptionResult.error) {
+        console.error('Erro ao carregar personal_subscriptions:', subscriptionResult.error)
+      }
+
+      if (studentsResult.error) {
+        console.error('Erro ao carregar alunos ativos:', studentsResult.error)
+      }
+
+      setSavedPaymentMethod(resolveSavedPaymentMethod(profile?.data, paymentMethodResult.data || null))
+
+      const fallbackSubscription = buildLegacySubscription(profile?.data)
+      const resolvedSubscription = subscriptionResult.data || fallbackSubscription
+
+      setSubscription(resolvedSubscription)
+      setSubscriptionAmount(normalizeMoneyValue(subscriptionResult.data?.amount))
+      setActiveStudents((studentsResult.data || []).filter((student: any) => (student?.data?.status || 'ativo') !== 'inativo').length)
+
+      if (subscriptionResult.data?.id && (resolvedSubscription?.status === 'blocked' || resolvedSubscription?.status === 'past_due')) {
+        const { data: paymentData } = await supabase
+          .from('subscription_payments')
+          .select('id, status, amount, currency, provider, provider_payment_id, provider_reference, description, due_at, created_at, raw_payload')
+          .eq('subscription_id', subscriptionResult.data.id)
+          .in('status', ['pending', 'failed'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle<SubscriptionPaymentRow>()
+
+        setLatestPayment(paymentData || null)
+      } else {
+        setLatestPayment(null)
+        setShowCardForm(false)
+        setCardFormMode(null)
+        setCardFormAmount(null)
       }
     } catch (error: any) {
       console.error(error)
@@ -56,47 +285,12 @@ export default function Profile() {
     }
   }
 
-  const handleAddField = () => {
-    setEvolutionFields(prev => [...prev, { id: Date.now().toString(), label: '', exampleUrl: '' }])
-  }
-
-  const handleRemoveField = (fieldId: string) => {
-    setEvolutionFields(prev => prev.filter(f => f.id !== fieldId))
-  }
-
-  const handleUpdateField = (fieldId: string, key: string, value: string) => {
-    setEvolutionFields(prev => prev.map(f => f.id === fieldId ? { ...f, [key]: value } : f))
-  }
-
-  const handleFieldExampleUpload = async (fieldId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return
-    const file = e.target.files[0]
-    const fileExt = file.name.split('.').pop()
-    const fileName = `examples/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
-
-    try {
-        const { error: uploadError } = await supabase.storage
-            .from('logos') // Usando bucket logos por conveniência
-            .upload(fileName, file)
-
-        if (uploadError) throw uploadError
-
-        const { data } = supabase.storage.from('logos').getPublicUrl(fileName)
-        handleUpdateField(fieldId, 'exampleUrl', data.publicUrl)
-    } catch (err: any) {
-        alert('Erro upload: ' + err.message)
-    }
-  }
-
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleUpdateProfile = async () => {
     setSaving(true)
     setMsg('')
     setError('')
 
     try {
-      // 1. Atualizar Profile (Nome, Telefone, Config Evolução)
-      // Primeiro buscamos o dado atual para não perder outros campos do JSONB
       const { data: currentProfile } = await supabase
         .from('profiles')
         .select('data')
@@ -106,11 +300,6 @@ export default function Profile() {
       const newData = {
         ...(currentProfile?.data || {}),
         phone: phone,
-        config: {
-          ...(currentProfile?.data?.config || {}),
-          evolutionMode,
-          evolutionFields
-        }
       }
 
       const { error: updateError } = await supabase
@@ -141,61 +330,7 @@ export default function Profile() {
         setConfirmPassword('')
       }
 
-      // 2. Propagar configuração via PROTOCOLOS (Mais seguro e garantido)
-      // Cria/Atualiza um protocolo 'evolution_config' para cada aluno
-      if (evolutionMode === 'standalone') {
-          const { data: students } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('personal_id', id)
-            .eq('role', 'aluno') // Garante que é aluno
-          
-          if (students && students.length > 0) {
-              setMsg(`Aplicando configuração para ${students.length} alunos...`)
-              
-              const updates = students.map(async (student) => {
-                  // Verifica se já existe config
-                  const { data: existing } = await supabase
-                      .from('protocols')
-                      .select('id')
-                      .eq('student_id', student.id)
-                      .eq('type', 'evolution_config')
-                      .single()
-
-                  const configData = {
-                      mode: evolutionMode,
-                      fields: evolutionFields,
-                      updated_at: new Date().toISOString()
-                  }
-
-                  if (existing) {
-                      return supabase
-                          .from('protocols')
-                          .update({
-                              data: configData,
-                              title: 'Configuração de Evolução'
-                          })
-                          .eq('id', existing.id)
-                  } else {
-                      return supabase
-                          .from('protocols')
-                          .insert({
-                              student_id: student.id,
-                              personal_id: id,
-                              type: 'evolution_config',
-                              title: 'Configuração de Evolução',
-                              status: 'active',
-                              data: configData
-                          })
-                  }
-              })
-              
-              await Promise.all(updates)
-          }
-      }
-
-      setMsg('Configurações salvas e aplicadas aos alunos!')
-      // setStudents(prev => prev.map(s => s.id === selectedId ? { ...s, name, email } : s)) // Linha removida pois não existe aqui
+      setMsg('Perfil atualizado com sucesso!')
     } catch (err: any) {
       console.error(err)
       setError(err.message || 'Erro ao atualizar perfil.')
@@ -204,73 +339,592 @@ export default function Profile() {
     }
   }
 
+  async function handleConfirmDowngrade() {
+    if (!downgradeTargetPlan) return
+
+    try {
+      setDowngradeLoading(true)
+      setMsg('')
+      setError('')
+
+      const response = await requestSubscriptionDowngrade({
+        targetPlan: downgradeTargetPlan,
+      })
+
+      setDowngradeModalOpen(false)
+      setMsg(`Downgrade para o plano ${PLAN_LABELS[response.targetPlan] || response.targetPlan} agendado para ${formatDate(response.effectiveAt)}.`)
+      await loadProfile()
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || 'Não foi possível solicitar o downgrade do plano.')
+    } finally {
+      setDowngradeLoading(false)
+    }
+  }
+
+  async function handleCancelDowngrade() {
+    try {
+      setCancelDowngradeLoading(true)
+      setMsg('')
+      setError('')
+
+      const response = await cancelSubscriptionDowngrade()
+      setShowDowngradeOptions(false)
+      setMsg(`Downgrade para o plano ${PLAN_LABELS[response.canceledPlan] || response.canceledPlan} cancelado com sucesso.`)
+      await loadProfile()
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || 'Não foi possível cancelar o downgrade agendado.')
+    } finally {
+      setCancelDowngradeLoading(false)
+    }
+  }
+
+  async function handleCopyPixCode() {
+    if (!paymentActionData.pixCode) return
+
+    try {
+      await navigator.clipboard.writeText(paymentActionData.pixCode)
+      setCopyPixMsg('Codigo PIX copiado com sucesso.')
+      window.setTimeout(() => setCopyPixMsg(''), 3000)
+    } catch (error) {
+      console.error(error)
+      setCopyPixMsg('Nao foi possivel copiar o codigo PIX automaticamente.')
+    }
+  }
+
+  async function openCardForm(mode: 'regularization' | 'save-card') {
+    if (!mercadoPagoPublicKey) {
+      throw new Error('A public key do Mercado Pago ainda não foi configurada no front.')
+    }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: freshSubscriptionAmount } = await supabase
+      .from('personal_subscriptions')
+      .select('amount')
+      .eq('personal_id', personalAccountId || user?.id || id)
+      .maybeSingle<{ amount: number | string | null }>()
+
+    const normalizedAmount = normalizeMoneyValue(freshSubscriptionAmount?.amount)
+
+    setCardFormAmount(normalizedAmount > 0 ? normalizedAmount : 1)
+    setCardFormMode(mode)
+    setShowCardForm(true)
+  }
+
+  async function handleGenerateRegularizationPayment(action: 'pix' | 'card-pay' | 'card-change') {
+    try {
+      setMsg('')
+      setError('')
+      setCopyPixMsg('')
+
+      if (action === 'card-pay' && hasSavedPaymentMethod && savedPaymentMethodValidated) {
+        setPaymentActionLoading('card')
+        const response = await chargeSavedCard()
+        setShowCardForm(false)
+        setCardFormMode(null)
+        setCardFormAmount(null)
+        await handleCardChargeResponse(response)
+        return
+      }
+
+      if (action !== 'pix') {
+        await openCardForm(action === 'card-change' ? 'save-card' : 'regularization')
+        setMsg(action === 'card-change'
+          ? hasSavedPaymentMethod
+            ? 'Preencha o formulário abaixo para trocar o cartão cadastrado.'
+            : 'Preencha o formulário abaixo para cadastrar um cartão no seu perfil.'
+          : hasSavedPaymentMethod && !savedPaymentMethodValidated
+            ? 'Esse cartao salvo ainda precisa da primeira validacao com CVV. Preencha o formulario para concluir essa etapa e liberar as proximas cobrancas automaticas.'
+          : 'Preencha o formulário abaixo para pagar com cartão sem sair da tela.')
+        return
+      }
+
+      setPaymentActionLoading('pix')
+      const response = await createRegularizationPayment({ method: 'pix' })
+      setCardFormAmount(null)
+      setShowCardForm(false)
+      await loadProfile()
+      setMsg(response.pixCode ? 'PIX gerado com sucesso.' : 'Cobrança PIX gerada. Confira os dados abaixo.')
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || 'Não foi possível gerar a cobrança.')
+    } finally {
+      setPaymentActionLoading(null)
+    }
+  }
+
+  async function handleCardChargeResponse(response: CardChargeResponse) {
+    setCardFormAmount(null)
+    await loadProfile()
+    await refreshAuthState()
+
+    if (response.approved) {
+      setShowCardForm(false)
+      setCardFormMode(null)
+      setMsg('Pagamento aprovado com sucesso. O acesso do personal foi regularizado.')
+      return
+    }
+
+    if (response.status === 'pending') {
+      setMsg('Pagamento enviado com sucesso e aguardando confirmacao. Clique em "Checar pagamento" em alguns segundos para atualizar o status.')
+      return
+    }
+
+    throw new Error(response.statusDetail || 'O pagamento com cartão não foi aprovado.')
+  }
+
+  async function handleCardFormSubmit(data: {
+    token: string
+    paymentMethodId: string
+    issuerId?: string | null
+    installments: number
+    identificationType: string
+    identificationNumber: string
+  }) {
+    try {
+      setPaymentActionLoading('card')
+      setMsg('')
+      setError('')
+      setCopyPixMsg('')
+
+      if (cardFormMode === 'save-card') {
+        const response = await saveCardToken(data)
+        setCardFormAmount(null)
+        setShowCardForm(false)
+        setCardFormMode(null)
+        await loadProfile()
+        setMsg(`Cartão ${formatSavedCardBrand(response.brand)} final ${response.lastFour || '****'} cadastrado com sucesso.`)
+        return
+      }
+
+      const response = await payWithCardToken(data)
+      await handleCardChargeResponse(response)
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || 'Não foi possível processar o pagamento com cartão.')
+    } finally {
+      setPaymentActionLoading(null)
+    }
+  }
+
+  async function handleRemoveSavedCard() {
+    try {
+      setRemoveSavedCardLoading(true)
+      setMsg('')
+      setError('')
+
+      await removeSavedPaymentMethod()
+      setRemoveSavedCardModalOpen(false)
+      setShowCardForm(false)
+      setCardFormMode(null)
+      await loadProfile()
+      setMsg('Cartão cadastrado excluído com sucesso.')
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || 'Não foi possível excluir o cartão cadastrado.')
+    } finally {
+      setRemoveSavedCardLoading(false)
+    }
+  }
+
+  async function handleCheckPaymentStatus() {
+    try {
+      setPaymentActionLoading('check')
+      setMsg('')
+      setError('')
+
+      const response = await checkSubscriptionPaymentStatus({
+        providerPaymentId: latestPayment?.provider_payment_id,
+        localPaymentId: latestPayment?.id,
+      })
+
+      await loadProfile()
+      await refreshAuthState()
+
+      if (response.approved) {
+        setMsg('Pagamento aprovado com sucesso. O acesso do personal foi regularizado.')
+      } else if (response.requiresRedirectCheck) {
+        setMsg('A cobrança de checkout ainda depende da confirmação do retorno ou do webhook do Mercado Pago.')
+      } else {
+        setMsg(`Pagamento ainda não aprovado. Status atual: ${getPaymentStatusLabel(response.status)}.`)
+      }
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || 'Não foi possível consultar o status do pagamento.')
+    } finally {
+      setPaymentActionLoading(null)
+    }
+  }
+
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Carregando perfil...</div>
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: '1.8rem', color: '#0f172a', margin: 0 }}>Evolução dos Alunos</h1>
-        <p style={{ color: '#64748b', marginTop: 4 }}>Configure como seus alunos enviam fotos de evolução.</p>
+        <h1 style={{ fontSize: '1.8rem', color: '#0f172a', margin: 0 }}>Perfil do Personal</h1>
+        <p style={{ color: '#64748b', marginTop: 4 }}>Gerencie seus dados de acesso e acompanhe o status do seu plano.</p>
       </div>
 
-      <form onSubmit={handleUpdateProfile} style={{ display: 'grid', gap: 24 }}>
-        
-        {/* Card: Configuração de Evolução */}
+      <div style={{ display: 'grid', gap: 24 }}>
         <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Modo de Evolução</h3>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Dados do Perfil</h3>
+          </div>
+          <div style={{ padding: 24, display: 'grid', gap: 16 }}>
+            <label style={{ display: 'grid', gap: 8 }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Nome</span>
+              <input value={name} onChange={e => setName(e.target.value)} style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+            </label>
+            <label style={{ display: 'grid', gap: 8 }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Email</span>
+              <input value={email} disabled style={{ padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b' }} />
+            </label>
+            <label style={{ display: 'grid', gap: 8 }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Telefone</span>
+              <input value={phone} onChange={e => setPhone(e.target.value)} style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+            </label>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Nova senha</span>
+              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Opcional" style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+            </div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Confirmar nova senha</span>
+              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repita a nova senha" style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Plano e Assinatura</h3>
           </div>
           <div style={{ padding: 24, display: 'grid', gap: 20 }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ padding: 12, borderRadius: 8, background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '1rem', fontWeight: 500 }}>
-                  {evolutionMode === 'standalone' ? 'Fotos Avulsas (Standalone)' : 'Via Anamnese (Padrão)'}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
+              <InfoCard label="Plano atual" value={PLAN_LABELS[subscription?.plan_slug || 'free'] || 'Free'} />
+              <InfoCard label="Status" value={STATUS_LABELS[subscription?.status || 'free'] || 'Free'} tone={subscription?.status === 'blocked' ? 'danger' : subscription?.status === 'past_due' ? 'warning' : 'default'} />
+              <InfoCard label="Ciclo" value={BILLING_CYCLE_LABELS[subscription?.billing_cycle || 'monthly'] || 'Mensal'} />
+              <InfoCard label="Limite de alunos" value={String(subscription?.student_limit ?? 1)} />
+              <InfoCard label="Alunos ativos" value={String(activeStudents)} tone={typeof subscription?.student_limit === 'number' && activeStudents >= subscription.student_limit ? 'warning' : 'default'} />
+              <InfoCard label="Próxima cobrança" value={subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : '-'} />
+            </div>
+
+            {(subscription?.status === 'blocked' || subscription?.status === 'past_due') && (
+              <div style={subscription?.status === 'blocked' ? blockedBannerStyle : pastDueBannerStyle}>
+                <div style={{ fontWeight: 700 }}>
+                  {subscription.status === 'blocked' ? 'Acesso temporariamente bloqueado' : 'Pagamento em atraso'}
+                </div>
+                <div style={{ fontSize: '0.92rem', lineHeight: 1.5 }}>
+                  {subscription.status === 'blocked'
+                    ? 'Enquanto o pagamento não for regularizado, o acesso às demais áreas do painel fica bloqueado. Seu Perfil do Personal continua liberado para acompanhar o plano e resolver a cobrança.'
+                    : 'Seu acesso às demais áreas está restrito até a regularização do pagamento.'}
+                </div>
+              </div>
+            )}
+
+            {(subscription?.plan_slug || 'free') !== 'free' && (
+              <div style={regularizationCardStyle}>
+                <div style={{ fontWeight: 700, color: '#0f172a' }}>Metodo de pagamento cadastrado</div>
+
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
+                    {hasSavedPaymentMethod
+                      ? `${formatSavedCardBrand(savedPaymentMethod?.brand)} final ${savedPaymentMethod?.lastFour || '****'}`
+                      : 'Nenhum cartao cadastrado'}
+                  </div>
+                  <div style={{ fontSize: '0.9rem', color: '#475569' }}>
+                    {hasSavedPaymentMethod
+                      ? 'Esse cartao fica salvo para tentativas manuais agora e para as proximas renovacoes automaticas.'
+                      : 'Cadastre um cartao para manter o metodo de pagamento salvo e liberar a renovacao automatica.'}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        setMsg('')
+                        setError('')
+                        await openCardForm('save-card')
+                        setMsg(hasSavedPaymentMethod
+                          ? 'Preencha o formulário abaixo para trocar o cartão cadastrado.'
+                          : 'Preencha o formulário abaixo para cadastrar um cartão no seu perfil.')
+                      } catch (err: any) {
+                        console.error(err)
+                        setError(err.message || 'Não foi possível abrir o formulário do cartão.')
+                      }
+                    }}
+                    disabled={paymentActionLoading !== null || removeSavedCardLoading}
+                    style={paymentActionLoading !== null || removeSavedCardLoading ? disabledActionButtonStyle : actionButtonStyle}
+                  >
+                    {hasSavedPaymentMethod ? 'Trocar cartao' : 'Cadastrar cartao'}
+                  </button>
+
+                  {hasSavedPaymentMethod && (
+                    <button
+                      type="button"
+                      onClick={() => setRemoveSavedCardModalOpen(true)}
+                      disabled={paymentActionLoading !== null || removeSavedCardLoading}
+                      style={paymentActionLoading !== null || removeSavedCardLoading ? {
+                        ...subtleDangerButtonStyle,
+                        opacity: 0.7,
+                        cursor: 'not-allowed',
+                      } : subtleDangerButtonStyle}
+                    >
+                      Excluir cartao
+                    </button>
+                  )}
+                </div>
+
+                {showCardForm && cardFormMode === 'save-card' && (
+                  mercadoPagoPublicKey ? (
+                    <MercadoPagoCardForm
+                      publicKey={mercadoPagoPublicKey}
+                      amount={cardPaymentAmount}
+                      payerEmail={email}
+                      loading={paymentActionLoading === 'card'}
+                      title={hasSavedPaymentMethod ? 'Trocar cartao cadastrado' : 'Cadastrar cartao'}
+                      submitLabel={hasSavedPaymentMethod ? 'Salvar novo cartao' : 'Salvar cartao'}
+                      showAmount={false}
+                      processingTitle="Salvando cartao..."
+                      processingText="Aguarde um instante enquanto validamos e salvamos o cartao no seu perfil."
+                      onSubmit={handleCardFormSubmit}
+                      onCancel={() => {
+                        if (paymentActionLoading !== 'card') {
+                          setShowCardForm(false)
+                          setCardFormMode(null)
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div style={downgradeWarningStyle}>
+                      Configure `VITE_MERCADO_PAGO_PUBLIC_KEY` no front para liberar o cadastro de cartão.
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
+            {needsRegularization && (
+              <div style={regularizationCardStyle}>
+                <div style={{ fontWeight: 700, color: '#0f172a' }}>Regularizacao do pagamento</div>
+
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <button type="button" onClick={() => handleGenerateRegularizationPayment('card-pay')} disabled={paymentActionLoading !== null} style={paymentActionLoading !== null ? disabledActionButtonStyle : actionButtonStyle}>
+                    {paymentActionLoading === 'card' ? 'Processando...' : hasSavedPaymentMethod ? (savedPaymentMethodValidated ? 'Pagar com cartao salvo' : 'Validar cartao salvo') : 'Pagar com cartao'}
+                  </button>
+
+                  <button type="button" onClick={() => handleGenerateRegularizationPayment('card-change')} disabled={paymentActionLoading !== null} style={paymentActionLoading !== null ? disabledActionButtonStyle : actionButtonStyle}>
+                    {paymentActionLoading === 'card' ? 'Processando...' : hasSavedPaymentMethod ? 'Trocar cartao salvo' : 'Cadastrar cartao'}
+                  </button>
+
+                  <button type="button" onClick={() => handleGenerateRegularizationPayment('pix')} disabled={paymentActionLoading !== null} style={paymentActionLoading !== null ? disabledActionButtonStyle : actionButtonStyle}>
+                    {paymentActionLoading === 'pix' ? 'Gerando PIX...' : 'Gerar cobranca PIX'}
+                  </button>
+
+                  {canCopyPix && (
+                    <button type="button" onClick={handleCopyPixCode} style={actionButtonStyle}>Copiar codigo PIX</button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleCheckPaymentStatus}
+                    disabled={paymentActionLoading !== null || !latestPayment}
+                    style={paymentActionLoading !== null || !latestPayment ? disabledActionButtonStyle : actionButtonStyle}
+                  >
+                    {paymentActionLoading === 'check' ? 'Consultando...' : 'Checar pagamento'}
+                  </button>
+                </div>
+
+                {error && (
+                  <div style={inlineErrorStyle}>
+                    {error}
+                  </div>
+                )}
+
+                {msg && (
+                  <div style={inlineSuccessStyle}>
+                    {msg}
+                  </div>
+                )}
+
+                {latestPayment ? (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                      <InfoCard label="Status da cobranca" value={getPaymentStatusLabel(latestPayment.status)} tone={latestPayment.status === 'failed' ? 'danger' : 'warning'} />
+                      <InfoCard label="Valor" value={formatCurrency(latestPayment.amount, latestPayment.currency || 'BRL')} />
+                      <InfoCard label="Vencimento" value={latestPayment.due_at ? formatDate(latestPayment.due_at) : '-'} />
+                      <InfoCard label="Provedor" value={latestPayment.provider || '-'} />
+                    </div>
+
+                    {(latestPayment.description || latestPayment.provider_reference) && (
+                      <div style={{ display: 'grid', gap: 6, fontSize: '0.9rem', color: '#475569' }}>
+                        {latestPayment.description && <div><strong style={{ color: '#0f172a' }}>Descricao:</strong> {latestPayment.description}</div>}
+                        {latestPayment.provider_reference && (
+                          <div>
+                            <strong style={{ color: '#0f172a' }}>Referencia:</strong>{' '}
+                            {formatBillingReference(latestPayment.due_at || subscription?.next_billing_at || latestPayment.created_at)}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {paymentActionData.pixCode && (
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Codigo PIX</div>
+                        <textarea
+                          readOnly
+                          value={paymentActionData.pixCode}
+                          style={{
+                            width: '100%',
+                            minHeight: 88,
+                            padding: 12,
+                            borderRadius: 8,
+                            border: '1px solid #cbd5e1',
+                            resize: 'vertical',
+                            fontFamily: 'monospace',
+                            fontSize: '0.85rem',
+                            background: '#fff',
+                          }}
+                        />
+                        {copyPixMsg && <div style={{ fontSize: '0.85rem', color: '#166534', fontWeight: 600 }}>{copyPixMsg}</div>}
+                      </div>
+                    )}
+
+                    {(paymentActionData.qrCodeBase64 || paymentActionData.ticketUrl) && (
+                      <div style={{ display: 'grid', gap: 10 }}>
+                        {paymentActionData.qrCodeBase64 && (
+                          <div style={{ display: 'grid', gap: 8, justifyItems: 'start' }}>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>QR Code PIX</div>
+                            <img
+                              src={buildQrCodeImageSource(paymentActionData.qrCodeBase64)}
+                              alt="QR Code PIX"
+                              style={{ width: 180, height: 180, borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff', padding: 8 }}
+                            />
+                          </div>
+                        )}
+
+                        {paymentActionData.ticketUrl && (
+                          <div>
+                            <a href={paymentActionData.ticketUrl} target="_blank" rel="noreferrer" style={primaryLinkButtonStyle}>
+                              Abrir PIX no navegador
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : null}
+
+                {showCardForm && cardFormMode === 'regularization' && (
+                  mercadoPagoPublicKey ? (
+                    <MercadoPagoCardForm
+                      publicKey={mercadoPagoPublicKey}
+                      amount={cardPaymentAmount}
+                      payerEmail={email}
+                      loading={paymentActionLoading === 'card'}
+                      onSubmit={handleCardFormSubmit}
+                      onCancel={() => {
+                        if (paymentActionLoading !== 'card') {
+                          setShowCardForm(false)
+                          setCardFormMode(null)
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div style={downgradeWarningStyle}>
+                      Configure `VITE_MERCADO_PAGO_PUBLIC_KEY` no front para liberar o pagamento embutido com cartão.
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
+            {subscription?.scheduled_plan_slug && (
+              <div style={scheduledChangeBoxStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Downgrade agendado</div>
+                  <button
+                    type="button"
+                    onClick={handleCancelDowngrade}
+                    disabled={cancelDowngradeLoading}
+                    style={cancelDowngradeLoading ? disabledActionButtonStyle : actionButtonStyle}
+                  >
+                    {cancelDowngradeLoading ? 'Cancelando...' : 'Cancelar downgrade'}
+                  </button>
+                </div>
+                <div style={{ fontSize: '0.92rem', color: '#475569' }}>
+                  Seu plano será alterado para {PLAN_LABELS[subscription.scheduled_plan_slug] || subscription.scheduled_plan_slug} em {subscription.scheduled_change_at ? formatDate(subscription.scheduled_change_at) : 'data a confirmar'}.
+                </div>
+              </div>
+            )}
+
+            <div style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', display: 'grid', gap: 10 }}>
+              <div style={{ fontWeight: 600, color: '#0f172a' }}>Ações do plano</div>
+              <div style={{ fontSize: '0.9rem' }}>
+                Ajustes de plano e regularização de pagamento ficam centralizados por aqui.
               </div>
 
-              <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                O modo de evolução é definido pelo administrador no momento da contratação.
-              </span>
-            </label>
+              {canDowngrade && downgradeOptions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowDowngradeOptions(current => !current)}
+                  style={ghostButtonStyle}
+                >
+                  {showDowngradeOptions ? 'Ocultar opções de downgrade' : 'Ver opções de downgrade'}
+                </button>
+              )}
 
-            {/* Editor de Campos de Evolução (Apenas Standalone) */}
-            {evolutionMode === 'standalone' && (
-                <div style={{ background: '#f8fafc', padding: 16, borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                        <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#334155' }}>Campos Personalizados de Upload</h4>
-                        <button type="button" onClick={handleAddField} style={{ fontSize: '0.8rem', padding: '6px 12px', background: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>+ Adicionar Campo</button>
+              {canDowngrade && downgradeOptions.length > 0 && showDowngradeOptions && (
+                <div style={{ display: 'grid', gap: 12, padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff' }}>
+                  <label style={{ display: 'grid', gap: 8 }}>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Plano para downgrade</span>
+                    <select
+                      value={downgradeTargetPlan}
+                      onChange={e => setDowngradeTargetPlan(e.target.value)}
+                      style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff' }}
+                    >
+                      {downgradeOptions.map(([plan, config]) => (
+                        <option key={plan} value={plan}>
+                          {config.label} - até {config.studentLimit >= 999999 ? 'alunos ilimitados' : `${config.studentLimit} alunos ativos`}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {selectedDowngradeConfig && (
+                    <div style={{ fontSize: '0.9rem', color: '#475569' }}>
+                      O plano {selectedDowngradeConfig.label} permite até {selectedDowngradeConfig.studentLimit >= 999999 ? 'alunos ilimitados' : `${selectedDowngradeConfig.studentLimit} alunos ativos`}.
                     </div>
-                    
-                    {evolutionFields.length === 0 ? (
-                        <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>Nenhum campo definido (Upload livre).</div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            {evolutionFields.map((field, idx) => (
-                                <div key={field.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: '#fff', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }}>
-                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                        <input 
-                                            placeholder="Nome do Campo (ex: Frente Relaxado)" 
-                                            value={field.label}
-                                            onChange={e => handleUpdateField(field.id, 'label', e.target.value)}
-                                            style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e2e8f0', fontSize: '0.9rem' }}
-                                        />
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                            {field.exampleUrl ? (
-                                                <img src={field.exampleUrl} alt="Exemplo" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
-                                            ) : (
-                                                <div style={{ width: 40, height: 40, borderRadius: 6, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: '#94a3b8', border: '1px solid #e2e8f0' }}>Sem foto</div>
-                                            )}
-                                            <label style={{ cursor: 'pointer', fontSize: '0.85rem', color: '#3b82f6', fontWeight: 500 }}>
-                                                {field.exampleUrl ? 'Alterar Foto Exemplo' : 'Adicionar Foto Exemplo'}
-                                                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleFieldExampleUpload(field.id, e)} />
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <button type="button" onClick={() => handleRemoveField(field.id)} style={{ background: '#fee2e2', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 8, borderRadius: 6 }}>✕</button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                  )}
+
+                  {studentsToInactivate > 0 && (
+                    <div style={downgradeWarningStyle}>
+                      Para seguir com esse downgrade, você precisa inativar {studentsToInactivate} aluno{studentsToInactivate > 1 ? 's' : ''} antes.
+                    </div>
+                  )}
                 </div>
-            )}
+              )}
+
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {canUpgrade && <button type="button" disabled style={secondaryButtonStyle}>Fazer upgrade</button>}
+                {canDowngrade && showDowngradeOptions && (
+                  <button
+                    type="button"
+                    onClick={() => setDowngradeModalOpen(true)}
+                    disabled={!downgradeTargetPlan || studentsToInactivate > 0 || downgradeLoading}
+                    style={{
+                      ...subtleDangerButtonStyle,
+                      opacity: !downgradeTargetPlan || studentsToInactivate > 0 || downgradeLoading ? 0.7 : 1,
+                      cursor: !downgradeTargetPlan || studentsToInactivate > 0 || downgradeLoading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {downgradeLoading ? 'Solicitando...' : 'Confirmar downgrade'}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -279,7 +933,8 @@ export default function Profile() {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button 
-            type="submit" 
+            type="button"
+            onClick={handleUpdateProfile}
             disabled={saving}
             style={{ 
               background: '#0f172a', color: '#fff', padding: '14px 32px', borderRadius: 8, border: 'none', 
@@ -291,7 +946,378 @@ export default function Profile() {
           </button>
         </div>
 
-      </form>
+      </div>
+
+      <ConfirmModal
+        isOpen={downgradeModalOpen}
+        title="Confirmar downgrade do plano"
+        description={selectedDowngradeConfig
+          ? `Deseja mesmo regredir seu plano para ${selectedDowngradeConfig.label}? Lembrando que você irá perder funcionalidades do plano atual e a mudança será aplicada na próxima cobrança.`
+          : 'Deseja mesmo regredir seu plano?'}
+        cancelText="Não, manter meu plano"
+        confirmText={downgradeLoading ? 'Solicitando...' : 'Sim, solicitar downgrade'}
+        onCancel={() => {
+          if (!downgradeLoading) setDowngradeModalOpen(false)
+        }}
+        onConfirm={handleConfirmDowngrade}
+        isDanger
+        stackActions
+        cancelDisabled={downgradeLoading}
+        confirmDisabled={downgradeLoading}
+      />
+
+      <ConfirmModal
+        isOpen={removeSavedCardModalOpen}
+        title="Excluir cartão cadastrado"
+        description="Deseja mesmo excluir o cartão salvo do seu perfil? Você poderá cadastrar outro cartão quando quiser."
+        cancelText="Manter cartão"
+        confirmText={removeSavedCardLoading ? 'Excluindo...' : 'Sim, excluir cartão'}
+        onCancel={() => {
+          if (!removeSavedCardLoading) setRemoveSavedCardModalOpen(false)
+        }}
+        onConfirm={handleRemoveSavedCard}
+        isDanger
+        stackActions
+        cancelDisabled={removeSavedCardLoading}
+        confirmDisabled={removeSavedCardLoading}
+      />
     </div>
   )
+}
+
+function InfoCard({ label, value, tone = 'default' }: { label: string; value: string; tone?: 'default' | 'warning' | 'danger' }) {
+  const colors = tone === 'danger'
+    ? { background: '#fef2f2', border: '#fecaca', color: '#991b1b' }
+    : tone === 'warning'
+      ? { background: '#fff7ed', border: '#fdba74', color: '#9a3412' }
+      : { background: '#fff', border: '#e2e8f0', color: '#0f172a' }
+
+  return (
+    <div style={{ border: `1px solid ${colors.border}`, background: colors.background, borderRadius: 12, padding: 16 }}>
+      <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: 8 }}>{label}</div>
+      <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.color }}>{value}</div>
+    </div>
+  )
+}
+
+const secondaryButtonStyle: CSSProperties = {
+  padding: '10px 16px',
+  borderRadius: 8,
+  border: '1px solid #cbd5e1',
+  background: '#fff',
+  color: '#64748b',
+  fontWeight: 600,
+  cursor: 'not-allowed',
+  opacity: 0.75,
+}
+
+const ghostButtonStyle: CSSProperties = {
+  padding: '6px 0',
+  borderRadius: 8,
+  border: 'none',
+  background: 'transparent',
+  color: '#64748b',
+  fontWeight: 600,
+  cursor: 'pointer',
+  justifySelf: 'start',
+}
+
+const subtleDangerButtonStyle: CSSProperties = {
+  padding: '10px 16px',
+  borderRadius: 8,
+  border: '1px solid #fecaca',
+  background: '#fff5f5',
+  color: '#b91c1c',
+  fontWeight: 600,
+}
+
+const scheduledChangeBoxStyle: CSSProperties = {
+  padding: 16,
+  borderRadius: 12,
+  background: '#eff6ff',
+  border: '1px solid #bfdbfe',
+  display: 'grid',
+  gap: 8,
+}
+
+const downgradeWarningStyle: CSSProperties = {
+  padding: 12,
+  borderRadius: 10,
+  background: '#fff7ed',
+  border: '1px solid #fdba74',
+  color: '#9a3412',
+  fontWeight: 600,
+}
+
+const blockedBannerStyle: CSSProperties = {
+  padding: 16,
+  borderRadius: 12,
+  background: '#fef2f2',
+  border: '1px solid #fecaca',
+  color: '#991b1b',
+  display: 'grid',
+  gap: 8,
+}
+
+const pastDueBannerStyle: CSSProperties = {
+  padding: 16,
+  borderRadius: 12,
+  background: '#fff7ed',
+  border: '1px solid #fdba74',
+  color: '#9a3412',
+  display: 'grid',
+  gap: 8,
+}
+
+const regularizationCardStyle: CSSProperties = {
+  padding: 16,
+  borderRadius: 12,
+  background: '#fff',
+  border: '1px solid #e2e8f0',
+  display: 'grid',
+  gap: 16,
+}
+
+const inlineSuccessStyle: CSSProperties = {
+  padding: 12,
+  borderRadius: 10,
+  background: '#dcfce7',
+  border: '1px solid #86efac',
+  color: '#166534',
+  fontWeight: 600,
+}
+
+const inlineErrorStyle: CSSProperties = {
+  padding: 12,
+  borderRadius: 10,
+  background: '#fef2f2',
+  border: '1px solid #fecaca',
+  color: '#b91c1c',
+  fontWeight: 600,
+}
+
+const actionButtonStyle: CSSProperties = {
+  padding: '10px 16px',
+  borderRadius: 8,
+  border: '1px solid #cbd5e1',
+  background: '#fff',
+  color: '#0f172a',
+  fontWeight: 600,
+  cursor: 'pointer',
+}
+
+const disabledActionButtonStyle: CSSProperties = {
+  ...actionButtonStyle,
+  opacity: 0.7,
+  cursor: 'not-allowed',
+}
+
+const primaryLinkButtonStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '10px 16px',
+  borderRadius: 8,
+  background: '#0f172a',
+  color: '#fff',
+  fontWeight: 600,
+  textDecoration: 'none',
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('pt-BR')
+}
+
+function formatCurrency(value: number, currency: string) {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency,
+  }).format(value || 0)
+}
+
+function formatBillingReference(value?: string | null) {
+  if (!value) return '-'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date)
+}
+
+function formatSavedCardBrand(brand?: string | null) {
+  if (!brand) return 'Cartao'
+
+  const normalized = brand.trim().toLowerCase()
+  if (normalized === 'visa') return 'Visa'
+  if (normalized === 'master' || normalized === 'mastercard') return 'Mastercard'
+  if (normalized === 'amex') return 'American Express'
+  if (normalized === 'elo') return 'Elo'
+  if (normalized === 'hipercard') return 'Hipercard'
+
+  return brand.charAt(0).toUpperCase() + brand.slice(1)
+}
+
+function getPaymentStatusLabel(status: SubscriptionPaymentRow['status']) {
+  if (status === 'approved') return 'Pago'
+  if (status === 'failed') return 'Falhou'
+  if (status === 'pending') return 'Pendente'
+  if (status === 'canceled') return 'Cancelado'
+  if (status === 'refunded') return 'Estornado'
+  return status
+}
+
+function buildLegacySubscription(data: unknown): SubscriptionRow | null {
+  if (!data || typeof data !== 'object') return null
+
+  const saas = (data as { saas?: Record<string, unknown> }).saas
+  if (!saas || typeof saas !== 'object') return null
+
+  const planSlug = typeof saas.plan === 'string' ? saas.plan : 'free'
+  const studentLimit = typeof saas.studentLimit === 'number'
+    ? saas.studentLimit
+    : typeof saas.studentLimit === 'string'
+      ? Number(saas.studentLimit)
+      : 1
+
+  return {
+    id: null,
+    plan_slug: planSlug,
+    student_limit: Number.isFinite(studentLimit) ? studentLimit : 1,
+    billing_cycle: normalizeBillingCycle(saas.billingCycle),
+    status: typeof saas.subscriptionStatus === 'string' ? saas.subscriptionStatus : (planSlug === 'free' ? 'free' : 'active'),
+    amount: null,
+    next_billing_at: typeof saas.nextBillingAt === 'string' ? saas.nextBillingAt : null,
+    scheduled_plan_slug: null,
+    scheduled_change_at: null,
+  }
+}
+
+function extractSavedPaymentMethod(data: unknown): SavedPaymentMethod | null {
+  if (!data || typeof data !== 'object') return null
+
+  const paymentMethod = (data as { paymentMethod?: Record<string, unknown> }).paymentMethod
+  if (!paymentMethod || typeof paymentMethod !== 'object') return null
+
+  const providerCustomerId = typeof paymentMethod.providerCustomerId === 'string' ? paymentMethod.providerCustomerId : ''
+  const providerCardId = typeof paymentMethod.providerCardId === 'string' ? paymentMethod.providerCardId : ''
+
+  if (!providerCustomerId || !providerCardId) return null
+
+  return {
+    provider: 'mercadopago',
+    providerCustomerId,
+    providerCardId,
+    paymentMethodId: typeof paymentMethod.paymentMethodId === 'string' ? paymentMethod.paymentMethodId : null,
+    issuerId: typeof paymentMethod.issuerId === 'string' ? paymentMethod.issuerId : null,
+    brand: typeof paymentMethod.brand === 'string' ? paymentMethod.brand : null,
+    lastFour: typeof paymentMethod.lastFour === 'string' ? paymentMethod.lastFour : null,
+    firstPaymentProviderPaymentId: typeof paymentMethod.firstPaymentProviderPaymentId === 'string' ? paymentMethod.firstPaymentProviderPaymentId : null,
+    updatedAt: typeof paymentMethod.updatedAt === 'string' ? paymentMethod.updatedAt : null,
+  }
+}
+
+function mapStoredPaymentMethod(row: StoredPaymentMethodRow | null | undefined): SavedPaymentMethod | null {
+  if (!row) return null
+
+  const providerCustomerId = typeof row.provider_customer_id === 'string' ? row.provider_customer_id : ''
+  const providerCardId = typeof row.provider_card_id === 'string' ? row.provider_card_id : ''
+
+  if (!providerCustomerId || !providerCardId) return null
+
+  return {
+    provider: 'mercadopago',
+    providerCustomerId,
+    providerCardId,
+    paymentMethodId: typeof row.payment_method_id === 'string' ? row.payment_method_id : null,
+    issuerId: typeof row.issuer_id === 'string' ? row.issuer_id : null,
+    brand: typeof row.brand === 'string' ? row.brand : null,
+    lastFour: typeof row.last_four === 'string' ? row.last_four : null,
+    firstPaymentProviderPaymentId: typeof row.first_payment_provider_payment_id === 'string' ? row.first_payment_provider_payment_id : null,
+    updatedAt: typeof row.updated_at === 'string' ? row.updated_at : null,
+  }
+}
+
+function resolveSavedPaymentMethod(data: unknown, row: StoredPaymentMethodRow | null | undefined) {
+  return mapStoredPaymentMethod(row) || extractSavedPaymentMethod(data)
+}
+
+function normalizeBillingCycle(value: unknown): SubscriptionRow['billing_cycle'] {
+  if (value === 'monthly' || value === 'quarterly' || value === 'yearly') {
+    return value
+  }
+
+  return 'monthly'
+}
+
+function normalizeMoneyValue(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const normalized = Number(value.replace(',', '.'))
+    if (Number.isFinite(normalized)) return normalized
+  }
+  return 0
+}
+
+function extractPaymentActionData(rawPayload: Record<string, unknown> | null | undefined) {
+  const checkoutUrl = findNestedString(rawPayload, [
+    'checkout_url',
+    'checkoutUrl',
+    'ticket_url',
+    'ticketUrl',
+    'init_point',
+    'sandbox_init_point',
+    'payment_url',
+    'paymentUrl',
+  ])
+
+  const pixCode = findNestedString(rawPayload, [
+    'pix_code',
+    'pixCode',
+    'qr_code',
+    'qrCode',
+    'qr_code_text',
+    'qrCodeText',
+    'copy_paste',
+    'copyPaste',
+  ])
+
+  const qrCodeBase64 = findNestedString(rawPayload, [
+    'qr_code_base64',
+    'qrCodeBase64',
+  ])
+
+  const ticketUrl = findNestedString(rawPayload, [
+    'ticket_url',
+    'ticketUrl',
+  ])
+
+  return { checkoutUrl, pixCode, qrCodeBase64, ticketUrl }
+}
+
+function buildQrCodeImageSource(value: string) {
+  return value.startsWith('data:image') ? value : `data:image/png;base64,${value}`
+}
+
+function findNestedString(value: unknown, keys: string[]): string | null {
+  if (!value || typeof value !== 'object') return null
+
+  const entries = Object.entries(value as Record<string, unknown>)
+
+  for (const [entryKey, entryValue] of entries) {
+    if (typeof entryValue === 'string' && keys.includes(entryKey)) {
+      return entryValue
+    }
+  }
+
+  for (const [, entryValue] of entries) {
+    if (entryValue && typeof entryValue === 'object') {
+      const nested = findNestedString(entryValue, keys)
+      if (nested) return nested
+    }
+  }
+
+  return null
 }

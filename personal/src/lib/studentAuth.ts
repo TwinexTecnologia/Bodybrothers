@@ -29,7 +29,7 @@ export async function createStudentAuthUser(input: CreateStudentAuthInput): Prom
   })
 
   if (error) {
-    throw await normalizeFunctionInvokeError(error)
+    throw await normalizeFunctionInvokeError(error, 'Não foi possível criar o aluno.')
   }
   if (data?.error) throw new Error(data.error)
   if (!data?.userId) throw new Error('Resposta inválida ao criar aluno.')
@@ -51,14 +51,14 @@ export async function updateStudentAuthCredentials(input: UpdateStudentAuthInput
   })
 
   if (error) {
-    throw await normalizeFunctionInvokeError(error)
+    throw await normalizeFunctionInvokeError(error, 'Não foi possível atualizar as credenciais do aluno.')
   }
   if (data?.error) throw new Error(data.error)
 }
 
-async function normalizeFunctionInvokeError(error: unknown): Promise<Error> {
+async function normalizeFunctionInvokeError(error: unknown, fallback: string): Promise<Error> {
   const fallbackMessage =
-    error instanceof Error ? error.message : 'Erro ao processar a requisição.'
+    error instanceof Error && error.message ? error.message : fallback
   const response = (error as { context?: Response } | null)?.context
 
   let detailedMessage = ''
@@ -70,7 +70,7 @@ async function normalizeFunctionInvokeError(error: unknown): Promise<Error> {
         detailedMessage = payload.error.trim()
       }
     } catch {
-      // Ignora erros de parsing e usa a mensagem padrão.
+      void 0
     }
   }
 

@@ -28,6 +28,7 @@ import {
   LogOut,
   type LucideIcon,
 } from 'lucide-react'
+import { useAuth } from '../auth/useAuth'
 
 type Branding = { brandTitle?: string; brandLogoUrl?: string }
 
@@ -44,6 +45,7 @@ type MenuItem = {
 }
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { isSubscriptionRestricted, subscriptionStatus } = useAuth()
   const [branding, setBranding] = useState<Branding>(() => {
     try {
       const raw = localStorage.getItem('personal_branding')
@@ -150,16 +152,21 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const settingsItems = useMemo<MenuItem[]>(() => {
     const items: MenuItem[] = [
       { label: 'Perfil do Personal', to: '/account/profile', icon: UserCircle2 },
-      { label: 'Identidade Visual', to: '/account/branding', icon: Palette },
-      { label: 'Preferências', to: '/account/preferences', icon: SlidersHorizontal },
     ]
 
-    if (evolutionMode === 'standalone') {
+    if (!isSubscriptionRestricted) {
+      items.push(
+        { label: 'Identidade Visual', to: '/account/branding', icon: Palette },
+        { label: 'Preferências', to: '/account/preferences', icon: SlidersHorizontal },
+      )
+    }
+
+    if (evolutionMode === 'standalone' && !isSubscriptionRestricted) {
       items.push({ label: 'Configurar Evolução', to: '/account/profile', icon: Camera })
     }
 
     return items
-  }, [evolutionMode])
+  }, [evolutionMode, isSubscriptionRestricted])
 
   const renderMenuItem = (item: MenuItem, compact = false) => {
     const Icon = item.icon
@@ -227,7 +234,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
       </div>
       <nav className="menu">
-        {canAccess('dashboard') && (
+        {isSubscriptionRestricted && (
+          <div style={{
+            margin: '0 12px 16px',
+            padding: '12px',
+            borderRadius: '10px',
+            background: subscriptionStatus === 'blocked' ? '#7f1d1d' : '#9a3412',
+            color: '#fff',
+            fontSize: '0.85rem',
+            lineHeight: 1.5,
+          }}>
+            {subscriptionStatus === 'blocked'
+              ? 'Sua assinatura está bloqueada. Regularize o pagamento no Perfil do Personal para voltar a usar a plataforma.'
+              : 'Sua assinatura está em atraso. Algumas áreas foram bloqueadas até a regularização.'}
+          </div>
+        )}
+
+        {!isSubscriptionRestricted && canAccess('dashboard') && (
           <div className="sidebar-group">
             <div className="sidebar-group-title">Dashboard</div>
             <div className="sidebar-group-links">
@@ -236,7 +259,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
         )}
 
-        {canAccess('students') && (
+        {!isSubscriptionRestricted && canAccess('students') && (
           <div className="sidebar-group">
             <div className="sidebar-group-title">Alunos</div>
             <div className="sidebar-group-links">
@@ -245,7 +268,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
         )}
 
-        {canAccess('protocols') && (
+        {!isSubscriptionRestricted && canAccess('protocols') && (
           <>
             <div className="sidebar-group">
               <div className="sidebar-group-title">Treinos</div>
@@ -270,7 +293,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </>
         )}
 
-        {canAccess('finance') && (
+        {!isSubscriptionRestricted && canAccess('finance') && (
           <div className="sidebar-group">
             <div className="sidebar-group-title">Financeiro</div>
             <div className="sidebar-group-links">

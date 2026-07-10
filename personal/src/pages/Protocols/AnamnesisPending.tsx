@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { listStudentsByPersonal } from '../../store/students'
 import { useNavigate } from 'react-router-dom'
 import { Toast, type ToastType } from '../../components/Toast'
 import { reviewAndReapplyAnamnesis } from '../../store/anamnesis'
+import type { StudentRecord } from '../../store/students'
 
 type PendingItem = {
-    student: any;
-    status: 'expired' | 'warning' | 'ok';
+    student: StudentRecord;
+    status: 'expired' | 'missing';
     dueDate: string;
 }
 
 type ReviewItem = {
     id: string;
-    student: any;
+    student: StudentRecord;
     answeredAt: string;
     data: any;
 }
@@ -60,15 +60,52 @@ export default function AnamnesisPending() {
                 const reviewRequired = profile?.data?.config?.anamnesisReviewRequired === true
                 setIsReviewRequired(reviewRequired)
 
-                const [students, modelsRes, responsesRes] = await Promise.all([
-                    listStudentsByPersonal(user.id),
-                    supabase.from('protocols').select('*').eq('personal_id', user.id).eq('type', 'anamnesis_model'),
-                    supabase.from('protocols').select('*').eq('personal_id', user.id).eq('type', 'anamnesis')
+                const [studentsRes, modelsRes, responsesRes] = await Promise.all([
+                    supabase
+                        .from('profiles')
+                        .select('id, personal_id, full_name, email, created_at, plan_id, due_day, data')
+                        .eq('personal_id', user.id)
+                        .eq('role', 'aluno'),
+                    supabase
+                        .from('protocols')
+                        .select('id, title, status, student_id')
+                        .eq('personal_id', user.id)
+                        .eq('type', 'anamnesis_model'),
+                    supabase
+                        .from('protocols')
+                        .select('id, student_id, created_at, data, content, renew_in_days')
+                        .eq('personal_id', user.id)
+                        .eq('type', 'anamnesis')
                 ])
 
+                const students = ((studentsRes.data || []) as any[]).map((student): StudentRecord => ({
+                    id: student.id,
+                    personalId: student.personal_id,
+                    name: student.full_name || '',
+                    email: student.email || student.data?.email || '',
+                    status: student.data?.status === 'inativo' ? 'inativo' : 'ativo',
+                    createdAt: student.created_at,
+                    lastAccess: student.data?.last_app_access_at,
+                    address: student.data?.address,
+                    planId: student.plan_id || student.data?.planId,
+                    planStartDate: student.data?.planStartDate,
+                    dueDay: student.due_day || student.data?.dueDay,
+                    workoutIds: student.data?.workoutIds,
+                    workoutSchedule: student.data?.workoutSchedule,
+                    dietIds: student.data?.dietIds,
+                    avatarUrl: student.data?.avatarUrl,
+                    tempPassword: student.data?.tempPassword,
+                    whatsapp: student.data?.whatsapp
+                }))
                 const allModels = modelsRes.data || []
                 const allResponses = responsesRes.data || []
                 const activeStudents = students.filter(s => s.status === 'ativo')
+                const activeStudentsById = new Map(activeStudents.map(student => [student.id, student]))
+                const studentsWithLinkedModel = new Set(
+                    allModels
+                        .filter((model: any) => !!model.student_id)
+                        .map((model: any) => model.student_id)
+                )
                 const activeModelOptions = allModels
                     .filter((model: any) => (model.status ?? 'active') === 'active')
                     .map((model: any) => ({
@@ -89,6 +126,14 @@ export default function AnamnesisPending() {
                         return acc
                     }, {})
                 )
+
+                const responsesByStudentId = new Map<string, any[]>()
+
+                allResponses.forEach((response: any) => {
+                    const currentResponses = responsesByStudentId.get(response.student_id) || []
+                    currentResponses.push(response)
+                    responsesByStudentId.set(response.student_id, currentResponses)
+                })
                 
                 const resultPending: PendingItem[] = []
                 const resultReview: ReviewItem[] = []
@@ -96,35 +141,35 @@ export default function AnamnesisPending() {
 
                 // Se não tiver modelos, não tem pendência
                 if (allModels.length > 0) {
-                    activeStudents.forEach(student => {
-                        // 1. Verifica se tem modelo VINCULADO
-                        const hasLinkedModel = allModels.some(m => m.student_id === student.id)
-                        if (!hasLinkedModel) return
+                    if (reviewRequired) {
+                        allResponses.forEach((response: any) => {
+                            const student = activeStudentsById.get(response.student_id)
+                            if (!student) return
 
-                        // 2. Busca respostas
-                        const studentResponses = allResponses.filter(r => r.student_id === student.id)
-                        
-                        // Lógica de Revisão (Novas Respostas) - APENAS SE CONFIGURADO
-                        if (reviewRequired) {
-                            // Pega todas as respostas que NÃO foram revisadas ainda
-                            studentResponses.forEach(resp => {
-                                const respData = resp.data || resp.content || {}
-                                // Se não tem reviewed_at, precisa de revisão
-                                if (!respData.reviewed_at) {
-                                    resultReview.push({
-                                        id: resp.id,
-                                        student,
-                                        answeredAt: resp.created_at,
-                                        data: respData
-                                    })
-                                }
-                            })
-                        }
+                            const respData = response.data || response.content || {}
+                            if (!respData.reviewed_at) {
+                                resultReview.push({
+                                    id: response.id,
+                                    student,
+                                    answeredAt: response.created_at,
+                                    data: respData
+                                })
+                            }
+                        })
+                    }
+
+                    activeStudents.forEach(student => {
+                        if (!studentsWithLinkedModel.has(student.id)) return
+
+                        const studentResponses = (responsesByStudentId.get(student.id) || []).slice()
 
                         if (studentResponses.length === 0) {
-                            // Nunca respondeu -> Ignora (ou mostra como missing se quiser)
+                            resultPending.push({
+                                student,
+                                status: 'missing',
+                                dueDate: ''
+                            })
                         } else {
-                            // Verifica validade da última
                             studentResponses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                             const last = studentResponses[0]
                             
@@ -134,9 +179,6 @@ export default function AnamnesisPending() {
                             
                             const lastData = last.data || last.content || {}
                             
-                            // Se precisa de revisão mas ainda não foi revisada, ela "não conta" como válida ainda
-                            // Então o aluno tecnicamente está "Vencido" ou "Pendente de Análise"
-                            // Para simplificar: se está em resultReview, não mostramos como vencido aqui embaixo para não duplicar
                             const isPendingReview = reviewRequired && !lastData.reviewed_at
                             if (isPendingReview) return 
 
