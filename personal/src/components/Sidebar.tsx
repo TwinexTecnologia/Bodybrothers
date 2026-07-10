@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { X } from 'lucide-react'
+import { useAuth } from '../auth/useAuth'
 
 type Branding = { brandTitle?: string; brandLogoUrl?: string }
 
@@ -11,6 +12,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { isSubscriptionRestricted, subscriptionStatus } = useAuth()
   const [open, setOpen] = useState<Record<string, boolean>>({
     dashboard: true,
     students: true,
@@ -109,7 +111,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </button>
       </div>
       <nav className="menu">
-        {canAccess('dashboard') && (
+        {isSubscriptionRestricted && (
+          <div style={{
+            margin: '0 12px 16px',
+            padding: '12px',
+            borderRadius: '10px',
+            background: subscriptionStatus === 'blocked' ? '#7f1d1d' : '#9a3412',
+            color: '#fff',
+            fontSize: '0.85rem',
+            lineHeight: 1.5,
+          }}>
+            {subscriptionStatus === 'blocked'
+              ? 'Sua assinatura está bloqueada. Regularize o pagamento no Perfil do Personal para voltar a usar a plataforma.'
+              : 'Sua assinatura está em atraso. Algumas áreas foram bloqueadas até a regularização.'}
+          </div>
+        )}
+
+        {!isSubscriptionRestricted && canAccess('dashboard') && (
         <div className="menu-section">
           <button className="menu-button" onClick={() => setOpen({ ...open, dashboard: !open.dashboard })}>
             <span>Dashboard</span>
@@ -124,7 +142,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
         )}
 
-        {canAccess('students') && (
+        {!isSubscriptionRestricted && canAccess('students') && (
         <div className="menu-section">
           <button className="menu-button" onClick={() => setOpen({ ...open, students: !open.students })}>
             <span>Alunos</span>
@@ -144,7 +162,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
         )}
 
-        {canAccess('protocols') && (
+        {!isSubscriptionRestricted && canAccess('protocols') && (
         <div className="menu-section">
           <button className="menu-button" onClick={() => setOpen({ ...open, protocols: !open.protocols })}>
             <span>Protocolos</span>
@@ -184,7 +202,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         )}
         */}
 
-        {canAccess('finance') && (
+        {!isSubscriptionRestricted && canAccess('finance') && (
         <div className="menu-section">
           <button className="menu-button" onClick={() => setOpen({ ...open, finance: !open.finance })}>
             <span>Financeiro do Aluno</span>
@@ -207,8 +225,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           {open.account && (
             <div className="submenu">
               <NavLink to="/account/profile">Perfil do Personal</NavLink>
-              <NavLink to="/account/branding">Identidade Visual</NavLink>
-              <NavLink to="/account/preferences">Preferências</NavLink>
+              {!isSubscriptionRestricted && <NavLink to="/account/branding">Identidade Visual</NavLink>}
+              {!isSubscriptionRestricted && <NavLink to="/account/preferences">Preferências</NavLink>}
             </div>
           )}
         </div>

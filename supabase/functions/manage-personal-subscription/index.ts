@@ -1,0 +1,2150 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const PLAN_CONFIGS: Record<string, { studentLimit: number; paid: boolean; rank: number }> = {
+  free: { studentLimit: 1, paid: false, rank: 0 },
+  starter: { studentLimit: 10, paid: true, rank: 1 },
+  pro: { studentLimit: 30, paid: true, rank: 2 },
+  premium: { studentLimit: 30, paid: true, rank: 2 },
+  elite: { studentLimit: 999999, paid: true, rank: 3 },
+  unlimited: { studentLimit: 999999, paid: true, rank: 3 },
+};
+
+const PLAN_PRICES: Record<string, number> = {
+  starter: 14.9,
+  premium: 39.9,
+  pro: 39.9,
+  elite: 39.9,
+  unlimited: 39.9,
+};
+
+type ProfileRow = {
+  id: string;
+  role: string | null;
+  personal_id: string | null;
+  email?: string | null;
+  data: Record<string, unknown> | null;
+};
+
+type SubscriptionRow = {
+  id: string;
+  personal_id: string;
+  plan_slug: string | null;
+  billing_cycle: string | null;
+  status: string | null;
+  student_limit: number | null;
+  amount: number | null;
+  currency: string | null;
+  next_billing_at: string | null;
+  blocked_at: string | null;
+  grace_until: string | null;
+  last_payment_id: string | null;
+  last_payment_status: string | null;
+  payment_provider: string | null;
+  provider_subscription_id?: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+};
+
+type SubscriptionPaymentRow = {
+  id: string;
+  personal_id: string;
+  subscription_id: string;
+  plan_slug: string;
+  billing_cycle: string;
+  amount: number;
+  currency: string;
+  status: "pending" | "approved" | "failed" | "canceled" | "refunded";
+  provider: string | null;
+  provider_payment_id: string | null;
+  provider_reference: string | null;
+  description: string | null;
+  due_at: string | null;
+  paid_at: string | null;
+  raw_payload: Record<string, unknown>;
+  created_at: string;
+};
+
+type CardTokenPaymentInput = {
+  token: string;
+  paymentMethodId: string;
+  issuerId: string | null;
+  installments: number;
+  identificationType: string;
+  identificationNumber: string;
+};
+
+type SavedPaymentMethod = {
+  provider: "mercadopago";
+  providerCustomerId: string;
+  providerCardId: string;
+  paymentMethodId: string | null;
+  issuerId: string | null;
+  brand: string | null;
+  lastFour: string | null;
+  firstPaymentProviderPaymentId: string | null;
+  updatedAt: string;
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    if (req.method !== "POST") {
+      throw new Error("Método não suportado.");
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error("SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY ausente.");
+    }
+
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length)
+      : "";
+    if (!token) throw new Error("Token de autenticação ausente.");
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const {
+      data: { user: requesterUser },
+      error: requesterError,
+    } = await supabase.auth.getUser(token);
+
+    if (requesterError || !requesterUser) {
+      throw requesterError ?? new Error("Usuário solicitante não autenticado.");
+    }
+
+    const { data: requesterProfile, error: requesterProfileError } = await supabase
+      .from("profiles")
+      .select("id, role, personal_id, data")
+      .eq("id", requesterUser.id)
+      .single<ProfileRow>();
+
+    if (requesterProfileError || !requesterProfile) {
+      throw requesterProfileError ?? new Error("Perfil do solicitante não encontrado.");
+    }
+
+    if (!["personal", "owner"].includes(requesterProfile.role ?? "")) {
+      throw new Error("Sem permissão para gerenciar o plano.");
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const action = typeof body?.action === "string" ? body.action.trim() : "";
+
+    if (action === "request_downgrade") {
+      return await handleRequestDowngrade({
+        supabase,
+        requesterId: requesterUser.id,
+        requesterRole: requesterProfile.role ?? "",
+        body,
+      });
+    }
+
+    if (action === "cancel_downgrade") {
+      return await handleCancelDowngrade({
+        supabase,
+        requesterId: requesterUser.id,
+        requesterRole: requesterProfile.role ?? "",
+        body,
+      });
+    }
+
+    if (action === "create_regularization_payment") {
+      return await handleCreateRegularizationPayment({
+        supabase,
+        requesterId: requesterUser.id,
+        requesterRole: requesterProfile.role ?? "",
+        requesterProfile,
+        body,
+      });
+    }
+
+    if (action === "check_payment_status") {
+      return await handleCheckPaymentStatus({
+        supabase,
+        requesterId: requesterUser.id,
+        requesterRole: requesterProfile.role ?? "",
+        body,
+      });
+    }
+
+    if (action === "pay_with_card_token") {
+      return await handlePayWithCardToken({
+        supabase,
+        requesterId: requesterUser.id,
+        requesterRole: requesterProfile.role ?? "",
+        requesterProfile,
+        body,
+      });
+    }
+
+    if (action === "charge_saved_card") {
+      return await handleChargeSavedCard({
+        supabase,
+        requesterId: requesterUser.id,
+        requesterRole: requesterProfile.role ?? "",
+        requesterProfile,
+        body,
+      });
+    }
+
+    if (action === "save_card_token") {
+      return await handleSaveCardToken({
+        supabase,
+        requesterId: requesterUser.id,
+        requesterRole: requesterProfile.role ?? "",
+        body,
+      });
+    }
+
+    if (action === "remove_saved_card") {
+      return await handleRemoveSavedCard({
+        supabase,
+        requesterId: requesterUser.id,
+        requesterRole: requesterProfile.role ?? "",
+        body,
+      });
+    }
+
+    throw new Error("Ação inválida.");
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
+  }
+});
+
+async function handleRequestDowngrade({
+  supabase,
+  requesterId,
+  requesterRole,
+  body,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  requesterId: string;
+  requesterRole: string;
+  body: Record<string, unknown>;
+}) {
+  const personalId = requesterRole === "owner"
+    ? getString(body, ["personalId"]) || requesterId
+    : requesterId;
+  const targetPlan = normalizePlan(getString(body, ["targetPlan", "plan"]));
+
+  if (!targetPlan) {
+    throw new Error("Plano de destino não informado.");
+  }
+
+  const targetConfig = PLAN_CONFIGS[targetPlan];
+  if (!targetConfig) {
+    throw new Error("Plano de destino inválido.");
+  }
+
+  const { data: subscription, error: subscriptionError } = await supabase
+    .from("personal_subscriptions")
+    .select("id, personal_id, plan_slug, billing_cycle, status, student_limit, amount, currency, next_billing_at, blocked_at, grace_until, last_payment_id, last_payment_status, payment_provider, provider_subscription_id, current_period_start, current_period_end")
+    .eq("personal_id", personalId)
+    .single<SubscriptionRow>();
+
+  if (subscriptionError || !subscription) {
+    throw subscriptionError ?? new Error("Assinatura do personal não encontrada.");
+  }
+
+  const currentPlan = normalizePlan(subscription.plan_slug || "free");
+  const currentConfig = PLAN_CONFIGS[currentPlan];
+
+  if (!currentConfig) {
+    throw new Error("Plano atual do personal é inválido.");
+  }
+
+  if (currentPlan === "free") {
+    throw new Error("O plano Free não possui downgrade disponível.");
+  }
+
+  if (currentPlan === targetPlan) {
+    throw new Error("O personal já está nesse plano.");
+  }
+
+  if (targetConfig.rank >= currentConfig.rank) {
+    throw new Error("A ação solicitada não é um downgrade válido.");
+  }
+
+  const activeStudents = await countActiveStudents({ supabase, personalId });
+  if (activeStudents > targetConfig.studentLimit) {
+    throw new Error(
+      `Para fazer downgrade para o plano ${targetPlan}, você precisa deixar no máximo ${targetConfig.studentLimit} alunos ativos. Hoje você possui ${activeStudents} alunos ativos.`,
+    );
+  }
+
+  const effectiveAt = subscription.next_billing_at ?? new Date().toISOString();
+
+  const { error: updateError } = await supabase
+    .from("personal_subscriptions")
+    .update({
+      scheduled_plan_slug: targetPlan,
+      scheduled_student_limit: targetConfig.studentLimit,
+      scheduled_billing_cycle: subscription.billing_cycle || "monthly",
+      scheduled_change_at: effectiveAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", subscription.id);
+
+  if (updateError) throw updateError;
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      personalId,
+      currentPlan,
+      targetPlan,
+      targetStudentLimit: targetConfig.studentLimit,
+      activeStudents,
+      effectiveAt,
+    }),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+}
+
+async function handleCancelDowngrade({
+  supabase,
+  requesterId,
+  requesterRole,
+  body,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  requesterId: string;
+  requesterRole: string;
+  body: Record<string, unknown>;
+}) {
+  const personalId = requesterRole === "owner"
+    ? getString(body, ["personalId"]) || requesterId
+    : requesterId;
+
+  const { data: subscription, error: subscriptionError } = await supabase
+    .from("personal_subscriptions")
+    .select("id, personal_id, plan_slug, billing_cycle, status, student_limit, amount, currency, next_billing_at, blocked_at, grace_until, last_payment_id, last_payment_status, payment_provider, provider_subscription_id, current_period_start, current_period_end")
+    .eq("personal_id", personalId)
+    .single<SubscriptionRow>();
+
+  if (subscriptionError || !subscription) {
+    throw subscriptionError ?? new Error("Assinatura do personal não encontrada.");
+  }
+
+  const scheduledPlanSlug = await getScheduledPlanSlug({
+    supabase,
+    subscriptionId: subscription.id,
+  });
+
+  if (!scheduledPlanSlug) {
+    throw new Error("Não existe downgrade agendado para cancelar.");
+  }
+
+  const { error: updateError } = await supabase
+    .from("personal_subscriptions")
+    .update({
+      scheduled_plan_slug: null,
+      scheduled_student_limit: null,
+      scheduled_billing_cycle: null,
+      scheduled_change_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", subscription.id);
+
+  if (updateError) throw updateError;
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      personalId,
+      currentPlan: normalizePlan(subscription.plan_slug || "free"),
+      canceledPlan: scheduledPlanSlug,
+    }),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+}
+
+async function handleCreateRegularizationPayment({
+  supabase,
+  requesterId,
+  requesterRole,
+  requesterProfile,
+  body,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  requesterId: string;
+  requesterRole: string;
+  requesterProfile: ProfileRow;
+  body: Record<string, unknown>;
+}) {
+  const personalId = requesterRole === "owner"
+    ? getString(body, ["personalId"]) || requesterId
+    : requesterId;
+  const method = normalizePaymentMethod(
+    getString(body, ["method", "paymentMethod"]) || "pix",
+  );
+
+  const { subscription, personalProfile } = await getSubscriptionContext({
+    supabase,
+    personalId,
+  });
+
+  if (!PLAN_CONFIGS[normalizePlan(subscription.plan_slug || "free")]?.paid) {
+    throw new Error("O plano atual não precisa de regularização de pagamento.");
+  }
+
+  const amount = await resolveSubscriptionAmount({ supabase, subscription });
+  const currency = subscription.currency || "BRL";
+  const description = buildPaymentDescription(subscription.plan_slug || "premium");
+  const email = normalizeEmail(requesterProfile.email || personalProfile.email || "");
+  const providerReference = buildProviderReference({
+    personalId,
+    subscriptionId: subscription.id,
+  });
+
+  const paymentResponse = method === "checkout-pro"
+    ? await createCheckoutPreference({
+      personalId,
+      subscriptionId: subscription.id,
+      providerReference,
+      plan: normalizePlan(subscription.plan_slug || "premium"),
+      amount,
+      config: getMercadoPagoConfig(),
+    })
+    : await createPixPayment({
+      personalId,
+      subscriptionId: subscription.id,
+      providerReference,
+      plan: normalizePlan(subscription.plan_slug || "premium"),
+      amount,
+      email: email || "test@test.com",
+      description,
+      config: getMercadoPagoConfig(),
+    });
+
+  const normalizedStatus = method === "checkout-pro"
+    ? "pending"
+    : normalizePaymentStatus(getString(paymentResponse, ["status"]) || "pending");
+
+  const providerPaymentId = method === "checkout-pro"
+    ? null
+    : getScalarAsString(paymentResponse.id);
+  const dueAt = getString(paymentResponse, ["date_of_expiration", "expiration_date"]);
+
+  const paymentInsert = {
+    personal_id: personalId,
+    subscription_id: subscription.id,
+    plan_slug: normalizePlan(subscription.plan_slug || "premium"),
+    billing_cycle: subscription.billing_cycle || "monthly",
+    amount,
+    currency,
+    status: normalizedStatus,
+    provider: "mercadopago",
+    provider_payment_id: providerPaymentId,
+    provider_reference: providerReference || null,
+    description,
+    due_at: dueAt || null,
+    paid_at: normalizedStatus === "approved" ? new Date().toISOString() : null,
+    raw_payload: paymentResponse,
+  };
+
+  const { data: insertedPayment, error: paymentInsertError } = await supabase
+    .from("subscription_payments")
+    .insert(paymentInsert)
+    .select("*")
+    .single<SubscriptionPaymentRow>();
+
+  if (paymentInsertError || !insertedPayment) {
+    throw paymentInsertError ?? new Error("Não foi possível salvar a cobrança de regularização.");
+  }
+
+  const { error: subscriptionUpdateError } = await supabase
+    .from("personal_subscriptions")
+    .update({
+      amount,
+      currency,
+      payment_provider: "mercadopago",
+      last_payment_id: providerPaymentId || subscription.last_payment_id,
+      last_payment_status: normalizedStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", subscription.id);
+
+  if (subscriptionUpdateError) throw subscriptionUpdateError;
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      action: "create_regularization_payment",
+      paymentId: insertedPayment.id,
+      providerPaymentId,
+      providerReference,
+      status: insertedPayment.status,
+      method,
+      checkoutUrl: extractNestedString(insertedPayment.raw_payload, [
+        "init_point",
+        "sandbox_init_point",
+        "checkout_url",
+        "checkoutUrl",
+        "ticket_url",
+        "ticketUrl",
+      ]),
+      pixCode: extractNestedString(insertedPayment.raw_payload, [
+        "qr_code",
+        "qrCode",
+        "pixCode",
+        "pix_code",
+        "copyPaste",
+        "copy_paste",
+      ]),
+      qrCodeBase64: extractNestedString(insertedPayment.raw_payload, [
+        "qr_code_base64",
+        "qrCodeBase64",
+      ]),
+      ticketUrl: extractNestedString(insertedPayment.raw_payload, [
+        "ticket_url",
+        "ticketUrl",
+      ]),
+    }),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+}
+
+async function handleCheckPaymentStatus({
+  supabase,
+  requesterId,
+  requesterRole,
+  body,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  requesterId: string;
+  requesterRole: string;
+  body: Record<string, unknown>;
+}) {
+  const personalId = requesterRole === "owner"
+    ? getString(body, ["personalId"]) || requesterId
+    : requesterId;
+  const providedProviderPaymentId = getString(body, ["providerPaymentId", "paymentId"]);
+  const providedLocalPaymentId = getString(body, ["localPaymentId"]);
+
+  const { subscription } = await getSubscriptionContext({
+    supabase,
+    personalId,
+  });
+
+  let paymentRecord: SubscriptionPaymentRow | null = null;
+
+  if (providedLocalPaymentId) {
+    const { data } = await supabase
+      .from("subscription_payments")
+      .select("*")
+      .eq("id", providedLocalPaymentId)
+      .eq("subscription_id", subscription.id)
+      .maybeSingle<SubscriptionPaymentRow>();
+    paymentRecord = data ?? null;
+  }
+
+  if (!paymentRecord && providedProviderPaymentId) {
+    const { data } = await supabase
+      .from("subscription_payments")
+      .select("*")
+      .eq("provider_payment_id", providedProviderPaymentId)
+      .eq("subscription_id", subscription.id)
+      .order("created_at", { ascending: false })
+      .maybeSingle<SubscriptionPaymentRow>();
+    paymentRecord = data ?? null;
+  }
+
+  if (!paymentRecord) {
+    const { data } = await supabase
+      .from("subscription_payments")
+      .select("*")
+      .eq("subscription_id", subscription.id)
+      .in("status", ["pending", "failed"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<SubscriptionPaymentRow>();
+    paymentRecord = data ?? null;
+  }
+
+  if (!paymentRecord) {
+    throw new Error("Nenhuma cobrança pendente encontrada para consultar.");
+  }
+
+  if (!paymentRecord.provider_payment_id) {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        approved: false,
+        status: paymentRecord.status,
+        providerPaymentId: null,
+        requiresRedirectCheck: true,
+        payment: paymentRecord,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  const gatewayPayment = await getPaymentById({
+    paymentId: paymentRecord.provider_payment_id,
+    config: getMercadoPagoConfig(),
+  });
+  const normalizedStatus = normalizePaymentStatus(
+    getString(gatewayPayment, ["status"]) || paymentRecord.status,
+  );
+  const paidAt = getString(gatewayPayment, ["date_approved"]) || null;
+  const dueAt = getString(gatewayPayment, ["date_of_expiration", "expiration_date"]) || paymentRecord.due_at;
+
+  const { data: updatedPayment, error: paymentUpdateError } = await supabase
+    .from("subscription_payments")
+    .update({
+      status: normalizedStatus,
+      paid_at: normalizedStatus === "approved" ? paidAt || new Date().toISOString() : null,
+      due_at: dueAt || null,
+      raw_payload: gatewayPayment,
+    })
+    .eq("id", paymentRecord.id)
+    .select("*")
+    .single<SubscriptionPaymentRow>();
+
+  if (paymentUpdateError || !updatedPayment) {
+    throw paymentUpdateError ?? new Error("Não foi possível atualizar o status da cobrança.");
+  }
+
+  await syncSubscriptionWithPayment({
+    supabase,
+    subscription,
+    payment: updatedPayment,
+  });
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      approved: updatedPayment.status === "approved",
+      status: updatedPayment.status,
+      providerPaymentId: updatedPayment.provider_payment_id,
+      payment: updatedPayment,
+    }),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+}
+
+async function handlePayWithCardToken({
+  supabase,
+  requesterId,
+  requesterRole,
+  requesterProfile,
+  body,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  requesterId: string;
+  requesterRole: string;
+  requesterProfile: ProfileRow;
+  body: Record<string, unknown>;
+}) {
+  const personalId = requesterRole === "owner"
+    ? getString(body, ["personalId"]) || requesterId
+    : requesterId;
+
+  const cardInput = parseCardTokenPaymentInput(body);
+  const { subscription, personalProfile } = await getSubscriptionContext({
+    supabase,
+    personalId,
+  });
+  const existingSavedMethod = extractSavedPaymentMethod(personalProfile.data);
+
+  if (!PLAN_CONFIGS[normalizePlan(subscription.plan_slug || "free")]?.paid) {
+    throw new Error("O plano atual não precisa de regularização de pagamento.");
+  }
+
+  const amount = await resolveSubscriptionAmount({ supabase, subscription });
+  const currency = subscription.currency || "BRL";
+  const description = buildPaymentDescription(subscription.plan_slug || "premium");
+  const email = normalizeEmail(requesterProfile.email || personalProfile.email || "");
+
+  if (!email) {
+    throw new Error("Não foi possível identificar o email do pagador.");
+  }
+
+  const providerReference = buildProviderReference({
+    personalId,
+    subscriptionId: subscription.id,
+  });
+
+  const validationPaymentContext = buildFirstValidationPaymentContext({
+    subscription,
+  });
+
+  const gatewayPayment = await createCardTokenPayment({
+    personalId,
+    subscriptionId: subscription.id,
+    providerReference,
+    plan: normalizePlan(subscription.plan_slug || "premium"),
+    amount,
+    email,
+    description,
+    config: getMercadoPagoConfig(),
+    cardInput,
+    validationPaymentContext,
+    savedPaymentMethod: existingSavedMethod,
+  });
+
+  const normalizedStatus = normalizePaymentStatus(
+    getString(gatewayPayment, ["status"]) || "pending",
+  );
+  const providerPaymentId = getScalarAsString(gatewayPayment.id);
+  const paidAt = getString(gatewayPayment, ["date_approved"]) || null;
+  const dueAt = getString(gatewayPayment, ["date_of_expiration", "expiration_date"]) || null;
+
+  const paymentInsert = {
+    personal_id: personalId,
+    subscription_id: subscription.id,
+    plan_slug: normalizePlan(subscription.plan_slug || "premium"),
+    billing_cycle: subscription.billing_cycle || "monthly",
+    amount,
+    currency,
+    status: normalizedStatus,
+    provider: "mercadopago",
+    provider_payment_id: providerPaymentId || null,
+    provider_reference: providerReference,
+    description,
+    due_at: dueAt,
+    paid_at: normalizedStatus === "approved" ? paidAt || new Date().toISOString() : null,
+    raw_payload: gatewayPayment,
+  };
+
+  const { data: insertedPayment, error: paymentInsertError } = await supabase
+    .from("subscription_payments")
+    .insert(paymentInsert)
+    .select("*")
+    .single<SubscriptionPaymentRow>();
+
+  if (paymentInsertError || !insertedPayment) {
+    throw paymentInsertError ?? new Error("Não foi possível salvar o pagamento com cartão.");
+  }
+
+  if (
+    existingSavedMethod &&
+    providerPaymentId &&
+    insertedPayment.status === "approved" &&
+    !existingSavedMethod.firstPaymentProviderPaymentId
+  ) {
+    await savePaymentMethodToProfile({
+      supabase,
+      personalId,
+      currentData: personalProfile.data,
+      paymentMethod: {
+        ...existingSavedMethod,
+        firstPaymentProviderPaymentId: providerPaymentId,
+        paymentMethodId: existingSavedMethod.paymentMethodId || cardInput.paymentMethodId,
+        issuerId: existingSavedMethod.issuerId || cardInput.issuerId || null,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  }
+
+  await syncSubscriptionWithPayment({
+    supabase,
+    subscription,
+    payment: insertedPayment,
+  });
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      action: "pay_with_card_token",
+      paymentId: insertedPayment.id,
+      providerPaymentId: insertedPayment.provider_payment_id,
+      status: insertedPayment.status,
+      approved: insertedPayment.status === "approved",
+      statusDetail: getString(gatewayPayment, ["status_detail", "statusDetail"]) || null,
+      payment: insertedPayment,
+    }),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+}
+
+async function handleChargeSavedCard({
+  supabase,
+  requesterId,
+  requesterRole,
+  requesterProfile,
+  body,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  requesterId: string;
+  requesterRole: string;
+  requesterProfile: ProfileRow;
+  body: Record<string, unknown>;
+}) {
+  const personalId = requesterRole === "owner"
+    ? getString(body, ["personalId"]) || requesterId
+    : requesterId;
+
+  const { subscription, personalProfile } = await getSubscriptionContext({
+    supabase,
+    personalId,
+  });
+
+  if (!PLAN_CONFIGS[normalizePlan(subscription.plan_slug || "free")]?.paid) {
+    throw new Error("O plano atual não precisa de regularização de pagamento.");
+  }
+
+  const existingMethod = extractSavedPaymentMethod(personalProfile.data);
+  if (!existingMethod?.providerCustomerId || !existingMethod.providerCardId) {
+    throw new Error("Nenhum cartão salvo foi encontrado para este perfil.");
+  }
+
+  const config = getMercadoPagoConfig();
+  let savedPaymentMethod = existingMethod;
+
+  if (!savedPaymentMethod.paymentMethodId) {
+    const gatewayCard = await getMercadoPagoCustomerCard({
+      customerId: savedPaymentMethod.providerCustomerId,
+      cardId: savedPaymentMethod.providerCardId,
+      config,
+    });
+
+    savedPaymentMethod = buildSavedPaymentMethod({
+      providerCustomerId: savedPaymentMethod.providerCustomerId,
+      cardResponse: gatewayCard,
+      fallbackBrand: savedPaymentMethod.brand || "",
+      fallbackFirstPaymentProviderPaymentId: savedPaymentMethod.firstPaymentProviderPaymentId,
+    });
+
+    await savePaymentMethodToProfile({
+      supabase,
+      personalId,
+      currentData: personalProfile.data,
+      paymentMethod: savedPaymentMethod,
+    });
+  }
+
+  if (!savedPaymentMethod.paymentMethodId) {
+    throw new Error("Não foi possível identificar os dados do cartão salvo. Cadastre o cartão novamente.");
+  }
+
+  const amount = await resolveSubscriptionAmount({ supabase, subscription });
+  const currency = subscription.currency || "BRL";
+  const description = buildPaymentDescription(
+    subscription.plan_slug || "premium",
+    "regularization",
+  );
+  const email = normalizeEmail(requesterProfile.email || personalProfile.email || "");
+
+  if (!email) {
+    throw new Error("Não foi possível identificar o email do pagador.");
+  }
+
+  const providerReference = buildProviderReference({
+    personalId,
+    subscriptionId: subscription.id,
+    prefix: "saved",
+  });
+
+  const automaticPaymentContext = await resolveAutomaticPaymentContext({
+    supabase,
+    subscription,
+    savedPaymentMethod,
+    userPresent: true,
+  });
+
+  const gatewayPayment = await createSavedCardPayment({
+    personalId,
+    subscriptionId: subscription.id,
+    providerReference,
+    plan: normalizePlan(subscription.plan_slug || "premium"),
+    amount,
+    email,
+    description,
+    config,
+    savedPaymentMethod,
+    automaticPaymentContext,
+  });
+
+  const normalizedStatus = normalizePaymentStatus(
+    getString(gatewayPayment, ["status"]) || "pending",
+  );
+  const providerPaymentId = getScalarAsString(gatewayPayment.id);
+  const paidAt = getString(gatewayPayment, ["date_approved"]) || null;
+  const dueAt = getString(gatewayPayment, ["date_of_expiration", "expiration_date"]) || null;
+
+  const paymentInsert = {
+    personal_id: personalId,
+    subscription_id: subscription.id,
+    plan_slug: normalizePlan(subscription.plan_slug || "premium"),
+    billing_cycle: subscription.billing_cycle || "monthly",
+    amount,
+    currency,
+    status: normalizedStatus,
+    provider: "mercadopago",
+    provider_payment_id: providerPaymentId || null,
+    provider_reference: providerReference,
+    description,
+    due_at: dueAt,
+    paid_at: normalizedStatus === "approved" ? paidAt || new Date().toISOString() : null,
+    raw_payload: gatewayPayment,
+  };
+
+  const { data: insertedPayment, error: paymentInsertError } = await supabase
+    .from("subscription_payments")
+    .insert(paymentInsert)
+    .select("*")
+    .single<SubscriptionPaymentRow>();
+
+  if (paymentInsertError || !insertedPayment) {
+    throw paymentInsertError ?? new Error("Não foi possível salvar o pagamento com cartão salvo.");
+  }
+
+  await syncSubscriptionWithPayment({
+    supabase,
+    subscription,
+    payment: insertedPayment,
+  });
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      action: "charge_saved_card",
+      paymentId: insertedPayment.id,
+      providerPaymentId: insertedPayment.provider_payment_id,
+      status: insertedPayment.status,
+      approved: insertedPayment.status === "approved",
+      statusDetail: getString(gatewayPayment, ["status_detail", "statusDetail"]) || null,
+      payment: insertedPayment,
+    }),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+}
+
+async function handleSaveCardToken({
+  supabase,
+  requesterId,
+  requesterRole,
+  body,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  requesterId: string;
+  requesterRole: string;
+  body: Record<string, unknown>;
+}) {
+  const personalId = requesterRole === "owner"
+    ? getString(body, ["personalId"]) || requesterId
+    : requesterId;
+
+  const cardInput = parseCardTokenPaymentInput(body);
+  const { subscription, personalProfile } = await getSubscriptionContext({
+    supabase,
+    personalId,
+  });
+
+  if (!PLAN_CONFIGS[normalizePlan(subscription.plan_slug || "free")]?.paid) {
+    throw new Error("Somente planos pagos podem cadastrar cartão.");
+  }
+
+  const email = normalizeEmail(personalProfile.email || "");
+  if (!email) {
+    throw new Error("Não foi possível identificar o email do titular para salvar o cartão.");
+  }
+
+  const config = getMercadoPagoConfig();
+  const existingMethod = extractSavedPaymentMethod(personalProfile.data);
+  const providerCustomerId = existingMethod?.providerCustomerId ||
+    await createMercadoPagoCustomer({
+      email,
+      config,
+    });
+
+  if (existingMethod?.providerCardId) {
+    await deleteMercadoPagoCustomerCard({
+      customerId: providerCustomerId,
+      cardId: existingMethod.providerCardId,
+      config,
+      ignoreNotFound: true,
+    });
+  }
+
+  const savedCardResponse = await createMercadoPagoCustomerCard({
+    customerId: providerCustomerId,
+    config,
+    cardInput,
+  });
+
+  const savedPaymentMethod = buildSavedPaymentMethod({
+    providerCustomerId,
+    cardResponse: savedCardResponse,
+    fallbackBrand: cardInput.paymentMethodId,
+    fallbackFirstPaymentProviderPaymentId: existingMethod?.firstPaymentProviderPaymentId || null,
+  });
+
+  await savePaymentMethodToProfile({
+    supabase,
+    personalId,
+    currentData: personalProfile.data,
+    paymentMethod: savedPaymentMethod,
+  });
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      action: "save_card_token",
+      provider: savedPaymentMethod.provider,
+      providerCustomerId: savedPaymentMethod.providerCustomerId,
+      providerCardId: savedPaymentMethod.providerCardId,
+      brand: savedPaymentMethod.brand,
+      lastFour: savedPaymentMethod.lastFour,
+    }),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+}
+
+async function handleRemoveSavedCard({
+  supabase,
+  requesterId,
+  requesterRole,
+  body,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  requesterId: string;
+  requesterRole: string;
+  body: Record<string, unknown>;
+}) {
+  const personalId = requesterRole === "owner"
+    ? getString(body, ["personalId"]) || requesterId
+    : requesterId;
+
+  const { personalProfile } = await getSubscriptionContext({
+    supabase,
+    personalId,
+  });
+
+  const existingMethod = extractSavedPaymentMethod(personalProfile.data);
+
+  if (existingMethod?.providerCustomerId && existingMethod.providerCardId) {
+    await deleteMercadoPagoCustomerCard({
+      customerId: existingMethod.providerCustomerId,
+      cardId: existingMethod.providerCardId,
+      config: getMercadoPagoConfig(),
+      ignoreNotFound: true,
+    });
+  }
+
+  await savePaymentMethodToProfile({
+    supabase,
+    personalId,
+    currentData: personalProfile.data,
+    paymentMethod: null,
+  });
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      action: "remove_saved_card",
+    }),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+}
+
+async function countActiveStudents({
+  supabase,
+  personalId,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  personalId: string;
+}) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("data")
+    .eq("personal_id", personalId)
+    .eq("role", "aluno");
+
+  if (error) throw error;
+
+  return (data ?? []).filter((student) => {
+    const status =
+      typeof student?.data === "object" && student.data !== null
+        ? (student.data as Record<string, unknown>).status
+        : undefined;
+    return status !== "inativo";
+  }).length;
+}
+
+async function getSubscriptionContext({
+  supabase,
+  personalId,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  personalId: string;
+}) {
+  const [{ data: subscription, error: subscriptionError }, { data: personalProfile, error: profileError }] =
+    await Promise.all([
+      supabase
+        .from("personal_subscriptions")
+        .select("id, personal_id, plan_slug, billing_cycle, status, student_limit, amount, currency, next_billing_at, blocked_at, grace_until, last_payment_id, last_payment_status, payment_provider, provider_subscription_id, current_period_start, current_period_end")
+        .eq("personal_id", personalId)
+        .single<SubscriptionRow>(),
+      supabase
+        .from("profiles")
+        .select("id, role, personal_id, data, email")
+        .eq("id", personalId)
+        .single<ProfileRow & { email: string | null }>(),
+    ]);
+
+  if (subscriptionError || !subscription) {
+    throw subscriptionError ?? new Error("Assinatura do personal não encontrada.");
+  }
+
+  if (profileError || !personalProfile) {
+    throw profileError ?? new Error("Perfil do personal não encontrado.");
+  }
+
+  return { subscription, personalProfile };
+}
+
+async function getScheduledPlanSlug({
+  supabase,
+  subscriptionId,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  subscriptionId: string;
+}) {
+  const { data, error } = await supabase
+    .from("personal_subscriptions")
+    .select("scheduled_plan_slug")
+    .eq("id", subscriptionId)
+    .maybeSingle<{ scheduled_plan_slug: string | null }>();
+
+  if (error) throw error;
+  return normalizePlan(data?.scheduled_plan_slug || "");
+}
+
+async function resolveSubscriptionAmount({
+  supabase,
+  subscription,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  subscription: SubscriptionRow;
+}) {
+  if (typeof subscription.amount === "number" && !Number.isNaN(subscription.amount)) {
+    return Number(subscription.amount);
+  }
+
+  const { data: latestApprovedPayment } = await supabase
+    .from("subscription_payments")
+    .select("amount")
+    .eq("subscription_id", subscription.id)
+    .in("status", ["approved", "pending", "failed"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ amount: number }>();
+
+  if (typeof latestApprovedPayment?.amount === "number") {
+    return Number(latestApprovedPayment.amount);
+  }
+
+  const planSlug = normalizePlan(subscription.plan_slug || "");
+  const defaultAmount = PLAN_PRICES[planSlug];
+
+  if (typeof defaultAmount === "number") {
+    return defaultAmount;
+  }
+
+  throw new Error(`Não foi possível determinar o valor da assinatura do plano ${planSlug || "atual"}.`);
+}
+
+async function syncSubscriptionWithPayment({
+  supabase,
+  subscription,
+  payment,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  subscription: SubscriptionRow;
+  payment: SubscriptionPaymentRow;
+}) {
+  const nowIso = new Date().toISOString();
+
+  if (payment.status === "approved") {
+    const currentPeriodStart = nowIso;
+    const currentPeriodEnd = calculateNextBillingAt(
+      currentPeriodStart,
+      subscription.billing_cycle || "monthly",
+    );
+
+    const { error } = await supabase
+      .from("personal_subscriptions")
+      .update({
+        status: "active",
+        amount: payment.amount,
+        currency: payment.currency || "BRL",
+        payment_provider: payment.provider || "mercadopago",
+        last_payment_id: payment.provider_payment_id,
+        last_payment_status: payment.status,
+        started_at: subscription.current_period_start || currentPeriodStart,
+        current_period_start: currentPeriodStart,
+        current_period_end: currentPeriodEnd,
+        next_billing_at: currentPeriodEnd,
+        grace_until: null,
+        blocked_at: null,
+        updated_at: nowIso,
+      })
+      .eq("id", subscription.id);
+
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase
+    .from("personal_subscriptions")
+    .update({
+      last_payment_id: payment.provider_payment_id,
+      last_payment_status: payment.status,
+      payment_provider: payment.provider || subscription.payment_provider || "mercadopago",
+      updated_at: nowIso,
+    })
+    .eq("id", subscription.id);
+
+  if (error) throw error;
+}
+
+function getString(body: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = body[key];
+    if (typeof value === "string") {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
+
+function getScalarAsString(value: unknown) {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
+function normalizePlan(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function normalizePaymentMethod(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "checkout-pro" || normalized === "pix") return normalized;
+  return "pix";
+}
+
+function normalizePaymentStatus(value: string): SubscriptionPaymentRow["status"] {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "approved") return "approved";
+  if (normalized === "pending" || normalized === "in_process") return "pending";
+  if (normalized === "canceled" || normalized === "cancelled") return "canceled";
+  if (normalized === "refunded" || normalized === "charged_back") return "refunded";
+  if (normalized === "failed" || normalized === "rejected") return "failed";
+
+  return "pending";
+}
+
+function parseCardTokenPaymentInput(body: Record<string, unknown>): CardTokenPaymentInput {
+  const token = getString(body, ["token"]);
+  const paymentMethodId = getString(body, ["paymentMethodId", "payment_method_id"]);
+  const issuerIdRaw = getString(body, ["issuerId", "issuer_id"]);
+  const installmentsRaw = getString(body, ["installments"]) || "1";
+  const identificationType = getString(body, ["identificationType", "identification_type"]);
+  const identificationNumber = getString(body, ["identificationNumber", "identification_number"]);
+
+  if (!token) throw new Error("Token do cartão não informado.");
+  if (!paymentMethodId) throw new Error("Bandeira do cartão não informada.");
+  if (!identificationType) throw new Error("Tipo de documento não informado.");
+  if (!identificationNumber) throw new Error("Número do documento não informado.");
+
+  const installments = Number(installmentsRaw);
+  if (!Number.isFinite(installments) || installments <= 0) {
+    throw new Error("Quantidade de parcelas inválida.");
+  }
+
+  return {
+    token,
+    paymentMethodId,
+    issuerId: issuerIdRaw || null,
+    installments,
+    identificationType,
+    identificationNumber,
+  };
+}
+
+function calculateNextBillingAt(startedAtIso: string, billingCycle: string) {
+  const date = new Date(startedAtIso);
+
+  if (billingCycle === "quarterly") {
+    date.setMonth(date.getMonth() + 3);
+  } else if (billingCycle === "yearly") {
+    date.setFullYear(date.getFullYear() + 1);
+  } else {
+    date.setMonth(date.getMonth() + 1);
+  }
+
+  return date.toISOString();
+}
+
+function getMercadoPagoConfig() {
+  const accessToken = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN")?.trim() || "";
+  const baseUrl = (
+    Deno.env.get("PERSONAL_APP_BASE_URL") ||
+    Deno.env.get("APP_BASE_URL") ||
+    ""
+  ).trim();
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim() || "";
+
+  if (!accessToken) {
+    throw new Error("MERCADO_PAGO_ACCESS_TOKEN não configurado.");
+  }
+  if (!supabaseUrl) {
+    throw new Error("SUPABASE_URL não configurado.");
+  }
+
+  return {
+    accessToken,
+    baseUrl,
+    webhookUrl: `${supabaseUrl}/functions/v1/mercado-pago-webhook`,
+    successPath: "/account/profile",
+    failurePath: "/account/profile",
+    pendingPath: "/account/profile",
+  };
+}
+
+async function mercadoPagoRequest(
+  path: string,
+  config: { accessToken: string },
+  options: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: Record<string, unknown>;
+  } = {},
+) {
+  const response = await fetch(`https://api.mercadopago.com${path}`, {
+    method: options.method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.accessToken}`,
+      ...(options.headers || {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const causes = Array.isArray((data as { cause?: unknown[] })?.cause)
+      ? ((data as { cause?: unknown[] }).cause ?? [])
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") return "";
+          const causeRecord = entry as Record<string, unknown>;
+          return [
+            getScalarAsString(causeRecord.code),
+            getScalarAsString(causeRecord.description),
+          ].filter(Boolean).join(": ");
+        })
+        .filter(Boolean)
+      : [];
+
+    throw new Error(
+      [
+        typeof data?.message === "string" ? data.message : "Erro ao comunicar com o Mercado Pago.",
+        causes.length ? causes.join(" | ") : "",
+      ].filter(Boolean).join(" - "),
+    );
+  }
+
+  return isRecord(data) ? data : {};
+}
+
+async function createMercadoPagoCustomer({
+  email,
+  config,
+}: {
+  email: string;
+  config: { accessToken: string };
+}) {
+  const existingCustomerId = await findMercadoPagoCustomerByEmail({
+    email,
+    config,
+  });
+
+  if (existingCustomerId) {
+    return existingCustomerId;
+  }
+
+  const response = await mercadoPagoRequest("/v1/customers", config, {
+    method: "POST",
+    body: { email },
+  });
+
+  const customerId = getString(response, ["id"]) || getScalarAsString(response.id);
+  if (!customerId) {
+    throw new Error("Não foi possível criar o cliente no Mercado Pago.");
+  }
+
+  return customerId;
+}
+
+async function findMercadoPagoCustomerByEmail({
+  email,
+  config,
+}: {
+  email: string;
+  config: { accessToken: string };
+}) {
+  const response = await fetch(`https://api.mercadopago.com/v1/customers/search?email=${encodeURIComponent(email)}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.accessToken}`,
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    return "";
+  }
+
+  if (!isRecord(data) || !Array.isArray(data.results) || !data.results.length) {
+    return "";
+  }
+
+  const firstCustomer = data.results[0];
+  if (!isRecord(firstCustomer)) {
+    return "";
+  }
+
+  return getScalarAsString(firstCustomer.id);
+}
+
+async function createMercadoPagoCustomerCard({
+  customerId,
+  config,
+  cardInput,
+}: {
+  customerId: string;
+  config: { accessToken: string };
+  cardInput: CardTokenPaymentInput;
+}) {
+  return await mercadoPagoRequest(`/v1/customers/${customerId}/cards`, config, {
+    method: "POST",
+    body: {
+      token: cardInput.token,
+    },
+  });
+}
+
+async function getMercadoPagoCustomerCard({
+  customerId,
+  cardId,
+  config,
+}: {
+  customerId: string;
+  cardId: string;
+  config: { accessToken: string };
+}) {
+  return await mercadoPagoRequest(`/v1/customers/${customerId}/cards/${cardId}`, config);
+}
+
+async function createMercadoPagoCardToken({
+  cardId,
+  config,
+}: {
+  cardId: string;
+  config: { accessToken: string };
+}) {
+  const response = await mercadoPagoRequest("/v1/card_tokens", config, {
+    method: "POST",
+    body: {
+      card_id: cardId,
+    },
+  });
+
+  const token = getScalarAsString(response.id);
+  if (!token) {
+    throw new Error("Não foi possível gerar o token temporário do cartão salvo.");
+  }
+
+  return {
+    token,
+    paymentMethodId: getString(response, ["payment_method_id", "paymentMethodId"]) || null,
+  };
+}
+
+async function deleteMercadoPagoCustomerCard({
+  customerId,
+  cardId,
+  config,
+  ignoreNotFound = false,
+}: {
+  customerId: string;
+  cardId: string;
+  config: { accessToken: string };
+  ignoreNotFound?: boolean;
+}) {
+  try {
+    await mercadoPagoRequest(`/v1/customers/${customerId}/cards/${cardId}`, config, {
+      method: "DELETE",
+    });
+  } catch (error) {
+    if (ignoreNotFound && error instanceof Error && error.message.toLowerCase().includes("not found")) {
+      return;
+    }
+    throw error;
+  }
+}
+
+function buildSavedPaymentMethod({
+  providerCustomerId,
+  cardResponse,
+  fallbackBrand,
+  fallbackFirstPaymentProviderPaymentId,
+}: {
+  providerCustomerId: string;
+  cardResponse: Record<string, unknown>;
+  fallbackBrand: string;
+  fallbackFirstPaymentProviderPaymentId: string | null;
+}): SavedPaymentMethod {
+  const cardId = getScalarAsString(cardResponse.id);
+  const directBrand = getString(cardResponse, ["payment_method_id", "paymentMethodId"]);
+  const nestedPaymentMethod = isRecord(cardResponse.payment_method)
+    ? getString(cardResponse.payment_method, ["id", "name"])
+    : "";
+  const lastFour = getString(cardResponse, ["last_four_digits", "lastFourDigits", "last_four"]);
+  const issuerId = getString(cardResponse, ["issuer_id", "issuerId"]) ||
+    (isRecord(cardResponse.issuer)
+      ? getString(cardResponse.issuer, ["id"])
+      : "");
+
+  if (!cardId) {
+    throw new Error("Não foi possível identificar o cartão salvo no Mercado Pago.");
+  }
+
+  return {
+    provider: "mercadopago",
+    providerCustomerId,
+    providerCardId: cardId,
+    paymentMethodId: directBrand || nestedPaymentMethod || fallbackBrand || null,
+    issuerId: issuerId || null,
+    brand: directBrand || nestedPaymentMethod || fallbackBrand || null,
+    lastFour: lastFour || null,
+    firstPaymentProviderPaymentId: fallbackFirstPaymentProviderPaymentId,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function extractSavedPaymentMethod(data: Record<string, unknown> | null): SavedPaymentMethod | null {
+  if (!isRecord(data)) return null;
+
+  const rawPaymentMethod = data.paymentMethod;
+  if (!isRecord(rawPaymentMethod)) return null;
+
+  const providerCustomerId = getString(rawPaymentMethod, ["providerCustomerId"]);
+  const providerCardId = getString(rawPaymentMethod, ["providerCardId"]);
+
+  if (!providerCustomerId || !providerCardId) return null;
+
+  return {
+    provider: "mercadopago",
+    providerCustomerId,
+    providerCardId,
+    paymentMethodId: getString(rawPaymentMethod, ["paymentMethodId"]) || null,
+    issuerId: getString(rawPaymentMethod, ["issuerId"]) || null,
+    brand: getString(rawPaymentMethod, ["brand"]) || null,
+    lastFour: getString(rawPaymentMethod, ["lastFour"]) || null,
+    firstPaymentProviderPaymentId: getString(rawPaymentMethod, ["firstPaymentProviderPaymentId"]) || null,
+    updatedAt: getString(rawPaymentMethod, ["updatedAt"]) || new Date().toISOString(),
+  };
+}
+
+async function savePaymentMethodToProfile({
+  supabase,
+  personalId,
+  currentData,
+  paymentMethod,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  personalId: string;
+  currentData: Record<string, unknown> | null;
+  paymentMethod: SavedPaymentMethod | null;
+}) {
+  const nextData = isRecord(currentData)
+    ? { ...currentData }
+    : {};
+
+  if (paymentMethod) {
+    nextData.paymentMethod = paymentMethod;
+  } else {
+    delete nextData.paymentMethod;
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      data: nextData,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", personalId);
+
+  if (error) throw error;
+}
+
+function buildBackUrls(config: { baseUrl: string; successPath: string; failurePath: string; pendingPath: string }, plan: string) {
+  if (!config.baseUrl) return undefined;
+
+  return {
+    success: `${config.baseUrl}${config.successPath}?plan=${plan}`,
+    failure: `${config.baseUrl}${config.failurePath}`,
+    pending: `${config.baseUrl}${config.pendingPath}`,
+  };
+}
+
+async function createCheckoutPreference({
+  personalId,
+  subscriptionId,
+  providerReference,
+  plan,
+  amount,
+  config,
+}: {
+  personalId: string;
+  subscriptionId: string;
+  providerReference: string;
+  plan: string;
+  amount: number;
+  config: { accessToken: string; baseUrl: string; webhookUrl: string; successPath: string; failurePath: string; pendingPath: string };
+}) {
+  return await mercadoPagoRequest("/checkout/preferences", config, {
+    method: "POST",
+    body: {
+      items: [
+        {
+          title: buildPaymentDescription(plan),
+          description: buildPaymentDescription(plan),
+          quantity: 1,
+          currency_id: "BRL",
+          unit_price: amount,
+        },
+      ],
+      ...(buildBackUrls(config, plan) ? { back_urls: buildBackUrls(config, plan) } : {}),
+      auto_return: "approved",
+      notification_url: config.webhookUrl,
+      external_reference: providerReference,
+      metadata: {
+        plan,
+        personalId,
+        subscriptionId,
+        providerReference,
+        source: "personal-platform-regularization",
+      },
+    },
+  });
+}
+
+async function createPixPayment({
+  personalId,
+  subscriptionId,
+  providerReference,
+  plan,
+  amount,
+  email,
+  description,
+  config,
+}: {
+  personalId: string;
+  subscriptionId: string;
+  providerReference: string;
+  plan: string;
+  amount: number;
+  email: string;
+  description: string;
+  config: { accessToken: string; webhookUrl: string };
+}) {
+  const idempotencyKey = `${Date.now()}-${crypto.randomUUID()}`;
+
+  return await mercadoPagoRequest("/v1/payments", config, {
+    method: "POST",
+    headers: {
+      "X-Idempotency-Key": idempotencyKey,
+    },
+    body: {
+      transaction_amount: amount,
+      description,
+      payment_method_id: "pix",
+      payer: {
+        email,
+        first_name: "Cliente",
+        last_name: "FitBodyPro",
+      },
+      notification_url: config.webhookUrl,
+      external_reference: providerReference,
+      metadata: {
+        plan,
+        personalId,
+        subscriptionId,
+        providerReference,
+        source: "personal-platform-regularization",
+      },
+    },
+  });
+}
+
+async function createCardTokenPayment({
+  personalId,
+  subscriptionId,
+  providerReference,
+  plan,
+  amount,
+  email,
+  description,
+  config,
+  cardInput,
+  validationPaymentContext,
+  savedPaymentMethod,
+}: {
+  personalId: string;
+  subscriptionId: string;
+  providerReference: string;
+  plan: string;
+  amount: number;
+  email: string;
+  description: string;
+  config: { accessToken: string; webhookUrl: string };
+  cardInput: CardTokenPaymentInput;
+  validationPaymentContext: ValidationPaymentContext;
+  savedPaymentMethod: SavedPaymentMethod | null;
+}) {
+  const idempotencyKey = `${Date.now()}-${crypto.randomUUID()}`;
+
+  return await mercadoPagoRequest("/v1/payments", config, {
+    method: "POST",
+    headers: {
+      "X-Idempotency-Key": idempotencyKey,
+    },
+    body: {
+      transaction_amount: amount,
+      token: cardInput.token,
+      description,
+      installments: cardInput.installments,
+      payment_method_id: cardInput.paymentMethodId,
+      ...(cardInput.issuerId ? { issuer_id: cardInput.issuerId } : {}),
+      payer: savedPaymentMethod?.providerCustomerId ? {
+        email,
+        type: "customer",
+        id: savedPaymentMethod.providerCustomerId,
+        identification: {
+          type: cardInput.identificationType,
+          number: cardInput.identificationNumber,
+        },
+      } : {
+        email,
+        identification: {
+          type: cardInput.identificationType,
+          number: cardInput.identificationNumber,
+        },
+      },
+      point_of_interaction: buildFirstValidationPaymentPointOfInteraction(validationPaymentContext),
+      notification_url: config.webhookUrl,
+      external_reference: providerReference,
+      metadata: {
+        plan,
+        personalId,
+        subscriptionId,
+        providerReference,
+        source: "personal-platform-card-form",
+      },
+    },
+  });
+}
+
+async function createSavedCardPayment({
+  personalId,
+  subscriptionId,
+  providerReference,
+  plan,
+  amount,
+  email,
+  description,
+  config,
+  savedPaymentMethod,
+  automaticPaymentContext,
+}: {
+  personalId: string;
+  subscriptionId: string;
+  providerReference: string;
+  plan: string;
+  amount: number;
+  email: string;
+  description: string;
+  config: { accessToken: string; webhookUrl: string };
+  savedPaymentMethod: SavedPaymentMethod;
+  automaticPaymentContext: AutomaticPaymentContext;
+}) {
+  const idempotencyKey = `${Date.now()}-${crypto.randomUUID()}`;
+  const cardToken = await createMercadoPagoCardToken({
+    cardId: savedPaymentMethod.providerCardId,
+    config,
+  });
+  const paymentMethodId = savedPaymentMethod.paymentMethodId || cardToken.paymentMethodId;
+
+  if (!paymentMethodId) {
+    throw new Error("Não foi possível identificar a bandeira do cartão salvo. Cadastre o cartão novamente.");
+  }
+
+  return await mercadoPagoRequest("/v1/payments", config, {
+    method: "POST",
+    headers: {
+      "X-Idempotency-Key": idempotencyKey,
+    },
+    body: {
+      transaction_amount: amount,
+      token: cardToken.token,
+      description,
+      installments: 1,
+      payment_method_id: paymentMethodId,
+      ...(savedPaymentMethod.issuerId ? { issuer_id: savedPaymentMethod.issuerId } : {}),
+      payer: {
+        email,
+        type: "customer",
+        id: savedPaymentMethod.providerCustomerId,
+      },
+      point_of_interaction: buildAutomaticPaymentPointOfInteraction(automaticPaymentContext),
+      notification_url: config.webhookUrl,
+      external_reference: providerReference,
+      metadata: {
+        plan,
+        personalId,
+        subscriptionId,
+        providerReference,
+        source: "personal-platform-saved-card",
+      },
+    },
+  });
+}
+
+type AutomaticPaymentContext = {
+  subscriptionGatewayId: string;
+  sequenceNumber: number;
+  referencePaymentId: string;
+  billingDate: string;
+  invoicePeriod: { period: number; type: string };
+  userPresent: boolean;
+};
+
+type ValidationPaymentContext = {
+  subscriptionGatewayId: string;
+  billingDate: string;
+  invoicePeriod: { period: number; type: string };
+  userPresent: boolean;
+};
+
+async function resolveAutomaticPaymentContext({
+  supabase,
+  subscription,
+  savedPaymentMethod,
+  userPresent,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  subscription: SubscriptionRow;
+  savedPaymentMethod: SavedPaymentMethod;
+  userPresent: boolean;
+}) {
+  const referencePaymentId = savedPaymentMethod.firstPaymentProviderPaymentId ||
+    await findLatestApprovedValidationPaymentId({
+      supabase,
+      subscriptionId: subscription.id,
+    });
+
+  if (!referencePaymentId) {
+    throw new Error("Esse cartão salvo ainda não possui um pagamento de validação. Faça um pagamento com o formulário completo uma vez para liberar as próximas cobranças automáticas.");
+  }
+
+  const sequenceNumber = await countSubscriptionPayments({
+    supabase,
+    subscriptionId: subscription.id,
+  });
+
+  return {
+    subscriptionGatewayId: resolveSubscriptionGatewayId(subscription),
+    sequenceNumber: Math.max(sequenceNumber + 1, 2),
+    referencePaymentId,
+    billingDate: formatBillingDate(subscription.next_billing_at || new Date().toISOString()),
+    invoicePeriod: getInvoicePeriod(subscription.billing_cycle || "monthly"),
+    userPresent,
+  };
+}
+
+async function countSubscriptionPayments({
+  supabase,
+  subscriptionId,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  subscriptionId: string;
+}) {
+  const { count, error } = await supabase
+    .from("subscription_payments")
+    .select("id", { count: "exact", head: true })
+    .eq("subscription_id", subscriptionId);
+
+  if (error) throw error;
+  return count || 0;
+}
+
+async function findLatestApprovedValidationPaymentId({
+  supabase,
+  subscriptionId,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  subscriptionId: string;
+}) {
+  const { data, error } = await supabase
+    .from("subscription_payments")
+    .select("provider_payment_id, raw_payload, status")
+    .eq("subscription_id", subscriptionId)
+    .eq("status", "approved")
+    .order("paid_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(10)
+    .returns<Array<{
+      provider_payment_id: string | null;
+      raw_payload: Record<string, unknown> | null;
+      status: SubscriptionPaymentRow["status"];
+    }>>();
+
+  if (error) throw error;
+
+  for (const payment of data || []) {
+    const providerPaymentId = payment.provider_payment_id ||
+      (isRecord(payment.raw_payload)
+        ? getScalarAsString(payment.raw_payload.id)
+        : "");
+    const transactionData = isRecord(payment.raw_payload?.point_of_interaction)
+      && isRecord(payment.raw_payload.point_of_interaction.transaction_data)
+      ? payment.raw_payload.point_of_interaction.transaction_data
+      : null;
+    const isValidationPayment = Boolean(transactionData && transactionData.first_time_use === true);
+
+    if (isValidationPayment && providerPaymentId) {
+      return providerPaymentId;
+    }
+  }
+
+  return "";
+}
+
+function buildAutomaticPaymentPointOfInteraction(context: AutomaticPaymentContext) {
+  return {
+    type: "SUBSCRIPTIONS",
+    transaction_data: {
+      first_time_use: false,
+      subscription_id: context.subscriptionGatewayId,
+      subscription_sequence: {
+        number: context.sequenceNumber,
+        total: null,
+      },
+      invoice_period: context.invoicePeriod,
+      payment_reference: {
+        id: context.referencePaymentId,
+      },
+      billing_date: context.billingDate,
+      user_present: context.userPresent,
+    },
+  };
+}
+
+function buildFirstValidationPaymentPointOfInteraction(context: ValidationPaymentContext) {
+  return {
+    type: "SUBSCRIPTIONS",
+    transaction_data: {
+      first_time_use: true,
+      subscription_id: context.subscriptionGatewayId,
+      subscription_sequence: {
+        number: 1,
+        total: null,
+      },
+      invoice_period: context.invoicePeriod,
+      billing_date: context.billingDate,
+      user_present: context.userPresent,
+    },
+  };
+}
+
+function buildFirstValidationPaymentContext({
+  subscription,
+}: {
+  subscription: SubscriptionRow;
+}): ValidationPaymentContext {
+  return {
+    subscriptionGatewayId: resolveSubscriptionGatewayId(subscription),
+    billingDate: formatBillingDate(subscription.next_billing_at || new Date().toISOString()),
+    invoicePeriod: getInvoicePeriod(subscription.billing_cycle || "monthly"),
+    userPresent: true,
+  };
+}
+
+function resolveSubscriptionGatewayId(subscription: SubscriptionRow) {
+  const providerSubscriptionId = subscription.provider_subscription_id?.trim() || "";
+  if (providerSubscriptionId && providerSubscriptionId.length <= 30) {
+    return providerSubscriptionId;
+  }
+
+  return buildSubscriptionGatewayId({
+    personalId: subscription.personal_id,
+    subscriptionId: subscription.id,
+  });
+}
+
+function buildSubscriptionGatewayId({
+  personalId,
+  subscriptionId,
+}: {
+  personalId: string;
+  subscriptionId: string;
+}) {
+  return `sub_${createShortStableId(`${personalId}:${subscriptionId}`)}`;
+}
+
+
+function createShortStableId(value: string) {
+  let hashA = 5381;
+  let hashB = 52711;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    hashA = ((hashA << 5) + hashA) ^ code;
+    hashB = ((hashB << 5) + hashB) ^ (code + index);
+  }
+
+  const normalizedA = (hashA >>> 0).toString(36);
+  const normalizedB = (hashB >>> 0).toString(36);
+  return `${normalizedA}${normalizedB}`.slice(0, 14);
+}
+
+function formatBillingDate(value: string) {
+  const date = new Date(value);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getInvoicePeriod(billingCycle: string) {
+  if (billingCycle === "quarterly") {
+    return { period: 3, type: "monthly" };
+  }
+
+  if (billingCycle === "yearly") {
+    return { period: 1, type: "yearly" };
+  }
+
+  return { period: 1, type: "monthly" };
+}
+
+async function getPaymentById({
+  paymentId,
+  config,
+}: {
+  paymentId: string;
+  config: { accessToken: string };
+}) {
+  if (!paymentId) {
+    throw new Error("ID do pagamento obrigatório.");
+  }
+
+  return await mercadoPagoRequest(`/v1/payments/${paymentId}`, config);
+}
+
+function buildPaymentDescription(plan: string, purpose: "regularization" | "renewal" = "regularization") {
+  const label = plan === "starter"
+    ? "FitBody Starter"
+    : plan === "premium" || plan === "pro" || plan === "elite" || plan === "unlimited"
+    ? "FitBody Premium"
+    : "FitBody Pro";
+
+  return purpose === "renewal"
+    ? `${label} - renovacao da assinatura`
+    : `${label} - regularizacao da assinatura`;
+}
+
+function buildProviderReference({
+  personalId,
+  subscriptionId,
+  prefix = "reg",
+  suffix,
+}: {
+  personalId: string;
+  subscriptionId: string;
+  prefix?: string;
+  suffix?: string;
+}) {
+  return `${prefix}_${personalId}_${subscriptionId}_${suffix || Date.now()}`;
+}
+
+function extractNestedString(value: unknown, keys: string[]): string | null {
+  if (!value || typeof value !== "object") return null;
+
+  const entries = Object.entries(value as Record<string, unknown>);
+
+  for (const [key, entryValue] of entries) {
+    if (typeof entryValue === "string" && keys.includes(key)) {
+      return entryValue;
+    }
+  }
+
+  for (const [, entryValue] of entries) {
+    if (entryValue && typeof entryValue === "object") {
+      const nested = extractNestedString(entryValue, keys);
+      if (nested) return nested;
+    }
+  }
+
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}

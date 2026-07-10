@@ -1,0 +1,531 @@
+.page-shell {
+  position: relative;
+  z-index: 1;
+}
+
+.topbar,
+.hero-section,
+.benefits-section,
+.features-section,
+.journey-section,
+.pricing-section,
+.faq-section,
+.cta-section {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  color: #f8fafc;
+  text-decoration: none;
+}
+
+.brand img {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(14, 165, 233, 0.25);
+}
+
+.brand strong,
+.brand span {
+  display: block;
+}
+
+.brand strong {
+  font-size: 0.95rem;
+  letter-spacing: 0.16em;
+}
+
+.brand span {
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.nav-links {
+  display: inline-flex;
+  gap: 24px;
+}
+
+.nav-links a,
+.ghost-button,
+.primary-button,
+.secondary-button,
+.plan-button {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.nav-links a {
+  color: #cbd5e1;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.nav-links a:hover,
+.nav-links a:focus-visible {
+  color: #fff;
+}
+
+.ghost-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.55);
+  color: #f8fafc;
+  text-decoration: none;
+}
+
+.primary-button,
+.plan-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 24px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: #0f172a;
+  font-weight: 700;
+  background: linear-gradient(135deg, #38bdf8, #22c55e);
+  box-shadow: 0 18px 40px rgba(34, 197, 94, 0.22);
+}
+
+.ghost-button:hover,
+.primary-button:hover,
+.secondary-button:hover,
+.plan-button:hover {
+  transform: translateY(-1px);
+}
+
+.hero-section {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 48px;
+  padding: 52px 0 80px;
+  align-items: center;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  background: rgba(14, 165, 233, 0.08);
+  color: #7dd3fc;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.hero-copy h1,
+.section-heading h2,
+.section-heading-left h2,
+.journey-copy h2,
+.cta-section h2,
+.hero-card-main h2 {
+  margin: 0;
+  color: #f8fafc;
+  line-height: 1.05;
+}
+
+.hero-copy h1 {
+  font-size: clamp(2.8rem, 5vw, 4.8rem);
+  max-width: 12ch;
+}
+
+.hero-text,
+.section-heading p,
+.journey-copy p,
+.cta-section p,
+.hero-card p,
+.benefit-card p,
+.feature-card li,
+.pricing-card p,
+.faq-item p,
+.step-card p {
+  color: #94a3b8;
+}
+
+.hero-text {
+  max-width: 650px;
+  margin-top: 22px;
+  font-size: 1.08rem;
+}
+
+.hero-actions,
+.cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 30px;
+}
+
+.hero-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.hero-notes span {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
+.hero-panel {
+  position: relative;
+}
+
+.hero-panel::before {
+  content: '';
+  position: absolute;
+  inset: 10% 15% auto auto;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.24), transparent 70%);
+  filter: blur(6px);
+}
+
+.hero-card {
+  position: relative;
+  z-index: 1;
+  padding: 24px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.7));
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 26px 60px rgba(2, 6, 23, 0.35);
+}
+
+.hero-card-main {
+  margin-bottom: 16px;
+  padding: 28px;
+}
+
+.panel-label,
+.plan-audience {
+  margin: 0 0 10px;
+  color: #7dd3fc;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hero-card-main h2 {
+  font-size: 1.8rem;
+  margin-bottom: 10px;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.stat-number {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: #fff;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.benefits-section,
+.features-section,
+.journey-section,
+.pricing-section,
+.faq-section,
+.cta-section {
+  padding: 88px 0;
+}
+
+.section-heading,
+.section-heading-left,
+.journey-copy {
+  max-width: 760px;
+}
+
+.section-heading h2,
+.section-heading-left h2,
+.journey-copy h2,
+.cta-section h2 {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+}
+
+.section-heading p,
+.section-heading-left p,
+.journey-copy p,
+.cta-section p {
+  margin-top: 18px;
+  font-size: 1.02rem;
+}
+
+.section-heading-left {
+  text-align: left;
+}
+
+.benefits-grid,
+.feature-groups,
+.pricing-grid,
+.faq-list {
+  display: grid;
+  gap: 22px;
+  margin-top: 36px;
+}
+
+.benefits-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.benefit-card,
+.feature-card,
+.pricing-card,
+.faq-item,
+.step-card {
+  padding: 28px;
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.74);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.benefit-card h3,
+.feature-card h3,
+.pricing-card h3,
+.faq-item h3 {
+  margin: 0 0 12px;
+  color: #f8fafc;
+  font-size: 1.3rem;
+}
+
+.feature-groups,
+.pricing-grid,
+.faq-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.feature-card ul,
+.pricing-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+}
+
+.feature-card li,
+.pricing-card li {
+  position: relative;
+  padding-left: 22px;
+}
+
+.feature-card li + li,
+.pricing-card li + li {
+  margin-top: 10px;
+}
+
+.feature-card li::before,
+.pricing-card li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #38bdf8, #22c55e);
+}
+
+.journey-section {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 28px;
+  align-items: start;
+}
+
+.journey-steps {
+  display: grid;
+  gap: 16px;
+}
+
+.step-card {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  gap: 18px;
+  align-items: center;
+}
+
+.step-card span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #67e8f9;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.pricing-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.pricing-card-featured {
+  border-color: rgba(56, 189, 248, 0.36);
+  background: linear-gradient(180deg, rgba(10, 20, 40, 0.95), rgba(8, 47, 73, 0.75));
+  box-shadow: 0 28px 70px rgba(14, 165, 233, 0.2);
+}
+
+.pricing-badge {
+  position: absolute;
+  top: -14px;
+  left: 28px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #38bdf8, #22c55e);
+  color: #082f49;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.plan-price {
+  display: inline-block;
+  margin: 12px 0 14px;
+  color: #f8fafc;
+  font-size: 2.3rem;
+  line-height: 1;
+}
+
+.plan-description {
+  margin: 0 0 8px;
+}
+
+.plan-button {
+  margin-top: auto;
+}
+
+.faq-item {
+  height: 100%;
+}
+
+.cta-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 60px;
+  padding: 40px;
+  border-radius: 32px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(34, 197, 94, 0.08));
+  border: 1px solid rgba(56, 189, 248, 0.18);
+}
+
+@media (max-width: 1100px) {
+  .nav-links {
+    display: none;
+  }
+
+  .hero-section,
+  .journey-section,
+  .cta-section {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .benefits-grid,
+  .feature-groups,
+  .pricing-grid,
+  .faq-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .topbar,
+  .hero-section,
+  .benefits-section,
+  .features-section,
+  .journey-section,
+  .pricing-section,
+  .faq-section,
+  .cta-section {
+    width: min(100% - 32px, 1180px);
+  }
+
+  .topbar {
+    padding: 18px 0;
+  }
+
+  .ghost-button {
+    display: none;
+  }
+
+  .hero-section {
+    gap: 32px;
+    padding: 30px 0 56px;
+  }
+
+  .hero-card-main,
+  .hero-card,
+  .benefit-card,
+  .feature-card,
+  .pricing-card,
+  .faq-item,
+  .step-card,
+  .cta-section {
+    padding: 22px;
+  }
+
+  .hero-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .benefits-section,
+  .features-section,
+  .journey-section,
+  .pricing-section,
+  .faq-section {
+    padding: 60px 0;
+  }
+
+  .step-card {
+    grid-template-columns: 54px 1fr;
+  }
+
+  .step-card span {
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+  }
+}

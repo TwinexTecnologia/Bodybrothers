@@ -4,8 +4,8 @@ import { supabase } from '../lib/supabase'
 
 // Cliente secundário para criar usuários sem deslogar o admin
 const supabaseAdmin = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co',
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder',
   {
     auth: {
       autoRefreshToken: false,

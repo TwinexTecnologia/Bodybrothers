@@ -26,7 +26,9 @@ export async function createStudentAuthUser(input: CreateStudentAuthInput): Prom
     },
   })
 
-  if (error) throw error
+  if (error) {
+    throw new Error(await extractFunctionErrorMessage(error, 'Não foi possível criar o aluno.'))
+  }
   if (data?.error) throw new Error(data.error)
   if (!data?.userId) throw new Error('Resposta inválida ao criar aluno.')
 
@@ -46,6 +48,26 @@ export async function updateStudentAuthCredentials(input: UpdateStudentAuthInput
     body: payload,
   })
 
-  if (error) throw error
+  if (error) {
+    throw new Error(await extractFunctionErrorMessage(error, 'Não foi possível atualizar as credenciais do aluno.'))
+  }
   if (data?.error) throw new Error(data.error)
+}
+
+async function extractFunctionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  if (error instanceof Error && error.message && !error.message.includes('non-2xx')) {
+    return error.message
+  }
+
+  const context = (error as { context?: Response })?.context
+  if (context && typeof context.json === 'function') {
+    const payload = await context.json().catch(() => null) as { error?: string } | null
+    if (payload?.error) return payload.error
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  return fallback
 }

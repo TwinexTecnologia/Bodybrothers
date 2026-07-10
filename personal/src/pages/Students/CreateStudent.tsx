@@ -105,6 +105,8 @@ export default function CreateStudent() {
         console.error('Erro geral:', err)
         if (err.message && (err.message.includes('already registered') || err.message.includes('already been registered'))) {
             setMsg('Erro: Este email já está cadastrado.')
+        } else if (err.message && err.message.includes('Seu plano atual permite até')) {
+            setMsg(err.message)
         } else {
             setMsg(`Erro ao criar aluno: ${err.message || JSON.stringify(err)}`)
         }
