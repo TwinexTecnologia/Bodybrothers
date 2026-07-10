@@ -7,7 +7,7 @@ import type { StudentRecord } from '../../store/students'
 
 type PendingItem = {
     student: StudentRecord;
-    status: 'expired' | 'missing';
+    status: 'expired';
     dueDate: string;
 }
 
@@ -164,11 +164,7 @@ export default function AnamnesisPending() {
                         const studentResponses = (responsesByStudentId.get(student.id) || []).slice()
 
                         if (studentResponses.length === 0) {
-                            resultPending.push({
-                                student,
-                                status: 'missing',
-                                dueDate: ''
-                            })
+                            return
                         } else {
                             studentResponses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                             const last = studentResponses[0]
@@ -435,25 +431,19 @@ export default function AnamnesisPending() {
                         )}
                         
                         {pendingItems.map((item, idx) => (
-                            <div key={item.student.id + idx} className="form-card" style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderLeft: item.status === 'missing' ? '4px solid #f59e0b' : '4px solid #ef4444' }}>
+                            <div key={item.student.id + idx} className="form-card" style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderLeft: '4px solid #ef4444' }}>
                                 <div>
                                     <div style={{ fontWeight: 'bold', fontSize: '1.1em' }}>{item.student.name}</div>
-                                    {item.status === 'missing' ? (
-                                        <div style={{ fontSize: 13, color: '#d97706', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            <span>⚠️</span> Nunca respondeu
-                                        </div>
-                                    ) : (
-                                        <div style={{ fontSize: 13, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            <span>⏰</span> Venceu em {new Date(item.dueDate!).toLocaleDateString()}
-                                        </div>
-                                    )}
+                                    <div style={{ fontSize: 13, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <span>⏰</span> Venceu em {new Date(item.dueDate).toLocaleDateString()}
+                                    </div>
                                 </div>
                                 <button 
                                     className="btn" 
-                                    style={{ background: item.status === 'missing' ? '#0f172a' : '#ef4444' }}
+                                    style={{ background: '#ef4444' }}
                                     onClick={() => navigate(`/protocols/anamnesis-apply?studentId=${item.student.id}`)}
                                 >
-                                    {item.status === 'missing' ? 'Aplicar Nova' : 'Renovar'}
+                                    Renovar
                                 </button>
                             </div>
                         ))}
