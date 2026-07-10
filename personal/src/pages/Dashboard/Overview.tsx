@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { countPendingAnamnesisReviews } from '../../lib/anamnesisReview'
 import { useNavigate } from 'react-router-dom'
 import type { StudentRecord } from '../../store/students'
 import type { PlanRecord } from '../../store/plans'
@@ -135,7 +136,7 @@ export default function Overview() {
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').neq('status', 'active'),
             supabase.from('profiles').select('data').eq('id', user.id).single(),
             supabase.from('protocols').select('id, status, student_id').eq('personal_id', user.id).eq('type', 'anamnesis_model'),
-            supabase.from('protocols').select('id, student_id, created_at, data, content, renew_in_days').eq('personal_id', user.id).eq('type', 'anamnesis')
+            supabase.from('protocols').select('id, student_id, created_at, data, renew_in_days').eq('personal_id', user.id).eq('type', 'anamnesis')
         ])
 
         const studentsRaw = studentsRes.data || []
@@ -166,22 +167,11 @@ export default function Overview() {
         if (showAnamnesisPending) {
             const allModels = anamnesisModelsRes.data || []
             const allResponses = anamnesisRes.data || []
-
-            if (allModels.length > 0) {
-                activeStudentsList.forEach(student => {
-                    const hasLinkedModel = allModels.some((model: any) => model.student_id === student.id)
-                    if (!hasLinkedModel) return
-
-                    const studentResponses = allResponses.filter((response: any) => response.student_id === student.id)
-
-                    studentResponses.forEach((response: any) => {
-                        const responseData = response.data || response.content || {}
-                        if (!responseData.reviewed_at) {
-                            pendingAnamnesisCount += 1
-                        }
-                    })
-                })
-            }
+            pendingAnamnesisCount = countPendingAnamnesisReviews(
+              allResponses,
+              activeStudentIds,
+              allModels.length > 0
+            )
         }
 
         const plans = (plansRes.data || []) as PlanRecord[]
