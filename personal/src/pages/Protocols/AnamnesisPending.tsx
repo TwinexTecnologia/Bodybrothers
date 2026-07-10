@@ -51,20 +51,15 @@ export default function AnamnesisPending() {
         try {
             const { data: { user } } = await supabase.auth.getUser()
             if (user) {
-                // 1. Busca perfil do personal para ver configuração
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('data')
-                    .eq('id', user.id)
-                    .single()
-
-                const reviewRequired = profile?.data?.config?.anamnesisReviewRequired === true
-                setIsReviewRequired(reviewRequired)
-
-                const [studentsRes, modelsRes, responsesRes] = await Promise.all([
+                const [profileRes, studentsRes, modelsRes, responsesRes] = await Promise.all([
                     supabase
                         .from('profiles')
-                        .select('id, personal_id, full_name, email, created_at, plan_id, due_day, data')
+                        .select('data')
+                        .eq('id', user.id)
+                        .single(),
+                    supabase
+                        .from('profiles')
+                        .select('id, personal_id, full_name, created_at, plan_id, due_day, data')
                         .eq('personal_id', user.id)
                         .eq('role', 'aluno'),
                     supabase
@@ -79,11 +74,14 @@ export default function AnamnesisPending() {
                         .eq('type', 'anamnesis')
                 ])
 
+                const reviewRequired = profileRes.data?.data?.config?.anamnesisReviewRequired === true
+                setIsReviewRequired(reviewRequired)
+
                 const students = ((studentsRes.data || []) as any[]).map((student): StudentRecord => ({
                     id: student.id,
                     personalId: student.personal_id,
                     name: student.full_name || '',
-                    email: student.email || student.data?.email || '',
+                    email: student.data?.email || '',
                     status: student.data?.status === 'inativo' ? 'inativo' : 'ativo',
                     createdAt: student.created_at,
                     lastAccess: student.data?.last_app_access_at,
