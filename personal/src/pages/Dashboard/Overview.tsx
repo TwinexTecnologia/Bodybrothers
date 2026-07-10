@@ -127,13 +127,13 @@ export default function Overview() {
             anamnesisModelsRes,
             anamnesisRes // NOVO
         ] = await Promise.all([
-            supabase.from('profiles').select('id, personal_id, full_name, email, created_at, plan_id, due_day, data').eq('personal_id', user.id).eq('role', 'aluno'),
+            supabase.from('profiles').select('id, personal_id, created_at, plan_id, due_day, data').eq('personal_id', user.id).eq('role', 'aluno'),
             supabase.from('plans').select('id, frequency').eq('personal_id', user.id),
-            supabase.from('debits').select('id, payer_id, receiver_id, amount, due_date, paid_at, status, saas_ref_month').eq('receiver_id', user.id).eq('status', 'paid'),
-            supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active'),
-            supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active'),
-            supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').eq('status', 'active'),
-            supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').neq('status', 'active'),
+            supabase.from('debits').select('id, payer_id, amount, due_date, paid_at').eq('receiver_id', user.id).eq('status', 'paid'),
+            supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active'),
+            supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active'),
+            supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').eq('status', 'active'),
+            supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').neq('status', 'active'),
             supabase.from('profiles').select('data').eq('id', user.id).single(),
             supabase.from('protocols').select('id, status, student_id').eq('personal_id', user.id).eq('type', 'anamnesis_model'),
             supabase.from('protocols').select('id, student_id, created_at, data, renew_in_days').eq('personal_id', user.id).eq('type', 'anamnesis')
@@ -143,8 +143,8 @@ export default function Overview() {
         const students: StudentRecord[] = studentsRaw.map((d: any) => ({
             id: d.id,
             personalId: d.personal_id,
-            name: d.full_name || '',
-            email: d.email || '',
+            name: '',
+            email: '',
             status: d.data?.status || 'ativo',
             createdAt: d.created_at,
             planId: d.plan_id || d.data?.planId,
@@ -181,12 +181,12 @@ export default function Overview() {
         const allPayments: DebitRecord[] = paymentsRaw.map((d: any) => ({
             id: d.id,
             payerId: d.payer_id,
-            receiverId: d.receiver_id,
+            receiverId: user.id,
             amount: Number(d.amount),
             dueDate: d.due_date,
             paidAt: d.paid_at,
-            status: d.status,
-            monthRef: d.saas_ref_month
+            status: 'paid',
+            monthRef: undefined
         }))
         const paymentsByStudentId = new Map<string, DebitRecord[]>()
 
