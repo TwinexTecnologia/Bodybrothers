@@ -123,6 +123,7 @@ export default function Overview() {
             workoutsActiveRes,
             workoutsInactiveRes,
             profileRes, // NOVO
+            anamnesisModelsRes,
             anamnesisRes // NOVO
         ] = await Promise.all([
             supabase.from('profiles').select('id, personal_id, full_name, email, created_at, plan_id, due_day, data').eq('personal_id', user.id).eq('role', 'aluno'),
@@ -133,7 +134,8 @@ export default function Overview() {
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').eq('status', 'active'),
             supabase.from('protocols').select('*', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').neq('status', 'active'),
             supabase.from('profiles').select('data').eq('id', user.id).single(),
-            supabase.from('protocols').select('student_id, data, content').eq('personal_id', user.id).eq('type', 'anamnesis')
+            supabase.from('protocols').select('id, status, student_id').eq('personal_id', user.id).eq('type', 'anamnesis_model'),
+            supabase.from('protocols').select('id, student_id, created_at, data, content, renew_in_days').eq('personal_id', user.id).eq('type', 'anamnesis')
         ])
 
         const studentsRaw = studentsRes.data || []
@@ -162,13 +164,24 @@ export default function Overview() {
         const showAnamnesisPending = profileRes.data?.data?.config?.anamnesisReviewRequired === true
         
         if (showAnamnesisPending) {
-            const allAnamnesis = anamnesisRes.data || []
+            const allModels = anamnesisModelsRes.data || []
+            const allResponses = anamnesisRes.data || []
 
-            pendingAnamnesisCount = allAnamnesis.reduce((count, anamnesis: any) => {
-                if (!activeStudentIds.has(anamnesis.student_id)) return count
-                const data = anamnesis.data || anamnesis.content || {}
-                return !data.reviewed_at ? count + 1 : count
-            }, 0)
+            if (allModels.length > 0) {
+                activeStudentsList.forEach(student => {
+                    const hasLinkedModel = allModels.some((model: any) => model.student_id === student.id)
+                    if (!hasLinkedModel) return
+
+                    const studentResponses = allResponses.filter((response: any) => response.student_id === student.id)
+
+                    studentResponses.forEach((response: any) => {
+                        const responseData = response.data || response.content || {}
+                        if (!responseData.reviewed_at) {
+                            pendingAnamnesisCount += 1
+                        }
+                    })
+                })
+            }
         }
 
         const plans = (plansRes.data || []) as PlanRecord[]
