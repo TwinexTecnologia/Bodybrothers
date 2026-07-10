@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { getAnamnesisResponseData, isAnamnesisAwaitingReview } from '../../lib/anamnesisReview'
 import { useNavigate } from 'react-router-dom'
 import { Toast, type ToastType } from '../../components/Toast'
 import { reviewAndReapplyAnamnesis } from '../../store/anamnesis'
@@ -146,8 +147,8 @@ export default function AnamnesisPending() {
                             const student = activeStudentsById.get(response.student_id)
                             if (!student) return
 
-                            const respData = response.data || response.content || {}
-                            if (!respData.reviewed_at) {
+                            const respData = getAnamnesisResponseData(response)
+                            if (isAnamnesisAwaitingReview(response)) {
                                 resultReview.push({
                                     id: response.id,
                                     student,
@@ -173,9 +174,9 @@ export default function AnamnesisPending() {
                             // MAS se ainda não foi revisada, ela cai na lista de cima (resultReview) e não aqui.
                             // Se já foi revisada, usamos reviewed_at. Se não é required, usamos created_at.
                             
-                            const lastData = last.data || last.content || {}
+                            const lastData = getAnamnesisResponseData(last)
                             
-                            const isPendingReview = reviewRequired && !lastData.reviewed_at
+                            const isPendingReview = reviewRequired && isAnamnesisAwaitingReview(last)
                             if (isPendingReview) return 
 
                             // Data base para cálculo de vencimento
