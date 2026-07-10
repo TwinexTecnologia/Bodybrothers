@@ -101,14 +101,18 @@ export default function CreateStudent() {
         setComplement('')
         setPlanId('')
 
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('Erro geral:', err)
-        if (err.message && (err.message.includes('already registered') || err.message.includes('already been registered'))) {
-            setMsg('Erro: Este email já está cadastrado.')
-        } else if (err.message && err.message.includes('Seu plano atual permite até')) {
-            setMsg(err.message)
+        const errorMessage = err instanceof Error
+          ? err.message
+          : 'Não foi possível criar o aluno.'
+
+        if (errorMessage === 'Este e-mail já está cadastrado em outro acesso, tente outro email.') {
+            setMsg(errorMessage)
+        } else if (errorMessage.includes('Seu plano atual permite até')) {
+            setMsg(errorMessage)
         } else {
-            setMsg(`Erro ao criar aluno: ${err.message || JSON.stringify(err)}`)
+            setMsg(`Erro ao criar aluno: ${errorMessage}`)
         }
     } finally {
         setLoading(false)

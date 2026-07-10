@@ -1,5 +1,7 @@
 import { supabase } from './supabase'
 
+const DUPLICATE_EMAIL_MESSAGE = 'Este e-mail já está cadastrado em outro acesso, tente outro email.'
+
 type CreateStudentAuthInput = {
   personalId: string
   name: string
@@ -27,7 +29,7 @@ export async function createStudentAuthUser(input: CreateStudentAuthInput): Prom
   })
 
   if (error) {
-    throw new Error(await extractFunctionErrorMessage(error, 'Não foi possível criar o aluno.'))
+    throw await normalizeFunctionInvokeError(error, 'Não foi possível criar o aluno.')
   }
   if (data?.error) throw new Error(data.error)
   if (!data?.userId) throw new Error('Resposta inválida ao criar aluno.')
@@ -49,25 +51,39 @@ export async function updateStudentAuthCredentials(input: UpdateStudentAuthInput
   })
 
   if (error) {
-    throw new Error(await extractFunctionErrorMessage(error, 'Não foi possível atualizar as credenciais do aluno.'))
+    throw await normalizeFunctionInvokeError(error, 'Não foi possível atualizar as credenciais do aluno.')
   }
   if (data?.error) throw new Error(data.error)
 }
 
-async function extractFunctionErrorMessage(error: unknown, fallback: string): Promise<string> {
-  if (error instanceof Error && error.message && !error.message.includes('non-2xx')) {
-    return error.message
+async function normalizeFunctionInvokeError(error: unknown, fallback: string): Promise<Error> {
+  const fallbackMessage =
+    error instanceof Error && error.message ? error.message : fallback
+  const response = (error as { context?: Response } | null)?.context
+
+  let detailedMessage = ''
+
+  if (response instanceof Response) {
+    try {
+      const payload = await response.clone().json()
+      if (payload && typeof payload.error === 'string') {
+        detailedMessage = payload.error.trim()
+      }
+    } catch {
+      void 0
+    }
   }
 
-  const context = (error as { context?: Response })?.context
-  if (context && typeof context.json === 'function') {
-    const payload = await context.json().catch(() => null) as { error?: string } | null
-    if (payload?.error) return payload.error
+  const message = detailedMessage || fallbackMessage
+  const normalizedMessage = message.toLowerCase()
+
+  if (
+    normalizedMessage.includes('already registered') ||
+    normalizedMessage.includes('already been registered') ||
+    normalizedMessage.includes('email address has already been registered')
+  ) {
+    return new Error(DUPLICATE_EMAIL_MESSAGE)
   }
 
-  if (error instanceof Error && error.message) {
-    return error.message
-  }
-
-  return fallback
+  return new Error(message)
 }

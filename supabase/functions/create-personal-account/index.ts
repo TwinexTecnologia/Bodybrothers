@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-landing-token, x-signup-token",
+    "authorization, x-client-info, apikey, content-type, x-landing-token, x-signup-token, x-api-key",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -129,28 +129,26 @@ async function resolveRequestMode({
   req: Request;
   supabase: ReturnType<typeof createClient>;
 }): Promise<RequestMode> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const bearerToken = authHeader.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length).trim()
+    : "";
   const landingToken =
     req.headers.get("x-landing-token")?.trim() ||
     req.headers.get("x-signup-token")?.trim() ||
+    req.headers.get("x-api-key")?.trim() ||
     "";
   const expectedLandingToken = Deno.env.get("LANDING_SIGNUP_TOKEN")?.trim() || "";
 
-  if (landingToken) {
-    if (!expectedLandingToken) {
-      throw new Error("LANDING_SIGNUP_TOKEN não configurado no projeto.");
+  if (expectedLandingToken) {
+    if (landingToken === expectedLandingToken || bearerToken === expectedLandingToken) {
+      return { mode: "landing" };
     }
 
-    if (landingToken !== expectedLandingToken) {
+    if (landingToken) {
       throw new Error("Token da landing inválido.");
     }
-
-    return { mode: "landing" };
   }
-
-  const authHeader = req.headers.get("Authorization") ?? "";
-  const bearerToken = authHeader.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length)
-    : "";
 
   if (!bearerToken) {
     throw new Error("Token da landing ou usuário owner autenticado é obrigatório.");
@@ -201,6 +199,10 @@ async function handleCreatePersonal({
   const phone = getString(body, ["phone"]);
   const brandName = getString(body, ["brandName"]) || name;
   const logoUrl = getString(body, ["logoUrl"]);
+  const source = getString(body, ["source"]) || requestMode.mode;
+  const loginUrl =
+    getString(body, ["loginUrl", "redirectUrl"]) ||
+    (Deno.env.get("PERSONAL_LOGIN_URL")?.trim() || "");
 
   const requestedPlan = normalizePlanSlug(
     getString(body, ["plan", "planSlug"]),
@@ -285,6 +287,7 @@ async function handleCreatePersonal({
   const profileData = {
     phone,
     status: "active",
+    signupSource: source,
     branding: {
       brandName,
       logoUrl,
@@ -304,6 +307,7 @@ async function handleCreatePersonal({
     full_name: name,
     role: "personal",
     phone,
+    source,
     branding: {
       brandName,
       logoUrl,
@@ -350,6 +354,21 @@ async function handleCreatePersonal({
     throw profileError;
   }
 
+  const { error: personalConfigError } = await supabase.from("personal_config").upsert({
+    personal_id: createdUserId,
+    app_name: brandName || name,
+    logo_url: logoUrl || null,
+    status: "active",
+    saas_monthly_value: 0,
+    updated_at: nowIso,
+  });
+
+  if (personalConfigError) {
+    await supabase.from("profiles").delete().eq("id", createdUserId).catch(() => undefined);
+    await supabase.auth.admin.deleteUser(createdUserId).catch(() => undefined);
+    throw personalConfigError;
+  }
+
   const { data: subscriptionRow, error: subscriptionError } = await supabase
     .from("personal_subscriptions")
     .upsert(
@@ -378,6 +397,7 @@ async function handleCreatePersonal({
     .single<SubscriptionRow>();
 
   if (subscriptionError) {
+    await supabase.from("personal_config").delete().eq("personal_id", createdUserId).catch(() => undefined);
     await supabase.from("profiles").delete().eq("id", createdUserId).catch(() => undefined);
     await supabase.auth.admin.deleteUser(createdUserId).catch(() => undefined);
     throw subscriptionError;
@@ -411,6 +431,7 @@ async function handleCreatePersonal({
       .delete()
       .eq("personal_id", createdUserId)
       .catch(() => undefined);
+    await supabase.from("personal_config").delete().eq("personal_id", createdUserId).catch(() => undefined);
     await supabase.from("personal_subscriptions").delete().eq("personal_id", createdUserId).catch(() => undefined);
     await supabase.from("profiles").delete().eq("id", createdUserId).catch(() => undefined);
     await supabase.auth.admin.deleteUser(createdUserId).catch(() => undefined);
@@ -419,8 +440,11 @@ async function handleCreatePersonal({
 
   return jsonResponse(200, {
     success: true,
+    message: "Conta criada com sucesso.",
     userId: createdUserId,
     personalId: createdUserId,
+    email,
+    loginUrl: loginUrl || null,
     mode: requestMode.mode,
     plan: requestedPlan,
     billingCycle,
@@ -430,6 +454,12 @@ async function handleCreatePersonal({
     recurringReady: paymentContext.recurringReady,
     paymentMethodStored: Boolean(paymentContext.savedPaymentMethod),
     missingRecurringFields: paymentContext.missingRecurringFields,
+    defaults: {
+      plan: requestedPlan,
+      studentLimit: planConfig.studentLimit,
+      evolutionMode,
+      anamnesisReviewRequired,
+    },
   });
 }
 
