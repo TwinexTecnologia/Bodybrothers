@@ -74,7 +74,7 @@ export default function AnamnesisPending() {
                         .eq('type', 'anamnesis_model'),
                     supabase
                         .from('protocols')
-                        .select('id, student_id, created_at, data, content, renew_in_days')
+                        .select('id, student_id, created_at, data, renew_in_days')
                         .eq('personal_id', user.id)
                         .eq('type', 'anamnesis')
                 ])
