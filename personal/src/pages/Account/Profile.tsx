@@ -35,7 +35,8 @@ type SubscriptionPaymentRow = {
 type SavedPaymentMethod = {
   provider: 'mercadopago'
   providerCustomerId: string
-  providerCardId: string
+  providerCardId: string | null
+  providerPaymentProfileId: string | null
   paymentMethodId: string | null
   issuerId: string | null
   brand: string | null
@@ -48,6 +49,7 @@ type StoredPaymentMethodRow = {
   provider: string | null
   provider_customer_id: string | null
   provider_card_id: string | null
+  provider_payment_profile_id: string | null
   payment_method_id: string | null
   issuer_id: string | null
   brand: string | null
@@ -157,7 +159,7 @@ export default function Profile() {
   const paymentActionData = useMemo(() => extractPaymentActionData(latestPayment?.raw_payload), [latestPayment])
   const canCopyPix = Boolean(paymentActionData.pixCode)
   const needsRegularization = subscription?.status === 'blocked' || subscription?.status === 'past_due'
-  const hasSavedPaymentMethod = Boolean(savedPaymentMethod?.providerCardId)
+  const hasSavedPaymentMethod = Boolean(savedPaymentMethod?.providerCardId || savedPaymentMethod?.providerPaymentProfileId)
   const savedPaymentMethodValidated = Boolean(savedPaymentMethod?.firstPaymentProviderPaymentId)
   const cardPaymentAmount = useMemo(() => {
     const explicitCardAmount = normalizeMoneyValue(cardFormAmount)
@@ -223,7 +225,7 @@ export default function Profile() {
       const [paymentMethodResult, subscriptionResult, studentsResult] = await Promise.all([
         supabase
           .from('personal_payment_methods')
-          .select('provider, provider_customer_id, provider_card_id, payment_method_id, issuer_id, brand, last_four, first_payment_provider_payment_id, updated_at')
+          .select('provider, provider_customer_id, provider_card_id, provider_payment_profile_id, payment_method_id, issuer_id, brand, last_four, first_payment_provider_payment_id, updated_at')
           .eq('personal_id', resolvedPersonalAccountId)
           .eq('status', 'active')
           .maybeSingle<StoredPaymentMethodRow>(),
@@ -1203,13 +1205,17 @@ function extractSavedPaymentMethod(data: unknown): SavedPaymentMethod | null {
 
   const providerCustomerId = typeof paymentMethod.providerCustomerId === 'string' ? paymentMethod.providerCustomerId : ''
   const providerCardId = typeof paymentMethod.providerCardId === 'string' ? paymentMethod.providerCardId : ''
+  const providerPaymentProfileId = typeof paymentMethod.providerPaymentProfileId === 'string'
+    ? paymentMethod.providerPaymentProfileId
+    : ''
 
-  if (!providerCustomerId || !providerCardId) return null
+  if (!providerCustomerId || (!providerCardId && !providerPaymentProfileId)) return null
 
   return {
     provider: 'mercadopago',
     providerCustomerId,
-    providerCardId,
+    providerCardId: providerCardId || null,
+    providerPaymentProfileId: providerPaymentProfileId || null,
     paymentMethodId: typeof paymentMethod.paymentMethodId === 'string' ? paymentMethod.paymentMethodId : null,
     issuerId: typeof paymentMethod.issuerId === 'string' ? paymentMethod.issuerId : null,
     brand: typeof paymentMethod.brand === 'string' ? paymentMethod.brand : null,
@@ -1224,13 +1230,17 @@ function mapStoredPaymentMethod(row: StoredPaymentMethodRow | null | undefined):
 
   const providerCustomerId = typeof row.provider_customer_id === 'string' ? row.provider_customer_id : ''
   const providerCardId = typeof row.provider_card_id === 'string' ? row.provider_card_id : ''
+  const providerPaymentProfileId = typeof row.provider_payment_profile_id === 'string'
+    ? row.provider_payment_profile_id
+    : ''
 
-  if (!providerCustomerId || !providerCardId) return null
+  if (!providerCustomerId || (!providerCardId && !providerPaymentProfileId)) return null
 
   return {
     provider: 'mercadopago',
     providerCustomerId,
-    providerCardId,
+    providerCardId: providerCardId || null,
+    providerPaymentProfileId: providerPaymentProfileId || null,
     paymentMethodId: typeof row.payment_method_id === 'string' ? row.payment_method_id : null,
     issuerId: typeof row.issuer_id === 'string' ? row.issuer_id : null,
     brand: typeof row.brand === 'string' ? row.brand : null,

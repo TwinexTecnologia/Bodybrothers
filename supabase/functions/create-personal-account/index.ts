@@ -41,7 +41,8 @@ type ProfileRow = {
 type SavedPaymentMethod = {
   provider: "mercadopago";
   providerCustomerId: string;
-  providerCardId: string;
+  providerCardId: string | null;
+  providerPaymentProfileId: string | null;
   paymentMethodId: string | null;
   issuerId: string | null;
   brand: string | null;
@@ -60,10 +61,13 @@ type LandingPaymentContext = {
   paymentDescription: string | null;
   paymentRawPayload: Record<string, unknown>;
   providerCustomerId: string | null;
+  providerPaymentProfileId: string | null;
   providerSubscriptionId: string | null;
   savedPaymentMethod: SavedPaymentMethod | null;
   recurringReady: boolean;
   missingRecurringFields: string[];
+  ordersApiReady: boolean;
+  missingOrdersApiFields: string[];
 };
 
 type SubscriptionRow = {
@@ -388,6 +392,7 @@ async function handleCreatePersonal({
         amount: paymentContext.paymentAmount,
         currency: paymentContext.paymentCurrency,
         providerCustomerId: paymentContext.providerCustomerId,
+        providerPaymentProfileId: paymentContext.providerPaymentProfileId,
         providerSubscriptionId: paymentContext.providerSubscriptionId,
         nowIso,
       }),
@@ -452,8 +457,10 @@ async function handleCreatePersonal({
     paymentRequired: planConfig.paid,
     subscriptionStatus,
     recurringReady: paymentContext.recurringReady,
+    ordersApiReady: paymentContext.ordersApiReady,
     paymentMethodStored: Boolean(paymentContext.savedPaymentMethod),
     missingRecurringFields: paymentContext.missingRecurringFields,
+    missingOrdersApiFields: paymentContext.missingOrdersApiFields,
     defaults: {
       plan: requestedPlan,
       studentLimit: planConfig.studentLimit,
@@ -580,6 +587,7 @@ function buildSubscriptionPayload({
   amount,
   currency,
   providerCustomerId,
+  providerPaymentProfileId,
   providerSubscriptionId,
   nowIso,
 }: {
@@ -596,6 +604,7 @@ function buildSubscriptionPayload({
   amount: number | null;
   currency: string | null;
   providerCustomerId: string | null;
+  providerPaymentProfileId: string | null;
   providerSubscriptionId: string | null;
   nowIso: string;
 }) {
@@ -619,6 +628,7 @@ function buildSubscriptionPayload({
     scheduled_change_at: null,
     payment_provider: paymentProvider,
     provider_customer_id: providerCustomerId,
+    provider_payment_profile_id: providerPaymentProfileId,
     provider_subscription_id: providerSubscriptionId,
     last_payment_id: paymentId,
     last_payment_status: paymentStatus,
@@ -644,6 +654,24 @@ function resolveLandingPaymentContext({
   const paymentId = getString(body, ["paymentId", "providerPaymentId"]) || null;
   const providerCustomerId = getString(body, ["providerCustomerId"]) || null;
   const providerCardId = getString(body, ["providerCardId"]) || null;
+  const providerPaymentProfileId = getString(body, [
+    "providerPaymentProfileId",
+    "paymentProfileId",
+  ]) ||
+    findNestedString(getRecord(body, [
+      "paymentRawPayload",
+      "paymentRaw",
+      "payment",
+      "raw",
+      "paymentData",
+    ]), [
+      "payment_profile_id",
+      "automatic_payments.payment_profile_id",
+      "automatic_payments.paymentProfileId",
+      "payment_profile.id",
+      "paymentProfile.id",
+    ]) ||
+    null;
   const paymentMethodId = getString(body, ["paymentMethodId"]) || null;
   const issuerId = getString(body, ["issuerId"]) || null;
   const brand = getString(body, ["cardBrand", "brand"]) || paymentMethodId || null;
@@ -670,11 +698,33 @@ function resolveLandingPaymentContext({
     "paymentData",
   ]) || {};
 
-  const missingRecurringFields = paymentProvider === "mercadopago" && planConfig.paid
+  const legacyRecurringReady = Boolean(
+    providerCustomerId &&
+      providerCardId &&
+      paymentMethodId &&
+      paymentId,
+  );
+  const ordersApiReady = Boolean(
+    providerCustomerId &&
+      providerPaymentProfileId &&
+      paymentId,
+  );
+  const missingOrdersApiFields = paymentProvider === "mercadopago" && planConfig.paid
     ? [
       !providerCustomerId ? "providerCustomerId" : "",
-      !providerCardId ? "providerCardId" : "",
-      !paymentMethodId ? "paymentMethodId" : "",
+      !providerPaymentProfileId ? "providerPaymentProfileId" : "",
+      !paymentId ? "firstPaymentProviderPaymentId" : "",
+    ].filter(Boolean)
+    : [];
+  const missingRecurringFields = paymentProvider === "mercadopago" && planConfig.paid && !(
+      ordersApiReady || legacyRecurringReady
+    )
+    ? [
+      !providerCustomerId ? "providerCustomerId" : "",
+      !providerPaymentProfileId && !providerCardId
+        ? "providerPaymentProfileId or providerCardId"
+        : "",
+      !providerPaymentProfileId && !paymentMethodId ? "paymentMethodId" : "",
       !paymentId ? "firstPaymentProviderPaymentId" : "",
     ].filter(Boolean)
     : [];
@@ -691,11 +741,12 @@ function resolveLandingPaymentContext({
 
   const savedPaymentMethod = paymentProvider === "mercadopago" &&
       providerCustomerId &&
-      providerCardId
+      (providerCardId || providerPaymentProfileId)
     ? {
       provider: "mercadopago" as const,
       providerCustomerId,
       providerCardId,
+      providerPaymentProfileId,
       paymentMethodId,
       issuerId,
       brand,
@@ -715,10 +766,13 @@ function resolveLandingPaymentContext({
     paymentDescription,
     paymentRawPayload,
     providerCustomerId: savedPaymentMethod?.providerCustomerId || providerCustomerId,
+    providerPaymentProfileId: savedPaymentMethod?.providerPaymentProfileId || providerPaymentProfileId,
     providerSubscriptionId,
     savedPaymentMethod,
     recurringReady: Boolean(savedPaymentMethod && !missingRecurringFields.length),
     missingRecurringFields,
+    ordersApiReady,
+    missingOrdersApiFields,
   };
 }
 
@@ -742,6 +796,7 @@ async function upsertPersonalPaymentMethod({
       provider: paymentMethod.provider,
       provider_customer_id: paymentMethod.providerCustomerId,
       provider_card_id: paymentMethod.providerCardId,
+      provider_payment_profile_id: paymentMethod.providerPaymentProfileId,
       payment_method_id: paymentMethod.paymentMethodId,
       issuer_id: paymentMethod.issuerId,
       brand: paymentMethod.brand,
@@ -864,6 +919,33 @@ function getRecord(body: Record<string, unknown>, keys: string[]) {
   }
 
   return null;
+}
+
+function findNestedString(
+  body: Record<string, unknown> | null,
+  paths: string[],
+) {
+  if (!body) return "";
+
+  for (const path of paths) {
+    const keys = path.split(".");
+    let current: unknown = body;
+
+    for (const key of keys) {
+      if (!isRecord(current)) {
+        current = null;
+        break;
+      }
+
+      current = current[key];
+    }
+
+    if (typeof current === "string" && current.trim()) {
+      return current.trim();
+    }
+  }
+
+  return "";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
