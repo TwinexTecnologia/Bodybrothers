@@ -84,7 +84,8 @@ type CardTokenPaymentInput = {
 type SavedPaymentMethod = {
   provider: "mercadopago";
   providerCustomerId: string;
-  providerCardId: string;
+  providerCardId: string | null;
+  providerPaymentProfileId: string | null;
   paymentMethodId: string | null;
   issuerId: string | null;
   brand: string | null;
@@ -821,14 +822,14 @@ async function handleChargeSavedCard({
   }
 
   const existingMethod = extractSavedPaymentMethod(personalProfile.data);
-  if (!existingMethod?.providerCustomerId || !existingMethod.providerCardId) {
+  if (!existingMethod?.providerCustomerId || (!existingMethod.providerCardId && !existingMethod.providerPaymentProfileId)) {
     throw new Error("Nenhum cartão salvo foi encontrado para este perfil.");
   }
 
   const config = getMercadoPagoConfig();
   let savedPaymentMethod = existingMethod;
 
-  if (!savedPaymentMethod.paymentMethodId) {
+  if (!savedPaymentMethod.paymentMethodId && savedPaymentMethod.providerCardId) {
     const gatewayCard = await getMercadoPagoCustomerCard({
       customerId: savedPaymentMethod.providerCustomerId,
       cardId: savedPaymentMethod.providerCardId,
@@ -850,7 +851,7 @@ async function handleChargeSavedCard({
     });
   }
 
-  if (!savedPaymentMethod.paymentMethodId) {
+  if (!savedPaymentMethod.paymentMethodId && !savedPaymentMethod.providerPaymentProfileId) {
     throw new Error("Não foi possível identificar os dados do cartão salvo. Cadastre o cartão novamente.");
   }
 
@@ -876,7 +877,6 @@ async function handleChargeSavedCard({
     supabase,
     subscription,
     savedPaymentMethod,
-    userPresent: true,
   });
 
   const gatewayPayment = await createSavedCardPayment({
@@ -893,10 +893,10 @@ async function handleChargeSavedCard({
   });
 
   const normalizedStatus = normalizePaymentStatus(
-    getString(gatewayPayment, ["status"]) || "pending",
+    extractGatewayPaymentStatus(gatewayPayment) || getString(gatewayPayment, ["status"]) || "pending",
   );
-  const providerPaymentId = getScalarAsString(gatewayPayment.id);
-  const paidAt = getString(gatewayPayment, ["date_approved"]) || null;
+  const providerPaymentId = extractGatewayPaymentId(gatewayPayment);
+  const paidAt = getString(gatewayPayment, ["date_approved", "last_updated_date", "date_created"]) || null;
   const dueAt = getString(gatewayPayment, ["date_of_expiration", "expiration_date"]) || null;
 
   const paymentInsert = {
@@ -1276,9 +1276,16 @@ function normalizePaymentMethod(value: string) {
 function normalizePaymentStatus(value: string): SubscriptionPaymentRow["status"] {
   const normalized = value.trim().toLowerCase();
 
-  if (normalized === "approved") return "approved";
-  if (normalized === "pending" || normalized === "in_process") return "pending";
+  if (normalized === "approved" || normalized === "processed") return "approved";
+  if (
+    normalized === "pending" ||
+    normalized === "in_process" ||
+    normalized === "processing" ||
+    normalized === "created" ||
+    normalized === "action_required"
+  ) return "pending";
   if (normalized === "canceled" || normalized === "cancelled") return "canceled";
+  if (normalized === "expired") return "canceled";
   if (normalized === "refunded" || normalized === "charged_back") return "refunded";
   if (normalized === "failed" || normalized === "rejected") return "failed";
 
@@ -1375,6 +1382,56 @@ async function mercadoPagoRequest(
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+// #region debug-point mp-request-error-context
+    const requestBody = isRecord(options.body) ? options.body : {};
+    const payer = isRecord(requestBody.payer) ? requestBody.payer : {};
+    const transactions = isRecord(requestBody.transactions) ? requestBody.transactions : {};
+    const payments = Array.isArray(transactions.payments) ? transactions.payments : [];
+    const firstPayment = payments.length && isRecord(payments[0]) ? payments[0] : {};
+    const automaticPayments = isRecord(firstPayment.automatic_payments)
+      ? firstPayment.automatic_payments
+      : {};
+    const storedCredential = isRecord(firstPayment.stored_credential)
+      ? firstPayment.stored_credential
+      : {};
+    const pointOfInteraction = isRecord(requestBody.point_of_interaction)
+      ? requestBody.point_of_interaction
+      : {};
+    const transactionData = isRecord(pointOfInteraction.transaction_data)
+      ? pointOfInteraction.transaction_data
+      : {};
+    const paymentReference = isRecord(transactionData.payment_reference)
+      ? transactionData.payment_reference
+      : {};
+    const debugContext = {
+      path,
+      responseStatus: response.status,
+      request: {
+        card_id: getScalarAsString(requestBody.card_id) || null,
+        payment_method_id: getScalarAsString(requestBody.payment_method_id) || null,
+        payment_profile_id: getScalarAsString(automaticPayments.payment_profile_id) || null,
+        issuer_id: getScalarAsString(requestBody.issuer_id) || null,
+        payer_type: getScalarAsString(payer.type) || null,
+        payer_id: getScalarAsString(payer.id) || null,
+        payer_customer_id: getScalarAsString(payer.customer_id) || null,
+        point_type: getScalarAsString(pointOfInteraction.type) || null,
+        first_time_use: transactionData.first_time_use ?? null,
+        subscription_id: getScalarAsString(transactionData.subscription_id) || null,
+        sequence_number: isRecord(transactionData.subscription_sequence)
+          ? getScalarAsString(transactionData.subscription_sequence.number) || null
+          : null,
+        payment_reference_id: getScalarAsString(paymentReference.id) || null,
+        user_present: transactionData.user_present ?? null,
+        external_reference: getScalarAsString(requestBody.external_reference) || null,
+        card_token_debug: isRecord(requestBody.metadata)
+          ? requestBody.metadata.card_token_debug ?? null
+          : null,
+        stored_credential_reason: getScalarAsString(storedCredential.reason) || null,
+        previous_transaction_reference:
+          getScalarAsString(storedCredential.previous_transaction_reference) || null,
+      },
+    };
+// #endregion debug-point mp-request-error-context
     const causes = Array.isArray((data as { cause?: unknown[] })?.cause)
       ? ((data as { cause?: unknown[] }).cause ?? [])
         .map((entry) => {
@@ -1392,6 +1449,7 @@ async function mercadoPagoRequest(
       [
         typeof data?.message === "string" ? data.message : "Erro ao comunicar com o Mercado Pago.",
         causes.length ? causes.join(" | ") : "",
+        `debug_context=${JSON.stringify(debugContext)}`,
       ].filter(Boolean).join(" - "),
     );
   }
@@ -1512,6 +1570,17 @@ async function createMercadoPagoCardToken({
   return {
     token,
     paymentMethodId: getString(response, ["payment_method_id", "paymentMethodId"]) || null,
+    debug: {
+      responseId: getScalarAsString(response.id) || null,
+      paymentMethodId: getString(response, ["payment_method_id", "paymentMethodId"]) || null,
+      issuerId: getScalarAsString(response.issuer_id) || null,
+      firstSixDigits: getScalarAsString(response.first_six_digits) || null,
+      lastFourDigits: getScalarAsString(response.last_four_digits) || null,
+      requiresEsc: response.requires_esc ?? null,
+      securityCodeLength: isRecord(response.security_code)
+        ? getScalarAsString(response.security_code.length) || null
+        : null,
+    },
   };
 }
 
@@ -1568,6 +1637,7 @@ function buildSavedPaymentMethod({
     provider: "mercadopago",
     providerCustomerId,
     providerCardId: cardId,
+    providerPaymentProfileId: null,
     paymentMethodId: directBrand || nestedPaymentMethod || fallbackBrand || null,
     issuerId: issuerId || null,
     brand: directBrand || nestedPaymentMethod || fallbackBrand || null,
@@ -1585,13 +1655,18 @@ function extractSavedPaymentMethod(data: Record<string, unknown> | null): SavedP
 
   const providerCustomerId = getString(rawPaymentMethod, ["providerCustomerId"]);
   const providerCardId = getString(rawPaymentMethod, ["providerCardId"]);
+  const providerPaymentProfileId = getString(rawPaymentMethod, [
+    "providerPaymentProfileId",
+    "paymentProfileId",
+  ]);
 
-  if (!providerCustomerId || !providerCardId) return null;
+  if (!providerCustomerId || (!providerCardId && !providerPaymentProfileId)) return null;
 
   return {
     provider: "mercadopago",
     providerCustomerId,
     providerCardId,
+    providerPaymentProfileId: providerPaymentProfileId || null,
     paymentMethodId: getString(rawPaymentMethod, ["paymentMethodId"]) || null,
     issuerId: getString(rawPaymentMethod, ["issuerId"]) || null,
     brand: getString(rawPaymentMethod, ["brand"]) || null,
@@ -1680,6 +1755,7 @@ async function createCheckoutPreference({
         subscriptionId,
         providerReference,
         source: "personal-platform-regularization",
+        card_token_debug: JSON.stringify(cardToken.debug),
       },
     },
   });
@@ -1824,6 +1900,24 @@ async function createSavedCardPayment({
   savedPaymentMethod: SavedPaymentMethod;
   automaticPaymentContext: AutomaticPaymentContext;
 }) {
+  if (savedPaymentMethod.providerPaymentProfileId) {
+    return await createSavedCardOrderPayment({
+      personalId,
+      subscriptionId,
+      providerReference,
+      plan,
+      amount,
+      description,
+      config,
+      savedPaymentMethod,
+      automaticPaymentContext,
+    });
+  }
+
+  if (!savedPaymentMethod.providerCardId) {
+    throw new Error("Não foi possível identificar o cartão salvo. Cadastre o método novamente.");
+  }
+
   const idempotencyKey = `${Date.now()}-${crypto.randomUUID()}`;
   const cardToken = await createMercadoPagoCardToken({
     cardId: savedPaymentMethod.providerCardId,
@@ -1835,32 +1929,112 @@ async function createSavedCardPayment({
     throw new Error("Não foi possível identificar a bandeira do cartão salvo. Cadastre o cartão novamente.");
   }
 
-  return await mercadoPagoRequest("/v1/payments", config, {
+  try {
+    return await mercadoPagoRequest("/v1/payments", config, {
+      method: "POST",
+      headers: {
+        "X-Idempotency-Key": idempotencyKey,
+      },
+      body: {
+        transaction_amount: amount,
+        token: cardToken.token,
+        description,
+        installments: 1,
+        payment_method_id: paymentMethodId,
+        ...(savedPaymentMethod.issuerId ? { issuer_id: savedPaymentMethod.issuerId } : {}),
+        payer: {
+          email,
+          type: "customer",
+          id: savedPaymentMethod.providerCustomerId,
+        },
+        point_of_interaction: buildAutomaticPaymentPointOfInteraction(automaticPaymentContext),
+        notification_url: config.webhookUrl,
+        external_reference: providerReference,
+        metadata: {
+          plan,
+          personalId,
+          subscriptionId,
+          providerReference,
+          source: "personal-platform-saved-card",
+        },
+      },
+    });
+  } catch (error) {
+// #region debug-point card-token-error-context
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${message} - card_token_debug=${JSON.stringify(cardToken.debug)}`);
+// #endregion debug-point card-token-error-context
+  }
+}
+
+async function createSavedCardOrderPayment({
+  personalId,
+  subscriptionId,
+  providerReference,
+  plan,
+  amount,
+  description,
+  config,
+  savedPaymentMethod,
+  automaticPaymentContext,
+}: {
+  personalId: string;
+  subscriptionId: string;
+  providerReference: string;
+  plan: string;
+  amount: number;
+  description: string;
+  config: { accessToken: string; webhookUrl: string };
+  savedPaymentMethod: SavedPaymentMethod;
+  automaticPaymentContext: AutomaticPaymentContext;
+}) {
+  const idempotencyKey = `${Date.now()}-${crypto.randomUUID()}`;
+
+  return await mercadoPagoRequest("/v1/orders", config, {
     method: "POST",
     headers: {
       "X-Idempotency-Key": idempotencyKey,
     },
     body: {
-      transaction_amount: amount,
-      token: cardToken.token,
-      description,
-      installments: 1,
-      payment_method_id: paymentMethodId,
-      ...(savedPaymentMethod.issuerId ? { issuer_id: savedPaymentMethod.issuerId } : {}),
-      payer: {
-        email,
-        type: "customer",
-        id: savedPaymentMethod.providerCustomerId,
-      },
-      point_of_interaction: buildAutomaticPaymentPointOfInteraction(automaticPaymentContext),
-      notification_url: config.webhookUrl,
+      type: "online",
       external_reference: providerReference,
-      metadata: {
-        plan,
-        personalId,
-        subscriptionId,
-        providerReference,
-        source: "personal-platform-saved-card",
+      notification_url: config.webhookUrl,
+      total_amount: formatOrderAmount(amount),
+      processing_mode: "automatic_async",
+      payer: {
+        customer_id: savedPaymentMethod.providerCustomerId,
+      },
+      transactions: {
+        payments: [
+          {
+            amount: formatOrderAmount(amount),
+            automatic_payments: {
+              payment_profile_id: savedPaymentMethod.providerPaymentProfileId,
+              retries: 3,
+              subscription: {
+                id: automaticPaymentContext.subscriptionGatewayId,
+                sequence: {
+                  number: automaticPaymentContext.sequenceNumber,
+                  total: null,
+                },
+                invoice: {
+                  id: automaticPaymentContext.invoiceId,
+                  billing_date: automaticPaymentContext.billingDate,
+                  period: {
+                    interval: automaticPaymentContext.invoicePeriod.period,
+                    type: automaticPaymentContext.invoicePeriod.type,
+                  },
+                },
+              },
+            },
+            stored_credential: {
+              payment_initiator: "merchant",
+              reason: "recurring",
+              previous_transaction_reference: automaticPaymentContext.previousTransactionReference,
+              first_payment: false,
+            },
+          },
+        ],
       },
     },
   });
@@ -1869,10 +2043,10 @@ async function createSavedCardPayment({
 type AutomaticPaymentContext = {
   subscriptionGatewayId: string;
   sequenceNumber: number;
-  referencePaymentId: string;
+  previousTransactionReference: string;
   billingDate: string;
+  invoiceId: string;
   invoicePeriod: { period: number; type: string };
-  userPresent: boolean;
 };
 
 type ValidationPaymentContext = {
@@ -1886,21 +2060,18 @@ async function resolveAutomaticPaymentContext({
   supabase,
   subscription,
   savedPaymentMethod,
-  userPresent,
 }: {
   supabase: ReturnType<typeof createClient>;
   subscription: SubscriptionRow;
   savedPaymentMethod: SavedPaymentMethod;
-  userPresent: boolean;
 }) {
-  const referencePaymentId = savedPaymentMethod.firstPaymentProviderPaymentId ||
-    await findLatestApprovedValidationPaymentId({
+  const previousTransactionReference = await findLatestApprovedTransactionReference({
       supabase,
       subscriptionId: subscription.id,
     });
 
-  if (!referencePaymentId) {
-    throw new Error("Esse cartão salvo ainda não possui um pagamento de validação. Faça um pagamento com o formulário completo uma vez para liberar as próximas cobranças automáticas.");
+  if (!previousTransactionReference) {
+    throw new Error("Esse cartão salvo ainda não possui uma transação anterior rastreável. Faça um pagamento com o formulário completo uma vez para liberar as próximas cobranças automáticas.");
   }
 
   const sequenceNumber = await countSubscriptionPayments({
@@ -1911,10 +2082,10 @@ async function resolveAutomaticPaymentContext({
   return {
     subscriptionGatewayId: resolveSubscriptionGatewayId(subscription),
     sequenceNumber: Math.max(sequenceNumber + 1, 2),
-    referencePaymentId,
+    previousTransactionReference,
     billingDate: formatBillingDate(subscription.next_billing_at || new Date().toISOString()),
+    invoiceId: buildSubscriptionInvoiceId(subscription, sequenceNumber + 1),
     invoicePeriod: getInvoicePeriod(subscription.billing_cycle || "monthly"),
-    userPresent,
   };
 }
 
@@ -1934,7 +2105,7 @@ async function countSubscriptionPayments({
   return count || 0;
 }
 
-async function findLatestApprovedValidationPaymentId({
+async function findLatestApprovedTransactionReference({
   supabase,
   subscriptionId,
 }: {
@@ -1958,42 +2129,14 @@ async function findLatestApprovedValidationPaymentId({
   if (error) throw error;
 
   for (const payment of data || []) {
-    const providerPaymentId = payment.provider_payment_id ||
-      (isRecord(payment.raw_payload)
-        ? getScalarAsString(payment.raw_payload.id)
-        : "");
-    const transactionData = isRecord(payment.raw_payload?.point_of_interaction)
-      && isRecord(payment.raw_payload.point_of_interaction.transaction_data)
-      ? payment.raw_payload.point_of_interaction.transaction_data
-      : null;
-    const isValidationPayment = Boolean(transactionData && transactionData.first_time_use === true);
+    const transactionReference = extractTransactionReference(payment.raw_payload) ||
+      payment.provider_payment_id ||
+      "";
 
-    if (isValidationPayment && providerPaymentId) {
-      return providerPaymentId;
-    }
+    if (transactionReference) return transactionReference;
   }
 
   return "";
-}
-
-function buildAutomaticPaymentPointOfInteraction(context: AutomaticPaymentContext) {
-  return {
-    type: "SUBSCRIPTIONS",
-    transaction_data: {
-      first_time_use: false,
-      subscription_id: context.subscriptionGatewayId,
-      subscription_sequence: {
-        number: context.sequenceNumber,
-        total: null,
-      },
-      invoice_period: context.invoicePeriod,
-      payment_reference: {
-        id: context.referencePaymentId,
-      },
-      billing_date: context.billingDate,
-      user_present: context.userPresent,
-    },
-  };
 }
 
 function buildFirstValidationPaymentPointOfInteraction(context: ValidationPaymentContext) {
@@ -2078,10 +2221,51 @@ function getInvoicePeriod(billingCycle: string) {
   }
 
   if (billingCycle === "yearly") {
-    return { period: 1, type: "yearly" };
+    return { period: 12, type: "monthly" };
   }
 
   return { period: 1, type: "monthly" };
+}
+
+function buildSubscriptionInvoiceId(subscription: SubscriptionRow, sequenceNumber: number) {
+  return `inv_${createShortStableId(`${subscription.id}:${sequenceNumber}`)}_${sequenceNumber}`;
+}
+
+function formatOrderAmount(amount: number) {
+  return amount.toFixed(2);
+}
+
+function extractTransactionReference(rawPayload: Record<string, unknown> | null | undefined) {
+  const firstPayment = getFirstOrderPayment(rawPayload);
+
+  return getScalarAsString(firstPayment?.reference_id) ||
+    getScalarAsString(firstPayment?.reference?.id) ||
+    "";
+}
+
+function extractGatewayPaymentId(rawPayload: Record<string, unknown> | null | undefined) {
+  const firstPayment = getFirstOrderPayment(rawPayload);
+
+  return getScalarAsString(firstPayment?.id) ||
+    (isRecord(rawPayload) ? getScalarAsString(rawPayload.id) : "") ||
+    "";
+}
+
+function extractGatewayPaymentStatus(rawPayload: Record<string, unknown> | null | undefined) {
+  const firstPayment = getFirstOrderPayment(rawPayload);
+
+  return getScalarAsString(firstPayment?.status) ||
+    (isRecord(rawPayload) ? getString(rawPayload, ["status"]) : "");
+}
+
+function getFirstOrderPayment(rawPayload: Record<string, unknown> | null | undefined) {
+  if (!isRecord(rawPayload)) return null;
+
+  const transactions = isRecord(rawPayload.transactions) ? rawPayload.transactions : null;
+  const payments = transactions && Array.isArray(transactions.payments) ? transactions.payments : [];
+  const firstPayment = payments.length && isRecord(payments[0]) ? payments[0] : null;
+
+  return firstPayment;
 }
 
 async function getPaymentById({

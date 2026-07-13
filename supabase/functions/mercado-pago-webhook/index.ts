@@ -72,9 +72,9 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const url = new URL(req.url);
     const eventType = resolveEventType(body, url);
-    const paymentId = resolvePaymentId(body, url);
+    const resourceId = resolveResourceId(body, url);
 
-    if (eventType !== "payment" || !paymentId) {
+    if ((eventType !== "payment" && eventType !== "order") || !resourceId) {
       return jsonResponse(200, {
         success: true,
         ignored: true,
@@ -82,13 +82,19 @@ serve(async (req) => {
       });
     }
 
-    const gatewayPayment = await mercadoPagoRequest(`/v1/payments/${paymentId}`, {
-      accessToken: mercadoPagoAccessToken,
-    });
+    const gatewayResource = eventType === "order"
+      ? await resolveGatewayOrder({
+        body,
+        orderId: resourceId,
+        accessToken: mercadoPagoAccessToken,
+      })
+      : await mercadoPagoRequest(`/v1/payments/${resourceId}`, {
+        accessToken: mercadoPagoAccessToken,
+      });
 
     const paymentContext = await resolvePaymentContext({
       supabase,
-      gatewayPayment,
+      gatewayPayment: gatewayResource,
     });
 
     if (!paymentContext) {
@@ -96,26 +102,28 @@ serve(async (req) => {
         success: true,
         ignored: true,
         reason: "payment_not_tracked",
-        paymentId,
+        resourceId,
       });
     }
 
     const normalizedStatus = normalizePaymentStatus(
-      getString(gatewayPayment, ["status"]) || paymentContext.payment.status,
+      resolveGatewayStatus(gatewayResource) || paymentContext.payment.status,
     );
-    const dueAt = getString(gatewayPayment, ["date_of_expiration", "expiration_date"]) || paymentContext.payment.due_at;
-    const paidAt = getString(gatewayPayment, ["date_approved"]) || null;
+    const providerPaymentId = resolveGatewayPaymentId(gatewayResource);
+    const dueAt = getString(gatewayResource, ["date_of_expiration", "expiration_date"]) ||
+      paymentContext.payment.due_at;
+    const paidAt = getString(gatewayResource, ["date_approved", "last_updated_date", "date_created"]) || null;
 
     const { data: updatedPayment, error: paymentUpdateError } = await supabase
       .from("subscription_payments")
       .update({
         status: normalizedStatus,
         provider: "mercadopago",
-        provider_payment_id: paymentId,
-        provider_reference: resolveProviderReference(gatewayPayment) || paymentContext.payment.provider_reference,
+        provider_payment_id: providerPaymentId || paymentContext.payment.provider_payment_id,
+        provider_reference: resolveProviderReference(gatewayResource) || paymentContext.payment.provider_reference,
         due_at: dueAt || null,
         paid_at: normalizedStatus === "approved" ? paidAt || new Date().toISOString() : null,
-        raw_payload: gatewayPayment,
+        raw_payload: gatewayResource,
       })
       .eq("id", paymentContext.payment.id)
       .select("*")
@@ -133,7 +141,7 @@ serve(async (req) => {
 
     return jsonResponse(200, {
       success: true,
-      paymentId,
+      paymentId: providerPaymentId || resourceId,
       status: updatedPayment.status,
       approved: updatedPayment.status === "approved",
     });
@@ -359,7 +367,7 @@ function resolveEventType(body: unknown, url: URL) {
     "";
 }
 
-function resolvePaymentId(body: unknown, url: URL) {
+function resolveResourceId(body: unknown, url: URL) {
   const bodyRecord = isRecord(body) ? body : {};
   const dataRecord = getRecord(bodyRecord, ["data"]);
 
@@ -375,6 +383,49 @@ function resolveProviderReference(gatewayPayment: Record<string, unknown>) {
   return getString(gatewayPayment, ["external_reference"]) ||
     getString(metadata, ["providerReference", "provider_reference"]) ||
     "";
+}
+
+function resolveGatewayPaymentId(gatewayPayment: Record<string, unknown>) {
+  const firstOrderPayment = getFirstOrderPayment(gatewayPayment);
+
+  return getScalarAsString(firstOrderPayment?.id) ||
+    getScalarAsString(gatewayPayment.id) ||
+    "";
+}
+
+function resolveGatewayStatus(gatewayPayment: Record<string, unknown>) {
+  const firstOrderPayment = getFirstOrderPayment(gatewayPayment);
+
+  return getScalarAsString(firstOrderPayment?.status) ||
+    getString(gatewayPayment, ["status"]) ||
+    "";
+}
+
+function getFirstOrderPayment(gatewayPayment: Record<string, unknown>) {
+  const transactions = getRecord(gatewayPayment, ["transactions"]);
+  const payments = Array.isArray(transactions?.payments) ? transactions?.payments : [];
+  return payments.length && isRecord(payments[0]) ? payments[0] : null;
+}
+
+async function resolveGatewayOrder({
+  body,
+  orderId,
+  accessToken,
+}: {
+  body: unknown;
+  orderId: string;
+  accessToken: string;
+}) {
+  const bodyRecord = isRecord(body) ? body : {};
+  const dataRecord = getRecord(bodyRecord, ["data"]);
+
+  if (isRecord(dataRecord) && Array.isArray(getRecord(dataRecord, ["transactions"])?.payments)) {
+    return dataRecord;
+  }
+
+  return await mercadoPagoRequest(`/v1/orders/${orderId}`, {
+    accessToken,
+  });
 }
 
 function getRecord(
@@ -416,9 +467,16 @@ function normalizePlan(value: string) {
 function normalizePaymentStatus(value: string): SubscriptionPaymentRow["status"] {
   const normalized = value.trim().toLowerCase();
 
-  if (normalized === "approved") return "approved";
-  if (normalized === "pending" || normalized === "in_process") return "pending";
+  if (normalized === "approved" || normalized === "processed") return "approved";
+  if (
+    normalized === "pending" ||
+    normalized === "in_process" ||
+    normalized === "processing" ||
+    normalized === "created" ||
+    normalized === "action_required"
+  ) return "pending";
   if (normalized === "canceled" || normalized === "cancelled") return "canceled";
+  if (normalized === "expired") return "canceled";
   if (normalized === "refunded" || normalized === "charged_back") return "refunded";
   if (normalized === "failed" || normalized === "rejected") return "failed";
 
