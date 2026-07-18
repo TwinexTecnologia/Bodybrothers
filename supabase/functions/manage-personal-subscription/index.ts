@@ -51,6 +51,10 @@ type SubscriptionRow = {
   provider_subscription_id?: string | null;
   current_period_start: string | null;
   current_period_end: string | null;
+  scheduled_plan_slug?: string | null;
+  scheduled_student_limit?: number | null;
+  scheduled_billing_cycle?: string | null;
+  scheduled_change_at?: string | null;
 };
 
 type SubscriptionPaymentRow = {
@@ -82,10 +86,12 @@ type CardTokenPaymentInput = {
 };
 
 type SavedPaymentMethod = {
-  provider: "mercadopago";
+  provider: "mercadopago" | "asaas";
   providerCustomerId: string;
   providerCardId: string | null;
   providerPaymentProfileId: string | null;
+  providerPaymentMethodToken: string | null;
+  providerSubscriptionId: string | null;
   paymentMethodId: string | null;
   issuerId: string | null;
   brand: string | null;
@@ -249,16 +255,10 @@ async function handleRequestDowngrade({
   const personalId = requesterRole === "owner"
     ? getString(body, ["personalId"]) || requesterId
     : requesterId;
-  const targetPlan = normalizePlan(getString(body, ["targetPlan", "plan"]));
-
-  if (!targetPlan) {
-    throw new Error("Plano de destino não informado.");
-  }
-
-  const targetConfig = PLAN_CONFIGS[targetPlan];
-  if (!targetConfig) {
-    throw new Error("Plano de destino inválido.");
-  }
+  const requestedTargetPlan = normalizePlan(getString(body, ["targetPlan", "plan"]));
+  const requestedTargetBillingCycle = normalizeBillingCycle(
+    getString(body, ["targetBillingCycle", "billingCycle", "cycle"]),
+  );
 
   const { data: subscription, error: subscriptionError } = await supabase
     .from("personal_subscriptions")
@@ -271,6 +271,7 @@ async function handleRequestDowngrade({
   }
 
   const currentPlan = normalizePlan(subscription.plan_slug || "free");
+  const currentBillingCycle = normalizeBillingCycle(subscription.billing_cycle || "monthly");
   const currentConfig = PLAN_CONFIGS[currentPlan];
 
   if (!currentConfig) {
@@ -281,29 +282,47 @@ async function handleRequestDowngrade({
     throw new Error("O plano Free não possui downgrade disponível.");
   }
 
-  if (currentPlan === targetPlan) {
-    throw new Error("O personal já está nesse plano.");
+  const targetPlan = requestedTargetPlan || currentPlan;
+  const targetBillingCycle = requestedTargetBillingCycle || currentBillingCycle;
+  const targetConfig = PLAN_CONFIGS[targetPlan];
+
+  if (!targetConfig) {
+    throw new Error("Plano de destino inválido.");
   }
 
-  if (targetConfig.rank >= currentConfig.rank) {
-    throw new Error("A ação solicitada não é um downgrade válido.");
+  if (targetPlan === currentPlan && targetBillingCycle === currentBillingCycle) {
+    throw new Error("Nenhuma mudança de plano ou ciclo foi informada.");
   }
 
-  const activeStudents = await countActiveStudents({ supabase, personalId });
-  if (activeStudents > targetConfig.studentLimit) {
+  const targetStudentLimit = targetConfig.studentLimit;
+  const requiresStudentReduction = targetStudentLimit < (subscription.student_limit ?? currentConfig.studentLimit);
+  const activeStudents = requiresStudentReduction
+    ? await countActiveStudents({ supabase, personalId })
+    : 0;
+
+  if (requiresStudentReduction && activeStudents > targetStudentLimit) {
     throw new Error(
-      `Para fazer downgrade para o plano ${targetPlan}, você precisa deixar no máximo ${targetConfig.studentLimit} alunos ativos. Hoje você possui ${activeStudents} alunos ativos.`,
+      `Para mudar para o plano ${targetPlan}, você precisa deixar no máximo ${targetStudentLimit} alunos ativos. Hoje você possui ${activeStudents} alunos ativos.`,
     );
   }
 
   const effectiveAt = subscription.next_billing_at ?? new Date().toISOString();
+  const targetAmount = resolveTargetSubscriptionAmount({
+    planSlug: targetPlan,
+    billingCycle: targetBillingCycle,
+  });
+  const changeType = targetPlan !== currentPlan && targetBillingCycle !== currentBillingCycle
+    ? "plan_and_billing_cycle_change"
+    : targetPlan !== currentPlan
+    ? "plan_change"
+    : "billing_cycle_change";
 
   const { error: updateError } = await supabase
     .from("personal_subscriptions")
     .update({
       scheduled_plan_slug: targetPlan,
-      scheduled_student_limit: targetConfig.studentLimit,
-      scheduled_billing_cycle: subscription.billing_cycle || "monthly",
+      scheduled_student_limit: targetStudentLimit,
+      scheduled_billing_cycle: targetBillingCycle,
       scheduled_change_at: effectiveAt,
       updated_at: new Date().toISOString(),
     })
@@ -316,8 +335,12 @@ async function handleRequestDowngrade({
       success: true,
       personalId,
       currentPlan,
+      currentBillingCycle,
       targetPlan,
-      targetStudentLimit: targetConfig.studentLimit,
+      targetBillingCycle,
+      targetAmount,
+      targetStudentLimit,
+      changeType,
       activeStudents,
       effectiveAt,
     }),
@@ -420,39 +443,70 @@ async function handleCreateRegularizationPayment({
   const currency = subscription.currency || "BRL";
   const description = buildPaymentDescription(subscription.plan_slug || "premium");
   const email = normalizeEmail(requesterProfile.email || personalProfile.email || "");
+  const savedPaymentMethod = extractSavedPaymentMethod(personalProfile.data);
+  const paymentProvider = resolveSubscriptionPaymentProvider({
+    subscription,
+    savedPaymentMethod,
+    body,
+  });
   const providerReference = buildProviderReference({
     personalId,
     subscriptionId: subscription.id,
   });
 
-  const paymentResponse = method === "checkout-pro"
-    ? await createCheckoutPreference({
-      personalId,
-      subscriptionId: subscription.id,
+  let paymentResponse: Record<string, unknown>;
+  let normalizedStatus: SubscriptionPaymentRow["status"];
+  let providerPaymentId: string | null;
+  let dueAt: string | null;
+
+  if (paymentProvider === "asaas") {
+    if (!savedPaymentMethod?.providerCustomerId) {
+      throw new Error("Nao foi possivel identificar o cliente no Asaas. Crie a conta novamente pelo fluxo novo ou recadastre o metodo de pagamento.");
+    }
+
+    paymentResponse = await createAsaasRegularizationPayment({
+      providerCustomerId: savedPaymentMethod.providerCustomerId,
       providerReference,
-      plan: normalizePlan(subscription.plan_slug || "premium"),
-      amount,
-      config: getMercadoPagoConfig(),
-    })
-    : await createPixPayment({
-      personalId,
-      subscriptionId: subscription.id,
-      providerReference,
-      plan: normalizePlan(subscription.plan_slug || "premium"),
-      amount,
-      email: email || "test@test.com",
       description,
-      config: getMercadoPagoConfig(),
+      amount,
+      method,
+      dueDate: buildAsaasDueDate(subscription.next_billing_at),
+      config: getAsaasConfig(),
     });
+    normalizedStatus = normalizeAsaasPaymentStatus(
+      getString(paymentResponse, ["status"]) || "PENDING",
+    );
+    providerPaymentId = getString(paymentResponse, ["id"]) || null;
+    dueAt = resolveAsaasDueAt(paymentResponse);
+  } else {
+    paymentResponse = method === "checkout-pro"
+      ? await createCheckoutPreference({
+        personalId,
+        subscriptionId: subscription.id,
+        providerReference,
+        plan: normalizePlan(subscription.plan_slug || "premium"),
+        amount,
+        config: getMercadoPagoConfig(),
+      })
+      : await createPixPayment({
+        personalId,
+        subscriptionId: subscription.id,
+        providerReference,
+        plan: normalizePlan(subscription.plan_slug || "premium"),
+        amount,
+        email: email || "test@test.com",
+        description,
+        config: getMercadoPagoConfig(),
+      });
 
-  const normalizedStatus = method === "checkout-pro"
-    ? "pending"
-    : normalizePaymentStatus(getString(paymentResponse, ["status"]) || "pending");
-
-  const providerPaymentId = method === "checkout-pro"
-    ? null
-    : getScalarAsString(paymentResponse.id);
-  const dueAt = getString(paymentResponse, ["date_of_expiration", "expiration_date"]);
+    normalizedStatus = method === "checkout-pro"
+      ? "pending"
+      : normalizePaymentStatus(getString(paymentResponse, ["status"]) || "pending");
+    providerPaymentId = method === "checkout-pro"
+      ? null
+      : getScalarAsString(paymentResponse.id) || null;
+    dueAt = getString(paymentResponse, ["date_of_expiration", "expiration_date"]) || null;
+  }
 
   const paymentInsert = {
     personal_id: personalId,
@@ -462,7 +516,7 @@ async function handleCreateRegularizationPayment({
     amount,
     currency,
     status: normalizedStatus,
-    provider: "mercadopago",
+    provider: paymentProvider,
     provider_payment_id: providerPaymentId,
     provider_reference: providerReference || null,
     description,
@@ -486,7 +540,7 @@ async function handleCreateRegularizationPayment({
     .update({
       amount,
       currency,
-      payment_provider: "mercadopago",
+      payment_provider: paymentProvider,
       last_payment_id: providerPaymentId || subscription.last_payment_id,
       last_payment_status: normalizedStatus,
       updated_at: new Date().toISOString(),
@@ -509,6 +563,10 @@ async function handleCreateRegularizationPayment({
         "sandbox_init_point",
         "checkout_url",
         "checkoutUrl",
+        "invoiceUrl",
+        "invoice_url",
+        "paymentUrl",
+        "payment_url",
         "ticket_url",
         "ticketUrl",
       ]),
@@ -517,16 +575,22 @@ async function handleCreateRegularizationPayment({
         "qrCode",
         "pixCode",
         "pix_code",
+        "payload",
         "copyPaste",
         "copy_paste",
       ]),
       qrCodeBase64: extractNestedString(insertedPayment.raw_payload, [
         "qr_code_base64",
         "qrCodeBase64",
+        "encodedImage",
       ]),
       ticketUrl: extractNestedString(insertedPayment.raw_payload, [
         "ticket_url",
         "ticketUrl",
+        "invoiceUrl",
+        "invoice_url",
+        "bankSlipUrl",
+        "bank_slip_url",
       ]),
     }),
     {
@@ -596,6 +660,10 @@ async function handleCheckPaymentStatus({
     throw new Error("Nenhuma cobrança pendente encontrada para consultar.");
   }
 
+  const paymentProvider = normalizePaymentProvider(
+    paymentRecord.provider || subscription.payment_provider || "",
+  ) || "mercadopago";
+
   if (!paymentRecord.provider_payment_id) {
     return new Response(
       JSON.stringify({
@@ -612,20 +680,34 @@ async function handleCheckPaymentStatus({
     );
   }
 
-  const gatewayPayment = await getPaymentById({
-    paymentId: paymentRecord.provider_payment_id,
-    config: getMercadoPagoConfig(),
-  });
-  const normalizedStatus = normalizePaymentStatus(
-    getString(gatewayPayment, ["status"]) || paymentRecord.status,
-  );
-  const paidAt = getString(gatewayPayment, ["date_approved"]) || null;
-  const dueAt = getString(gatewayPayment, ["date_of_expiration", "expiration_date"]) || paymentRecord.due_at;
+  const gatewayPayment = paymentProvider === "asaas"
+    ? await getAsaasPaymentById({
+      paymentId: paymentRecord.provider_payment_id,
+      config: getAsaasConfig(),
+    })
+    : await getPaymentById({
+      paymentId: paymentRecord.provider_payment_id,
+      config: getMercadoPagoConfig(),
+    });
+  const normalizedStatus = paymentProvider === "asaas"
+    ? normalizeAsaasPaymentStatus(
+      getString(gatewayPayment, ["status"]) || paymentRecord.status,
+    )
+    : normalizePaymentStatus(
+      getString(gatewayPayment, ["status"]) || paymentRecord.status,
+    );
+  const paidAt = paymentProvider === "asaas"
+    ? resolveAsaasPaidAt(gatewayPayment)
+    : getString(gatewayPayment, ["date_approved"]) || null;
+  const dueAt = paymentProvider === "asaas"
+    ? resolveAsaasDueAt(gatewayPayment) || paymentRecord.due_at
+    : getString(gatewayPayment, ["date_of_expiration", "expiration_date"]) || paymentRecord.due_at;
 
   const { data: updatedPayment, error: paymentUpdateError } = await supabase
     .from("subscription_payments")
     .update({
       status: normalizedStatus,
+      provider: paymentProvider,
       paid_at: normalizedStatus === "approved" ? paidAt || new Date().toISOString() : null,
       due_at: dueAt || null,
       raw_payload: gatewayPayment,
@@ -681,9 +763,18 @@ async function handlePayWithCardToken({
     personalId,
   });
   const existingSavedMethod = extractSavedPaymentMethod(personalProfile.data);
+  const paymentProvider = resolveSubscriptionPaymentProvider({
+    subscription,
+    savedPaymentMethod: existingSavedMethod,
+    body,
+  });
 
   if (!PLAN_CONFIGS[normalizePlan(subscription.plan_slug || "free")]?.paid) {
     throw new Error("O plano atual não precisa de regularização de pagamento.");
+  }
+
+  if (paymentProvider === "asaas") {
+    throw new Error("O formulario de cartao do painel ainda nao foi migrado para o Asaas. Por enquanto, gere a cobranca PIX ou conclua o pagamento/cartao pelo fluxo novo da landing.");
   }
 
   const amount = await resolveSubscriptionAmount({ supabase, subscription });
@@ -822,6 +913,14 @@ async function handleChargeSavedCard({
   }
 
   const existingMethod = extractSavedPaymentMethod(personalProfile.data);
+  const paymentProvider = resolveSubscriptionPaymentProvider({
+    subscription,
+    savedPaymentMethod: existingMethod,
+    body,
+  });
+  if (paymentProvider === "asaas") {
+    throw new Error("A cobranca automatica com cartao salvo ainda nao foi migrada para o Asaas no painel. Use o PIX/manual por enquanto.");
+  }
   if (!existingMethod?.providerCustomerId || (!existingMethod.providerCardId && !existingMethod.providerPaymentProfileId)) {
     throw new Error("Nenhum cartão salvo foi encontrado para este perfil.");
   }
@@ -974,6 +1073,15 @@ async function handleSaveCardToken({
     throw new Error("Somente planos pagos podem cadastrar cartão.");
   }
 
+  const paymentProvider = resolveSubscriptionPaymentProvider({
+    subscription,
+    savedPaymentMethod: extractSavedPaymentMethod(personalProfile.data),
+    body,
+  });
+  if (paymentProvider === "asaas") {
+    throw new Error("O cadastro de cartao no painel ainda esta no fluxo antigo do Mercado Pago. Para Asaas, vamos concluir esse trecho no proximo passo.");
+  }
+
   const email = normalizeEmail(personalProfile.email || "");
   if (!email) {
     throw new Error("Não foi possível identificar o email do titular para salvar o cartão.");
@@ -1054,7 +1162,7 @@ async function handleRemoveSavedCard({
 
   const existingMethod = extractSavedPaymentMethod(personalProfile.data);
 
-  if (existingMethod?.providerCustomerId && existingMethod.providerCardId) {
+  if (existingMethod?.provider === "mercadopago" && existingMethod.providerCustomerId && existingMethod.providerCardId) {
     await deleteMercadoPagoCustomerCard({
       customerId: existingMethod.providerCustomerId,
       cardId: existingMethod.providerCardId,
@@ -1263,6 +1371,38 @@ function normalizePlan(value: string) {
   return value.trim().toLowerCase();
 }
 
+function normalizeBillingCycle(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized) return "";
+  if (normalized === "annual") return "yearly";
+  if (["monthly", "quarterly", "yearly"].includes(normalized)) return normalized;
+
+  return "";
+}
+
+function getBillingCycleMultiplier(billingCycle: string) {
+  if (billingCycle === "quarterly") return 3;
+  if (billingCycle === "yearly") return 12;
+  return 1;
+}
+
+function resolveTargetSubscriptionAmount({
+  planSlug,
+  billingCycle,
+}: {
+  planSlug: string;
+  billingCycle: string;
+}) {
+  const baseAmount = PLAN_PRICES[planSlug];
+
+  if (typeof baseAmount !== "number" || Number.isNaN(baseAmount)) {
+    throw new Error(`Não foi possível determinar o valor do plano ${planSlug || "informado"}.`);
+  }
+
+  return Number((baseAmount * getBillingCycleMultiplier(billingCycle)).toFixed(2));
+}
+
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
@@ -1271,6 +1411,46 @@ function normalizePaymentMethod(value: string) {
   const normalized = value.trim().toLowerCase();
   if (normalized === "checkout-pro" || normalized === "pix") return normalized;
   return "pix";
+}
+
+function normalizePaymentProvider(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized) return "";
+  if (normalized === "mercado_pago") return "mercadopago";
+  if (normalized === "mercadopago" || normalized === "asaas") return normalized;
+
+  return normalized;
+}
+
+function resolveSubscriptionPaymentProvider({
+  subscription,
+  savedPaymentMethod,
+  body,
+}: {
+  subscription: SubscriptionRow;
+  savedPaymentMethod: SavedPaymentMethod | null;
+  body: Record<string, unknown>;
+}) {
+  const explicitProvider = normalizePaymentProvider(
+    getString(body, ["paymentProvider", "provider"]),
+  );
+
+  if (explicitProvider === "asaas" || explicitProvider === "mercadopago") {
+    return explicitProvider;
+  }
+
+  const savedProvider = normalizePaymentProvider(savedPaymentMethod?.provider || "");
+  if (savedProvider === "asaas" || savedProvider === "mercadopago") {
+    return savedProvider;
+  }
+
+  const subscriptionProvider = normalizePaymentProvider(subscription.payment_provider || "");
+  if (subscriptionProvider === "asaas" || subscriptionProvider === "mercadopago") {
+    return subscriptionProvider;
+  }
+
+  return "mercadopago";
 }
 
 function normalizePaymentStatus(value: string): SubscriptionPaymentRow["status"] {
@@ -1288,6 +1468,26 @@ function normalizePaymentStatus(value: string): SubscriptionPaymentRow["status"]
   if (normalized === "expired") return "canceled";
   if (normalized === "refunded" || normalized === "charged_back") return "refunded";
   if (normalized === "failed" || normalized === "rejected") return "failed";
+
+  return "pending";
+}
+
+function normalizeAsaasPaymentStatus(value: string): SubscriptionPaymentRow["status"] {
+  const normalized = value.trim().toLowerCase();
+
+  if (["received", "confirmed", "received_in_cash"].includes(normalized)) return "approved";
+  if (["pending", "awaiting_risk_analysis", "authorized"].includes(normalized)) return "pending";
+  if (["overdue", "deleted"].includes(normalized)) return "canceled";
+  if (["refunded", "partially_refunded"].includes(normalized)) return "refunded";
+  if (
+    [
+      "refund_requested",
+      "refund_in_progress",
+      "chargeback_requested",
+      "chargeback_dispute",
+      "awaiting_chargeback_reversal",
+    ].includes(normalized)
+  ) return "failed";
 
   return "pending";
 }
@@ -1358,6 +1558,83 @@ function getMercadoPagoConfig() {
     failurePath: "/account/profile",
     pendingPath: "/account/profile",
   };
+}
+
+function getAsaasConfig() {
+  const accessToken = (
+    Deno.env.get("ASAAS_ACCESS_TOKEN") ||
+    Deno.env.get("ASAAS_API_KEY") ||
+    ""
+  ).trim();
+  const configuredBaseUrl = (Deno.env.get("ASAAS_BASE_URL") || "").trim();
+  const configuredEnvironment = (
+    Deno.env.get("ASAAS_ENVIRONMENT") ||
+    Deno.env.get("ASAAS_ENV") ||
+    ""
+  ).trim().toLowerCase();
+
+  if (!accessToken) {
+    throw new Error("ASAAS_ACCESS_TOKEN nao configurado.");
+  }
+
+  const isSandbox = configuredEnvironment === "sandbox" || accessToken.startsWith("$aact_hmlg_");
+
+  return {
+    accessToken,
+    baseUrl: configuredBaseUrl || (isSandbox
+      ? "https://api-sandbox.asaas.com/v3"
+      : "https://api.asaas.com/v3"),
+    userAgent: (Deno.env.get("ASAAS_USER_AGENT") || "fitbodypro-personal-platform/1.0").trim(),
+  };
+}
+
+async function asaasRequest(
+  path: string,
+  config: { accessToken: string; baseUrl: string; userAgent: string },
+  options: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: Record<string, unknown>;
+  } = {},
+) {
+  const response = await fetch(`${config.baseUrl}${path}`, {
+    method: options.method || "GET",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "User-Agent": config.userAgent,
+      access_token: config.accessToken,
+      ...(options.headers || {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const errors = isRecord(data) && Array.isArray(data.errors)
+      ? data.errors
+        .map((entry) => {
+          if (!isRecord(entry)) return "";
+          return [
+            getScalarAsString(entry.code),
+            getScalarAsString(entry.description),
+          ].filter(Boolean).join(": ");
+        })
+        .filter(Boolean)
+      : [];
+
+    throw new Error(
+      [
+        isRecord(data) ? getString(data, ["message", "error"]) : "",
+        errors.length ? errors.join(" | ") : "",
+        `asaas_path=${path}`,
+        `asaas_status=${response.status}`,
+      ].filter(Boolean).join(" - ") || "Erro ao comunicar com o Asaas.",
+    );
+  }
+
+  return isRecord(data) ? data : {};
 }
 
 async function mercadoPagoRequest(
@@ -1638,6 +1915,8 @@ function buildSavedPaymentMethod({
     providerCustomerId,
     providerCardId: cardId,
     providerPaymentProfileId: null,
+    providerPaymentMethodToken: null,
+    providerSubscriptionId: null,
     paymentMethodId: directBrand || nestedPaymentMethod || fallbackBrand || null,
     issuerId: issuerId || null,
     brand: directBrand || nestedPaymentMethod || fallbackBrand || null,
@@ -1653,24 +1932,38 @@ function extractSavedPaymentMethod(data: Record<string, unknown> | null): SavedP
   const rawPaymentMethod = data.paymentMethod;
   if (!isRecord(rawPaymentMethod)) return null;
 
+  const provider = normalizePaymentProvider(getString(rawPaymentMethod, ["provider"])) || "mercadopago";
   const providerCustomerId = getString(rawPaymentMethod, ["providerCustomerId"]);
   const providerCardId = getString(rawPaymentMethod, ["providerCardId"]);
   const providerPaymentProfileId = getString(rawPaymentMethod, [
     "providerPaymentProfileId",
     "paymentProfileId",
   ]);
+  const providerPaymentMethodToken = getString(rawPaymentMethod, [
+    "providerPaymentMethodToken",
+    "paymentMethodToken",
+  ]);
+  const providerSubscriptionId = getString(rawPaymentMethod, ["providerSubscriptionId"]);
+  const brand = getString(rawPaymentMethod, ["brand"]);
+  const lastFour = getString(rawPaymentMethod, ["lastFour"]);
 
-  if (!providerCustomerId || (!providerCardId && !providerPaymentProfileId)) return null;
+  const hasReusableMethod = provider === "asaas"
+    ? Boolean(providerSubscriptionId || providerPaymentMethodToken || brand || lastFour)
+    : Boolean(providerCardId || providerPaymentProfileId);
+
+  if (!providerCustomerId || !hasReusableMethod) return null;
 
   return {
-    provider: "mercadopago",
+    provider: provider === "asaas" ? "asaas" : "mercadopago",
     providerCustomerId,
-    providerCardId,
+    providerCardId: providerCardId || null,
     providerPaymentProfileId: providerPaymentProfileId || null,
+    providerPaymentMethodToken: providerPaymentMethodToken || null,
+    providerSubscriptionId: providerSubscriptionId || null,
     paymentMethodId: getString(rawPaymentMethod, ["paymentMethodId"]) || null,
     issuerId: getString(rawPaymentMethod, ["issuerId"]) || null,
-    brand: getString(rawPaymentMethod, ["brand"]) || null,
-    lastFour: getString(rawPaymentMethod, ["lastFour"]) || null,
+    brand: brand || null,
+    lastFour: lastFour || null,
     firstPaymentProviderPaymentId: getString(rawPaymentMethod, ["firstPaymentProviderPaymentId"]) || null,
     updatedAt: getString(rawPaymentMethod, ["updatedAt"]) || new Date().toISOString(),
   };
@@ -1755,10 +2048,63 @@ async function createCheckoutPreference({
         subscriptionId,
         providerReference,
         source: "personal-platform-regularization",
-        card_token_debug: JSON.stringify(cardToken.debug),
       },
     },
   });
+}
+
+async function createAsaasRegularizationPayment({
+  providerCustomerId,
+  providerReference,
+  description,
+  amount,
+  method,
+  dueDate,
+  config,
+}: {
+  providerCustomerId: string;
+  providerReference: string;
+  description: string;
+  amount: number;
+  method: "pix" | "checkout-pro";
+  dueDate: string;
+  config: { accessToken: string; baseUrl: string; userAgent: string };
+}) {
+  const payment = await asaasRequest("/payments", config, {
+    method: "POST",
+    body: {
+      customer: providerCustomerId,
+      billingType: method === "pix" ? "PIX" : "UNDEFINED",
+      value: amount,
+      dueDate,
+      description,
+      externalReference: providerReference,
+    },
+  });
+
+  const paymentId = getString(payment, ["id"]);
+  if (!paymentId || method !== "pix") {
+    return payment;
+  }
+
+  try {
+    const pixQrCode = await getAsaasPixQrCode({
+      paymentId,
+      config,
+    });
+
+    return {
+      ...payment,
+      pixQrCode,
+      pixCode: getString(pixQrCode, ["payload", "copyPaste", "pixCode"]),
+      qrCodeBase64: getString(pixQrCode, ["encodedImage", "qrCodeBase64"]),
+    };
+  } catch (error) {
+    return {
+      ...payment,
+      pixQrCodeError: error instanceof Error ? error.message : "Nao foi possivel carregar o QR Code Pix no Asaas.",
+    };
+  }
 }
 
 async function createPixPayment({
@@ -2280,6 +2626,62 @@ async function getPaymentById({
   }
 
   return await mercadoPagoRequest(`/v1/payments/${paymentId}`, config);
+}
+
+async function getAsaasPaymentById({
+  paymentId,
+  config,
+}: {
+  paymentId: string;
+  config: { accessToken: string; baseUrl: string; userAgent: string };
+}) {
+  if (!paymentId) {
+    throw new Error("ID do pagamento obrigatorio.");
+  }
+
+  return await asaasRequest(`/payments/${paymentId}`, config);
+}
+
+async function getAsaasPixQrCode({
+  paymentId,
+  config,
+}: {
+  paymentId: string;
+  config: { accessToken: string; baseUrl: string; userAgent: string };
+}) {
+  if (!paymentId) {
+    throw new Error("ID do pagamento PIX obrigatorio.");
+  }
+
+  return await asaasRequest(`/payments/${paymentId}/pixQrCode`, config);
+}
+
+function buildAsaasDueDate(referenceIso: string | null) {
+  const now = new Date();
+  const referenceDate = referenceIso ? new Date(referenceIso) : now;
+  const dueDate = Number.isNaN(referenceDate.getTime()) || referenceDate.getTime() < now.getTime()
+    ? now
+    : referenceDate;
+
+  return formatBillingDate(dueDate.toISOString());
+}
+
+function resolveAsaasDueAt(gatewayPayment: Record<string, unknown>) {
+  return getString(gatewayPayment, [
+    "dueDate",
+    "due_at",
+    "expirationDate",
+    "dateCreated",
+  ]) || null;
+}
+
+function resolveAsaasPaidAt(gatewayPayment: Record<string, unknown>) {
+  return getString(gatewayPayment, [
+    "clientPaymentDate",
+    "paymentDate",
+    "confirmedDate",
+    "creditDate",
+  ]) || null;
 }
 
 function buildPaymentDescription(plan: string, purpose: "regularization" | "renewal" = "regularization") {

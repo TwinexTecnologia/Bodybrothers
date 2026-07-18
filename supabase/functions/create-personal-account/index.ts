@@ -39,10 +39,12 @@ type ProfileRow = {
 };
 
 type SavedPaymentMethod = {
-  provider: "mercadopago";
+  provider: "mercadopago" | "asaas";
   providerCustomerId: string;
   providerCardId: string | null;
   providerPaymentProfileId: string | null;
+  providerPaymentMethodToken: string | null;
+  providerSubscriptionId: string | null;
   paymentMethodId: string | null;
   issuerId: string | null;
   brand: string | null;
@@ -62,12 +64,15 @@ type LandingPaymentContext = {
   paymentRawPayload: Record<string, unknown>;
   providerCustomerId: string | null;
   providerPaymentProfileId: string | null;
+  providerPaymentMethodToken: string | null;
   providerSubscriptionId: string | null;
   savedPaymentMethod: SavedPaymentMethod | null;
   recurringReady: boolean;
   missingRecurringFields: string[];
   ordersApiReady: boolean;
   missingOrdersApiFields: string[];
+  asaasReady: boolean;
+  missingAsaasFields: string[];
 };
 
 type SubscriptionRow = {
@@ -230,11 +235,12 @@ async function handleCreatePersonal({
   }
 
   const paymentStatus = getString(body, ["paymentStatus"]).toLowerCase();
-  const paymentProvider = getString(body, ["paymentProvider"]).toLowerCase();
+  const paymentProvider = normalizePaymentProvider(getString(body, ["paymentProvider"]));
   const paymentId = getString(body, ["paymentId"]);
+  const normalizedPaymentStatus = normalizeSubscriptionPaymentStatus(paymentStatus, paymentProvider);
 
   if (requestMode.mode === "landing" && planConfig.paid) {
-    if (paymentStatus !== "approved") {
+    if (normalizedPaymentStatus !== "approved") {
       throw new Error("Plano pago só pode criar a conta após pagamento aprovado.");
     }
 
@@ -277,7 +283,7 @@ async function handleCreatePersonal({
     billingCycle,
     studentLimit: planConfig.studentLimit,
     paymentStatus: planConfig.paid
-      ? paymentStatus || (requestMode.mode === "owner" ? "manual" : "approved")
+      ? normalizedPaymentStatus || (requestMode.mode === "owner" ? "manual" : "approved")
       : "free",
     paymentProvider: planConfig.paid ? paymentProvider || null : null,
     paymentId: planConfig.paid ? paymentId || null : null,
@@ -458,9 +464,11 @@ async function handleCreatePersonal({
     subscriptionStatus,
     recurringReady: paymentContext.recurringReady,
     ordersApiReady: paymentContext.ordersApiReady,
+    asaasReady: paymentContext.asaasReady,
     paymentMethodStored: Boolean(paymentContext.savedPaymentMethod),
     missingRecurringFields: paymentContext.missingRecurringFields,
     missingOrdersApiFields: paymentContext.missingOrdersApiFields,
+    missingAsaasFields: paymentContext.missingAsaasFields,
     defaults: {
       plan: requestedPlan,
       studentLimit: planConfig.studentLimit,
@@ -559,6 +567,16 @@ function normalizeBillingCycle(value: string) {
   return "";
 }
 
+function normalizePaymentProvider(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized) return "";
+  if (normalized === "mercado_pago") return "mercadopago";
+  if (["mercadopago", "asaas"].includes(normalized)) return normalized;
+
+  return normalized;
+}
+
 function normalizeEvolutionMode(value: string) {
   const normalized = value.trim().toLowerCase();
 
@@ -650,8 +668,9 @@ function resolveLandingPaymentContext({
   requestMode: RequestMode;
 }): LandingPaymentContext {
   const paymentStatus = getString(body, ["paymentStatus"]).toLowerCase();
-  const paymentProvider = getString(body, ["paymentProvider"]).toLowerCase();
+  const paymentProvider = normalizePaymentProvider(getString(body, ["paymentProvider"]));
   const paymentId = getString(body, ["paymentId", "providerPaymentId"]) || null;
+  const normalizedPaymentStatus = normalizeSubscriptionPaymentStatus(paymentStatus, paymentProvider);
   const providerCustomerId = getString(body, ["providerCustomerId"]) || null;
   const providerCardId = getString(body, ["providerCardId"]) || null;
   const providerPaymentProfileId = getString(body, [
@@ -672,10 +691,28 @@ function resolveLandingPaymentContext({
       "paymentProfile.id",
     ]) ||
     null;
+  const providerPaymentMethodToken = getString(body, [
+    "providerPaymentMethodToken",
+    "paymentMethodToken",
+    "creditCardToken",
+  ]) ||
+    findNestedString(getRecord(body, [
+      "paymentRawPayload",
+      "paymentRaw",
+      "payment",
+      "raw",
+      "paymentData",
+    ]), [
+      "creditCardToken",
+      "credit_card_token",
+      "creditCard.token",
+      "paymentMethod.token",
+    ]) ||
+    null;
   const paymentMethodId = getString(body, ["paymentMethodId"]) || null;
   const issuerId = getString(body, ["issuerId"]) || null;
-  const brand = getString(body, ["cardBrand", "brand"]) || paymentMethodId || null;
-  const lastFour = getString(body, ["cardLastFour", "lastFour"]) || null;
+  const brand = getString(body, ["cardBrand", "brand", "creditCardBrand"]) || paymentMethodId || null;
+  const lastFour = getString(body, ["cardLastFour", "lastFour", "creditCardLastFour"]) || null;
   const providerSubscriptionId = getString(body, [
     "providerSubscriptionId",
     "subscriptionId",
@@ -690,13 +727,35 @@ function resolveLandingPaymentContext({
   ]) || null;
   const paymentDescription = getString(body, ["paymentDescription", "description"]) ||
     buildPaymentDescription(requestedPlan);
-  const paymentRawPayload = getRecord(body, [
+  const basePaymentRawPayload = getRecord(body, [
     "paymentRawPayload",
     "paymentRaw",
     "payment",
     "raw",
     "paymentData",
   ]) || {};
+  const supplementalPaymentRawPayload: Record<string, unknown> = {};
+  const paymentRemoteIp = getString(body, ["remoteIp", "remote_ip"]);
+  const creditCardHolderInfo = getRecord(body, [
+    "creditCardHolderInfo",
+    "credit_card_holder_info",
+  ]);
+
+  if (paymentRemoteIp && !getString(basePaymentRawPayload, ["remoteIp", "remote_ip"])) {
+    supplementalPaymentRawPayload.remoteIp = paymentRemoteIp;
+  }
+
+  if (creditCardHolderInfo && !isRecord(basePaymentRawPayload.creditCardHolderInfo)) {
+    supplementalPaymentRawPayload.creditCardHolderInfo = creditCardHolderInfo;
+  }
+
+  if (providerPaymentMethodToken && !getString(basePaymentRawPayload, ["creditCardToken", "credit_card_token"])) {
+    supplementalPaymentRawPayload.creditCardToken = providerPaymentMethodToken;
+  }
+
+  const paymentRawPayload = Object.keys(supplementalPaymentRawPayload).length
+    ? { ...basePaymentRawPayload, ...supplementalPaymentRawPayload }
+    : basePaymentRawPayload;
 
   const legacyRecurringReady = Boolean(
     providerCustomerId &&
@@ -704,9 +763,14 @@ function resolveLandingPaymentContext({
       paymentMethodId &&
       paymentId,
   );
-  const ordersApiReady = Boolean(
+  const ordersApiReady = paymentProvider === "mercadopago" && Boolean(
     providerCustomerId &&
       providerPaymentProfileId &&
+      paymentId,
+  );
+  const asaasReady = paymentProvider === "asaas" && Boolean(
+    providerCustomerId &&
+      providerSubscriptionId &&
       paymentId,
   );
   const missingOrdersApiFields = paymentProvider === "mercadopago" && planConfig.paid
@@ -716,9 +780,14 @@ function resolveLandingPaymentContext({
       !paymentId ? "firstPaymentProviderPaymentId" : "",
     ].filter(Boolean)
     : [];
-  const missingRecurringFields = paymentProvider === "mercadopago" && planConfig.paid && !(
-      ordersApiReady || legacyRecurringReady
-    )
+  const missingAsaasFields = paymentProvider === "asaas" && planConfig.paid
+    ? [
+      !providerCustomerId ? "providerCustomerId" : "",
+      !providerSubscriptionId ? "providerSubscriptionId" : "",
+      !paymentId ? "paymentId" : "",
+    ].filter(Boolean)
+    : [];
+  const missingRecurringFields = paymentProvider === "mercadopago" && planConfig.paid && !(ordersApiReady || legacyRecurringReady)
     ? [
       !providerCustomerId ? "providerCustomerId" : "",
       !providerPaymentProfileId && !providerCardId
@@ -727,10 +796,12 @@ function resolveLandingPaymentContext({
       !providerPaymentProfileId && !paymentMethodId ? "paymentMethodId" : "",
       !paymentId ? "firstPaymentProviderPaymentId" : "",
     ].filter(Boolean)
+    : paymentProvider === "asaas" && planConfig.paid && !asaasReady
+    ? missingAsaasFields
     : [];
 
   if (requestMode.mode === "landing" && planConfig.paid) {
-    if (paymentStatus !== "approved") {
+    if (normalizedPaymentStatus !== "approved") {
       throw new Error("Plano pago só pode criar a conta após pagamento aprovado.");
     }
 
@@ -739,14 +810,19 @@ function resolveLandingPaymentContext({
     }
   }
 
-  const savedPaymentMethod = paymentProvider === "mercadopago" &&
+  const savedPaymentMethod = (paymentProvider === "mercadopago" || paymentProvider === "asaas") &&
       providerCustomerId &&
-      (providerCardId || providerPaymentProfileId)
+      (
+        (paymentProvider === "mercadopago" && (providerCardId || providerPaymentProfileId)) ||
+        (paymentProvider === "asaas" && (providerSubscriptionId || providerPaymentMethodToken || brand || lastFour))
+      )
     ? {
-      provider: "mercadopago" as const,
+      provider: paymentProvider as "mercadopago" | "asaas",
       providerCustomerId,
       providerCardId,
       providerPaymentProfileId,
+      providerPaymentMethodToken,
+      providerSubscriptionId,
       paymentMethodId,
       issuerId,
       brand,
@@ -757,7 +833,7 @@ function resolveLandingPaymentContext({
     : null;
 
   return {
-    paymentStatus,
+    paymentStatus: normalizedPaymentStatus,
     paymentProvider,
     paymentId,
     paymentAmount,
@@ -767,12 +843,15 @@ function resolveLandingPaymentContext({
     paymentRawPayload,
     providerCustomerId: savedPaymentMethod?.providerCustomerId || providerCustomerId,
     providerPaymentProfileId: savedPaymentMethod?.providerPaymentProfileId || providerPaymentProfileId,
+    providerPaymentMethodToken: savedPaymentMethod?.providerPaymentMethodToken || providerPaymentMethodToken,
     providerSubscriptionId,
     savedPaymentMethod,
     recurringReady: Boolean(savedPaymentMethod && !missingRecurringFields.length),
     missingRecurringFields,
     ordersApiReady,
     missingOrdersApiFields,
+    asaasReady,
+    missingAsaasFields,
   };
 }
 
@@ -797,6 +876,7 @@ async function upsertPersonalPaymentMethod({
       provider_customer_id: paymentMethod.providerCustomerId,
       provider_card_id: paymentMethod.providerCardId,
       provider_payment_profile_id: paymentMethod.providerPaymentProfileId,
+      provider_payment_method_token: paymentMethod.providerPaymentMethodToken,
       payment_method_id: paymentMethod.paymentMethodId,
       issuer_id: paymentMethod.issuerId,
       brand: paymentMethod.brand,
@@ -848,13 +928,21 @@ async function insertInitialSubscriptionPayment({
       billing_cycle: billingCycle,
       amount: paymentContext.paymentAmount ?? resolvePlanAmount(requestedPlan) ?? 0,
       currency: paymentContext.paymentCurrency || "BRL",
-      status: normalizeSubscriptionPaymentStatus(paymentContext.paymentStatus || "approved"),
-      provider: paymentContext.paymentProvider || "mercadopago",
+      status: normalizeSubscriptionPaymentStatus(
+        paymentContext.paymentStatus || "approved",
+        paymentContext.paymentProvider,
+      ),
+      provider: paymentContext.paymentProvider || null,
       provider_payment_id: paymentContext.paymentId,
       provider_reference: paymentContext.providerReference,
       description: paymentContext.paymentDescription || buildPaymentDescription(requestedPlan),
       due_at: nowIso,
-      paid_at: paymentContext.paymentStatus === "approved" ? nowIso : null,
+      paid_at: normalizeSubscriptionPaymentStatus(
+          paymentContext.paymentStatus || "approved",
+          paymentContext.paymentProvider,
+        ) === "approved"
+        ? nowIso
+        : null,
       raw_payload: {
         source: "landing-create-personal-account",
         ...paymentContext.paymentRawPayload,
@@ -977,8 +1065,18 @@ function buildPaymentDescription(plan: string) {
   return `Assinatura ${label}`;
 }
 
-function normalizeSubscriptionPaymentStatus(value: string) {
+function normalizeSubscriptionPaymentStatus(value: string, paymentProvider = "") {
   const normalized = value.trim().toLowerCase();
+
+  if (paymentProvider === "asaas") {
+    if (["received", "confirmed", "received_in_cash"].includes(normalized)) return "approved";
+    if (["pending", "awaiting_risk_analysis"].includes(normalized)) return "pending";
+    if (["refunded"].includes(normalized)) return "refunded";
+    if (["overdue", "deleted"].includes(normalized)) return "canceled";
+    if (["refund_requested", "refund_in_progress", "chargeback_requested", "chargeback_dispute"].includes(normalized)) {
+      return "failed";
+    }
+  }
 
   if (["pending", "approved", "failed", "canceled", "refunded"].includes(normalized)) {
     return normalized;
