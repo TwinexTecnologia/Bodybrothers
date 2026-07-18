@@ -15,6 +15,7 @@ type SubscriptionRow = {
   amount: number | null
   next_billing_at: string | null
   scheduled_plan_slug: string | null
+  scheduled_billing_cycle: 'monthly' | 'quarterly' | 'yearly' | null
   scheduled_change_at: string | null
 }
 
@@ -33,10 +34,12 @@ type SubscriptionPaymentRow = {
 }
 
 type SavedPaymentMethod = {
-  provider: 'mercadopago'
+  provider: 'mercadopago' | 'asaas'
   providerCustomerId: string
   providerCardId: string | null
   providerPaymentProfileId: string | null
+  providerPaymentMethodToken: string | null
+  providerSubscriptionId: string | null
   paymentMethodId: string | null
   issuerId: string | null
   brand: string | null
@@ -50,6 +53,8 @@ type StoredPaymentMethodRow = {
   provider_customer_id: string | null
   provider_card_id: string | null
   provider_payment_profile_id: string | null
+  provider_payment_method_token: string | null
+  provider_subscription_id: string | null
   payment_method_id: string | null
   issuer_id: string | null
   brand: string | null
@@ -88,15 +93,6 @@ const BILLING_CYCLE_LABELS: Record<string, string> = {
   yearly: 'Anual',
 }
 
-const PLAN_CONFIGS: Record<string, { label: string; studentLimit: number; rank: number }> = {
-  free: { label: 'Free', studentLimit: 1, rank: 0 },
-  starter: { label: 'Starter', studentLimit: 10, rank: 1 },
-  pro: { label: 'Pro', studentLimit: 30, rank: 2 },
-  premium: { label: 'Premium', studentLimit: 30, rank: 2 },
-  elite: { label: 'Elite', studentLimit: 999999, rank: 3 },
-  unlimited: { label: 'Ilimitado', studentLimit: 999999, rank: 3 },
-}
-
 export default function Profile() {
   const { refreshAuthState } = useAuth()
   const mercadoPagoPublicKey = import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY || ''
@@ -116,11 +112,11 @@ export default function Profile() {
   const [savedPaymentMethod, setSavedPaymentMethod] = useState<SavedPaymentMethod | null>(null)
   const [latestPayment, setLatestPayment] = useState<SubscriptionPaymentRow | null>(null)
   const [activeStudents, setActiveStudents] = useState(0)
-  const [downgradeTargetPlan, setDowngradeTargetPlan] = useState('')
-  const [downgradeModalOpen, setDowngradeModalOpen] = useState(false)
-  const [showDowngradeOptions, setShowDowngradeOptions] = useState(false)
-  const [downgradeLoading, setDowngradeLoading] = useState(false)
-  const [cancelDowngradeLoading, setCancelDowngradeLoading] = useState(false)
+  const [selectedBillingCycle, setSelectedBillingCycle] = useState<SubscriptionRow['billing_cycle']>('monthly')
+  const [billingCycleModalOpen, setBillingCycleModalOpen] = useState(false)
+  const [showBillingCycleOptions, setShowBillingCycleOptions] = useState(false)
+  const [billingCycleChangeLoading, setBillingCycleChangeLoading] = useState(false)
+  const [cancelScheduledChangeLoading, setCancelScheduledChangeLoading] = useState(false)
   const [copyPixMsg, setCopyPixMsg] = useState('')
   const [paymentActionLoading, setPaymentActionLoading] = useState<'pix' | 'card' | 'check' | null>(null)
   const [showCardForm, setShowCardForm] = useState(false)
@@ -133,34 +129,36 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const canUpgrade = useMemo(() => {
-    const plan = subscription?.plan_slug || 'free'
-    return !['unlimited', 'elite'].includes(plan)
-  }, [subscription])
-
-  const canDowngrade = useMemo(() => {
+  const canManageBillingCycle = useMemo(() => {
     const plan = subscription?.plan_slug || 'free'
     return plan !== 'free'
   }, [subscription])
 
-  const downgradeOptions = useMemo(() => {
-    const currentPlan = (subscription?.plan_slug || 'free').toLowerCase()
-    const currentRank = PLAN_CONFIGS[currentPlan]?.rank ?? 0
-
-    return Object.entries(PLAN_CONFIGS)
-      .filter(([plan, config]) => config.rank < currentRank && plan !== currentPlan)
-      .sort(([, a], [, b]) => b.rank - a.rank)
-  }, [subscription])
-
-  const selectedDowngradeConfig = downgradeTargetPlan ? PLAN_CONFIGS[downgradeTargetPlan] : null
-  const studentsToInactivate = selectedDowngradeConfig
-    ? Math.max(activeStudents - selectedDowngradeConfig.studentLimit, 0)
-    : 0
+  const currentPlan = subscription?.plan_slug || 'free'
+  const currentBillingCycle = subscription?.billing_cycle || 'monthly'
+  const scheduledTargetPlan = subscription?.scheduled_plan_slug || currentPlan
+  const scheduledTargetBillingCycle = subscription?.scheduled_billing_cycle || null
+  const hasScheduledChange = Boolean(subscription?.scheduled_change_at && (subscription?.scheduled_plan_slug || subscription?.scheduled_billing_cycle))
+  const billingCycleOptions = useMemo(() => {
+    return (Object.entries(BILLING_CYCLE_LABELS) as Array<[NonNullable<SubscriptionRow['billing_cycle']>, string]>)
+      .filter(([cycle]) => cycle !== currentBillingCycle)
+  }, [currentBillingCycle])
+  const canScheduleBillingCycleChange = canManageBillingCycle && !hasScheduledChange
+  const selectedBillingCycleLabel = selectedBillingCycle ? BILLING_CYCLE_LABELS[selectedBillingCycle] || selectedBillingCycle : ''
+  const currentPlanLabel = PLAN_LABELS[currentPlan] || currentPlan
+  const currentBillingCycleLabel = BILLING_CYCLE_LABELS[currentBillingCycle] || 'Mensal'
+  const scheduledTargetPlanLabel = PLAN_LABELS[scheduledTargetPlan] || scheduledTargetPlan
+  const scheduledTargetBillingCycleLabel = scheduledTargetBillingCycle
+    ? BILLING_CYCLE_LABELS[scheduledTargetBillingCycle] || scheduledTargetBillingCycle
+    : null
   const paymentActionData = useMemo(() => extractPaymentActionData(latestPayment?.raw_payload), [latestPayment])
   const canCopyPix = Boolean(paymentActionData.pixCode)
   const needsRegularization = subscription?.status === 'blocked' || subscription?.status === 'past_due'
-  const hasSavedPaymentMethod = Boolean(savedPaymentMethod?.providerCardId || savedPaymentMethod?.providerPaymentProfileId)
-  const savedPaymentMethodValidated = Boolean(savedPaymentMethod?.firstPaymentProviderPaymentId)
+  const isAsaasSubscriptionFlow = savedPaymentMethod?.provider === 'asaas' || latestPayment?.provider === 'asaas'
+  const hasSavedPaymentMethod = isAsaasSubscriptionFlow
+    ? Boolean(savedPaymentMethod)
+    : Boolean(savedPaymentMethod?.providerCardId || savedPaymentMethod?.providerPaymentProfileId)
+  const savedPaymentMethodValidated = Boolean(savedPaymentMethod?.firstPaymentProviderPaymentId || savedPaymentMethod?.provider === 'asaas')
   const cardPaymentAmount = useMemo(() => {
     const explicitCardAmount = normalizeMoneyValue(cardFormAmount)
     if (explicitCardAmount > 0) return explicitCardAmount
@@ -181,16 +179,16 @@ export default function Profile() {
   }, [])
 
   useEffect(() => {
-    if (!downgradeOptions.length) {
-      setDowngradeTargetPlan('')
+    if (!billingCycleOptions.length) {
+      setSelectedBillingCycle(currentBillingCycle)
       return
     }
 
-    const hasCurrentOption = downgradeOptions.some(([plan]) => plan === downgradeTargetPlan)
+    const hasCurrentOption = billingCycleOptions.some(([cycle]) => cycle === selectedBillingCycle)
     if (!hasCurrentOption) {
-      setDowngradeTargetPlan(downgradeOptions[0][0])
+      setSelectedBillingCycle(billingCycleOptions[0][0])
     }
-  }, [downgradeOptions, downgradeTargetPlan])
+  }, [billingCycleOptions, currentBillingCycle, selectedBillingCycle])
 
   async function loadProfile() {
     try {
@@ -225,13 +223,13 @@ export default function Profile() {
       const [paymentMethodResult, subscriptionResult, studentsResult] = await Promise.all([
         supabase
           .from('personal_payment_methods')
-          .select('provider, provider_customer_id, provider_card_id, provider_payment_profile_id, payment_method_id, issuer_id, brand, last_four, first_payment_provider_payment_id, updated_at')
+          .select('provider, provider_customer_id, provider_card_id, provider_payment_profile_id, provider_payment_method_token, provider_subscription_id, payment_method_id, issuer_id, brand, last_four, first_payment_provider_payment_id, updated_at')
           .eq('personal_id', resolvedPersonalAccountId)
           .eq('status', 'active')
           .maybeSingle<StoredPaymentMethodRow>(),
         supabase
           .from('personal_subscriptions')
-          .select('id, plan_slug, student_limit, billing_cycle, status, amount, next_billing_at, scheduled_plan_slug, scheduled_change_at')
+          .select('id, plan_slug, student_limit, billing_cycle, status, amount, next_billing_at, scheduled_plan_slug, scheduled_billing_cycle, scheduled_change_at')
           .eq('personal_id', resolvedPersonalAccountId)
           .maybeSingle<SubscriptionRow>(),
         supabase
@@ -341,44 +339,55 @@ export default function Profile() {
     }
   }
 
-  async function handleConfirmDowngrade() {
-    if (!downgradeTargetPlan) return
+  async function handleConfirmBillingCycleChange() {
+    if (!selectedBillingCycle) return
 
     try {
-      setDowngradeLoading(true)
+      setBillingCycleChangeLoading(true)
       setMsg('')
       setError('')
 
       const response = await requestSubscriptionDowngrade({
-        targetPlan: downgradeTargetPlan,
+        targetPlan: currentPlan,
+        targetBillingCycle: selectedBillingCycle,
       })
 
-      setDowngradeModalOpen(false)
-      setMsg(`Downgrade para o plano ${PLAN_LABELS[response.targetPlan] || response.targetPlan} agendado para ${formatDate(response.effectiveAt)}.`)
+      setBillingCycleModalOpen(false)
+      setShowBillingCycleOptions(false)
+      setMsg(
+        `Mudança do plano ${PLAN_LABELS[response.targetPlan] || response.targetPlan} para o ciclo ${BILLING_CYCLE_LABELS[response.targetBillingCycle] || response.targetBillingCycle} agendada para ${formatDate(response.effectiveAt)}. A cobrança será feita somente a partir dessa data.`,
+      )
       await loadProfile()
     } catch (err: any) {
       console.error(err)
-      setError(err.message || 'Não foi possível solicitar o downgrade do plano.')
+      setError(err.message || 'Não foi possível solicitar a troca de ciclo do plano.')
     } finally {
-      setDowngradeLoading(false)
+      setBillingCycleChangeLoading(false)
     }
   }
 
-  async function handleCancelDowngrade() {
+  async function handleCancelScheduledChange() {
+    const canceledCycleLabel = scheduledTargetBillingCycleLabel
+    const canceledPlanLabel = scheduledTargetPlanLabel
+
     try {
-      setCancelDowngradeLoading(true)
+      setCancelScheduledChangeLoading(true)
       setMsg('')
       setError('')
 
       const response = await cancelSubscriptionDowngrade()
-      setShowDowngradeOptions(false)
-      setMsg(`Downgrade para o plano ${PLAN_LABELS[response.canceledPlan] || response.canceledPlan} cancelado com sucesso.`)
+      setShowBillingCycleOptions(false)
+      setMsg(
+        canceledCycleLabel
+          ? `Mudança agendada do plano ${canceledPlanLabel} para o ciclo ${canceledCycleLabel} cancelada com sucesso.`
+          : `Mudança agendada do plano ${PLAN_LABELS[response.canceledPlan] || response.canceledPlan} cancelada com sucesso.`,
+      )
       await loadProfile()
     } catch (err: any) {
       console.error(err)
-      setError(err.message || 'Não foi possível cancelar o downgrade agendado.')
+      setError(err.message || 'Não foi possível cancelar a mudança agendada.')
     } finally {
-      setCancelDowngradeLoading(false)
+      setCancelScheduledChangeLoading(false)
     }
   }
 
@@ -419,6 +428,10 @@ export default function Profile() {
       setMsg('')
       setError('')
       setCopyPixMsg('')
+
+      if (isAsaasSubscriptionFlow && action !== 'pix') {
+        throw new Error('Esse perfil ja esta no fluxo Asaas. No painel, por enquanto, a regularizacao com cartao ainda esta em migracao. Use o PIX.')
+      }
 
       if (action === 'card-pay' && hasSavedPaymentMethod && savedPaymentMethodValidated) {
         setPaymentActionLoading('card')
@@ -630,12 +643,16 @@ export default function Profile() {
 
                 <div style={{ display: 'grid', gap: 6 }}>
                   <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
-                    {hasSavedPaymentMethod
+                    {isAsaasSubscriptionFlow && hasSavedPaymentMethod
+                      ? `Asaas vinculado${savedPaymentMethod?.lastFour ? ` final ${savedPaymentMethod.lastFour}` : ''}`
+                      : hasSavedPaymentMethod
                       ? `${formatSavedCardBrand(savedPaymentMethod?.brand)} final ${savedPaymentMethod?.lastFour || '****'}`
                       : 'Nenhum cartao cadastrado'}
                   </div>
                   <div style={{ fontSize: '0.9rem', color: '#475569' }}>
-                    {hasSavedPaymentMethod
+                    {isAsaasSubscriptionFlow
+                      ? 'Esse perfil ja esta usando o Asaas. O painel ja gera PIX e consulta status, mas o gerenciamento de cartao ainda esta sendo migrado.'
+                      : hasSavedPaymentMethod
                       ? 'Esse cartao fica salvo para tentativas manuais agora e para as proximas renovacoes automaticas.'
                       : 'Cadastre um cartao para manter o metodo de pagamento salvo e liberar a renovacao automatica.'}
                   </div>
@@ -648,6 +665,9 @@ export default function Profile() {
                       try {
                         setMsg('')
                         setError('')
+                        if (isAsaasSubscriptionFlow) {
+                          throw new Error('O gerenciamento de cartao do Asaas ainda esta sendo finalizado no painel.')
+                        }
                         await openCardForm('save-card')
                         setMsg(hasSavedPaymentMethod
                           ? 'Preencha o formulário abaixo para trocar o cartão cadastrado.'
@@ -657,13 +677,13 @@ export default function Profile() {
                         setError(err.message || 'Não foi possível abrir o formulário do cartão.')
                       }
                     }}
-                    disabled={paymentActionLoading !== null || removeSavedCardLoading}
-                    style={paymentActionLoading !== null || removeSavedCardLoading ? disabledActionButtonStyle : actionButtonStyle}
+                    disabled={paymentActionLoading !== null || removeSavedCardLoading || isAsaasSubscriptionFlow}
+                    style={paymentActionLoading !== null || removeSavedCardLoading || isAsaasSubscriptionFlow ? disabledActionButtonStyle : actionButtonStyle}
                   >
-                    {hasSavedPaymentMethod ? 'Trocar cartao' : 'Cadastrar cartao'}
+                    {isAsaasSubscriptionFlow ? 'Cartao em migracao' : hasSavedPaymentMethod ? 'Trocar cartao' : 'Cadastrar cartao'}
                   </button>
 
-                  {hasSavedPaymentMethod && (
+                  {hasSavedPaymentMethod && !isAsaasSubscriptionFlow && (
                     <button
                       type="button"
                       onClick={() => setRemoveSavedCardModalOpen(true)}
@@ -679,7 +699,7 @@ export default function Profile() {
                   )}
                 </div>
 
-                {showCardForm && cardFormMode === 'save-card' && (
+                {!isAsaasSubscriptionFlow && showCardForm && cardFormMode === 'save-card' && (
                   mercadoPagoPublicKey ? (
                     <MercadoPagoCardForm
                       publicKey={mercadoPagoPublicKey}
@@ -713,12 +733,12 @@ export default function Profile() {
                 <div style={{ fontWeight: 700, color: '#0f172a' }}>Regularizacao do pagamento</div>
 
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  <button type="button" onClick={() => handleGenerateRegularizationPayment('card-pay')} disabled={paymentActionLoading !== null} style={paymentActionLoading !== null ? disabledActionButtonStyle : actionButtonStyle}>
-                    {paymentActionLoading === 'card' ? 'Processando...' : hasSavedPaymentMethod ? (savedPaymentMethodValidated ? 'Pagar com cartao salvo' : 'Validar cartao salvo') : 'Pagar com cartao'}
+                  <button type="button" onClick={() => handleGenerateRegularizationPayment('card-pay')} disabled={paymentActionLoading !== null || isAsaasSubscriptionFlow} style={paymentActionLoading !== null || isAsaasSubscriptionFlow ? disabledActionButtonStyle : actionButtonStyle}>
+                    {isAsaasSubscriptionFlow ? 'Cartao em migracao' : paymentActionLoading === 'card' ? 'Processando...' : hasSavedPaymentMethod ? (savedPaymentMethodValidated ? 'Pagar com cartao salvo' : 'Validar cartao salvo') : 'Pagar com cartao'}
                   </button>
 
-                  <button type="button" onClick={() => handleGenerateRegularizationPayment('card-change')} disabled={paymentActionLoading !== null} style={paymentActionLoading !== null ? disabledActionButtonStyle : actionButtonStyle}>
-                    {paymentActionLoading === 'card' ? 'Processando...' : hasSavedPaymentMethod ? 'Trocar cartao salvo' : 'Cadastrar cartao'}
+                  <button type="button" onClick={() => handleGenerateRegularizationPayment('card-change')} disabled={paymentActionLoading !== null || isAsaasSubscriptionFlow} style={paymentActionLoading !== null || isAsaasSubscriptionFlow ? disabledActionButtonStyle : actionButtonStyle}>
+                    {isAsaasSubscriptionFlow ? 'Cartao em migracao' : paymentActionLoading === 'card' ? 'Processando...' : hasSavedPaymentMethod ? 'Trocar cartao salvo' : 'Cadastrar cartao'}
                   </button>
 
                   <button type="button" onClick={() => handleGenerateRegularizationPayment('pix')} disabled={paymentActionLoading !== null} style={paymentActionLoading !== null ? disabledActionButtonStyle : actionButtonStyle}>
@@ -748,6 +768,12 @@ export default function Profile() {
                 {msg && (
                   <div style={inlineSuccessStyle}>
                     {msg}
+                  </div>
+                )}
+
+                {isAsaasSubscriptionFlow && (
+                  <div style={downgradeWarningStyle}>
+                    Esse perfil ja esta usando Asaas. Aqui no painel ja liberamos PIX e consulta de status, mas o pagamento embutido com cartao ainda esta em migracao.
                   </div>
                 )}
 
@@ -819,7 +845,7 @@ export default function Profile() {
                   </>
                 ) : null}
 
-                {showCardForm && cardFormMode === 'regularization' && (
+                {!isAsaasSubscriptionFlow && showCardForm && cardFormMode === 'regularization' && (
                   mercadoPagoPublicKey ? (
                     <MercadoPagoCardForm
                       publicKey={mercadoPagoPublicKey}
@@ -843,86 +869,97 @@ export default function Profile() {
               </div>
             )}
 
-            {subscription?.scheduled_plan_slug && (
+            {hasScheduledChange && (
               <div style={scheduledChangeBoxStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Downgrade agendado</div>
+                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Mudança agendada</div>
                   <button
                     type="button"
-                    onClick={handleCancelDowngrade}
-                    disabled={cancelDowngradeLoading}
-                    style={cancelDowngradeLoading ? disabledActionButtonStyle : actionButtonStyle}
+                    onClick={handleCancelScheduledChange}
+                    disabled={cancelScheduledChangeLoading}
+                    style={cancelScheduledChangeLoading ? disabledActionButtonStyle : actionButtonStyle}
                   >
-                    {cancelDowngradeLoading ? 'Cancelando...' : 'Cancelar downgrade'}
+                    {cancelScheduledChangeLoading ? 'Cancelando...' : 'Cancelar agendamento'}
                   </button>
                 </div>
                 <div style={{ fontSize: '0.92rem', color: '#475569' }}>
-                  Seu plano será alterado para {PLAN_LABELS[subscription.scheduled_plan_slug] || subscription.scheduled_plan_slug} em {subscription.scheduled_change_at ? formatDate(subscription.scheduled_change_at) : 'data a confirmar'}.
+                  {scheduledTargetBillingCycleLabel
+                    ? `Seu plano ${currentPlanLabel} continuará no ciclo ${currentBillingCycleLabel} até ${subscription?.scheduled_change_at ? formatDate(subscription.scheduled_change_at) : 'a próxima cobrança'}. Depois disso, ele passará para o ciclo ${scheduledTargetBillingCycleLabel} e a nova cobrança será feita a partir dessa data.`
+                    : `Seu plano será alterado para ${scheduledTargetPlanLabel} em ${subscription?.scheduled_change_at ? formatDate(subscription.scheduled_change_at) : 'data a confirmar'}.`}
                 </div>
               </div>
             )}
 
             <div style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', display: 'grid', gap: 10 }}>
-              <div style={{ fontWeight: 600, color: '#0f172a' }}>Ações do plano</div>
+              <div style={{ fontWeight: 600, color: '#0f172a' }}>Trocar ciclo do plano</div>
               <div style={{ fontSize: '0.9rem' }}>
-                Ajustes de plano e regularização de pagamento ficam centralizados por aqui.
+                Seu plano atual é {currentPlanLabel} no ciclo {currentBillingCycleLabel}. Escolha abaixo para qual dos outros ciclos você deseja migrar no próximo vencimento.
               </div>
 
-              {canDowngrade && downgradeOptions.length > 0 && (
+              {hasScheduledChange && (
+                <div style={{ fontSize: '0.9rem', color: '#1d4ed8' }}>
+                  Existe uma mudança agendada. Se quiser escolher outro ciclo, primeiro cancele o agendamento atual.
+                </div>
+              )}
+
+              {!canManageBillingCycle && (
+                <div style={{ fontSize: '0.9rem', color: '#475569' }}>
+                  A troca de ciclo fica disponível quando você estiver em um plano pago.
+                </div>
+              )}
+
+              {canScheduleBillingCycleChange && billingCycleOptions.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setShowDowngradeOptions(current => !current)}
+                  onClick={() => setShowBillingCycleOptions(current => !current)}
                   style={ghostButtonStyle}
                 >
-                  {showDowngradeOptions ? 'Ocultar opções de downgrade' : 'Ver opções de downgrade'}
+                  {showBillingCycleOptions ? 'Ocultar opções de ciclo' : 'Ver opções de ciclo'}
                 </button>
               )}
 
-              {canDowngrade && downgradeOptions.length > 0 && showDowngradeOptions && (
+              {canScheduleBillingCycleChange && billingCycleOptions.length > 0 && showBillingCycleOptions && (
                 <div style={{ display: 'grid', gap: 12, padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff' }}>
                   <label style={{ display: 'grid', gap: 8 }}>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Plano para downgrade</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Novo ciclo do plano</span>
                     <select
-                      value={downgradeTargetPlan}
-                      onChange={e => setDowngradeTargetPlan(e.target.value)}
+                      value={selectedBillingCycle || ''}
+                      onChange={e => setSelectedBillingCycle(normalizeBillingCycle(e.target.value))}
                       style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff' }}
                     >
-                      {downgradeOptions.map(([plan, config]) => (
-                        <option key={plan} value={plan}>
-                          {config.label} - até {config.studentLimit >= 999999 ? 'alunos ilimitados' : `${config.studentLimit} alunos ativos`}
+                      {billingCycleOptions.map(([cycle, label]) => (
+                        <option key={cycle} value={cycle}>
+                          {label}
                         </option>
                       ))}
                     </select>
                   </label>
 
-                  {selectedDowngradeConfig && (
+                  {selectedBillingCycleLabel && (
                     <div style={{ fontSize: '0.9rem', color: '#475569' }}>
-                      O plano {selectedDowngradeConfig.label} permite até {selectedDowngradeConfig.studentLimit >= 999999 ? 'alunos ilimitados' : `${selectedDowngradeConfig.studentLimit} alunos ativos`}.
+                      Você continuará no plano {currentPlanLabel}. Apenas o ciclo será alterado de {currentBillingCycleLabel} para {selectedBillingCycleLabel}.
                     </div>
                   )}
 
-                  {studentsToInactivate > 0 && (
-                    <div style={downgradeWarningStyle}>
-                      Para seguir com esse downgrade, você precisa inativar {studentsToInactivate} aluno{studentsToInactivate > 1 ? 's' : ''} antes.
-                    </div>
-                  )}
+                  <div style={downgradeWarningStyle}>
+                    A nova cobrança só será feita após o fim do ciclo atual, em {subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'sua próxima cobrança'}.
+                  </div>
                 </div>
               )}
 
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                {canUpgrade && <button type="button" disabled style={secondaryButtonStyle}>Fazer upgrade</button>}
-                {canDowngrade && showDowngradeOptions && (
+                {canScheduleBillingCycleChange && showBillingCycleOptions && (
                   <button
                     type="button"
-                    onClick={() => setDowngradeModalOpen(true)}
-                    disabled={!downgradeTargetPlan || studentsToInactivate > 0 || downgradeLoading}
+                    onClick={() => setBillingCycleModalOpen(true)}
+                    disabled={!selectedBillingCycle || billingCycleChangeLoading}
                     style={{
-                      ...subtleDangerButtonStyle,
-                      opacity: !downgradeTargetPlan || studentsToInactivate > 0 || downgradeLoading ? 0.7 : 1,
-                      cursor: !downgradeTargetPlan || studentsToInactivate > 0 || downgradeLoading ? 'not-allowed' : 'pointer',
+                      ...actionButtonStyle,
+                      opacity: !selectedBillingCycle || billingCycleChangeLoading ? 0.7 : 1,
+                      cursor: !selectedBillingCycle || billingCycleChangeLoading ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    {downgradeLoading ? 'Solicitando...' : 'Confirmar downgrade'}
+                    {billingCycleChangeLoading ? 'Agendando...' : 'Confirmar troca de ciclo'}
                   </button>
                 )}
               </div>
@@ -951,21 +988,20 @@ export default function Profile() {
       </div>
 
       <ConfirmModal
-        isOpen={downgradeModalOpen}
-        title="Confirmar downgrade do plano"
-        description={selectedDowngradeConfig
-          ? `Deseja mesmo regredir seu plano para ${selectedDowngradeConfig.label}? Lembrando que você irá perder funcionalidades do plano atual e a mudança será aplicada na próxima cobrança.`
-          : 'Deseja mesmo regredir seu plano?'}
-        cancelText="Não, manter meu plano"
-        confirmText={downgradeLoading ? 'Solicitando...' : 'Sim, solicitar downgrade'}
+        isOpen={billingCycleModalOpen}
+        title="Confirmar troca de ciclo"
+        description={selectedBillingCycleLabel
+          ? `Você confirma a mudança do plano ${currentPlanLabel} do ciclo ${currentBillingCycleLabel} para ${selectedBillingCycleLabel}? Lembrando que essa mudança e a nova cobrança só serão aplicadas após o fim do ciclo atual, em ${subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'sua próxima cobrança'}.`
+          : 'Deseja confirmar a troca de ciclo do plano?'}
+        cancelText="Não, manter ciclo atual"
+        confirmText={billingCycleChangeLoading ? 'Agendando...' : 'Sim, agendar troca'}
         onCancel={() => {
-          if (!downgradeLoading) setDowngradeModalOpen(false)
+          if (!billingCycleChangeLoading) setBillingCycleModalOpen(false)
         }}
-        onConfirm={handleConfirmDowngrade}
-        isDanger
+        onConfirm={handleConfirmBillingCycleChange}
         stackActions
-        cancelDisabled={downgradeLoading}
-        confirmDisabled={downgradeLoading}
+        cancelDisabled={billingCycleChangeLoading}
+        confirmDisabled={billingCycleChangeLoading}
       />
 
       <ConfirmModal
@@ -1000,17 +1036,6 @@ function InfoCard({ label, value, tone = 'default' }: { label: string; value: st
       <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.color }}>{value}</div>
     </div>
   )
-}
-
-const secondaryButtonStyle: CSSProperties = {
-  padding: '10px 16px',
-  borderRadius: 8,
-  border: '1px solid #cbd5e1',
-  background: '#fff',
-  color: '#64748b',
-  fontWeight: 600,
-  cursor: 'not-allowed',
-  opacity: 0.75,
 }
 
 const ghostButtonStyle: CSSProperties = {
@@ -1193,6 +1218,7 @@ function buildLegacySubscription(data: unknown): SubscriptionRow | null {
     amount: null,
     next_billing_at: typeof saas.nextBillingAt === 'string' ? saas.nextBillingAt : null,
     scheduled_plan_slug: null,
+    scheduled_billing_cycle: null,
     scheduled_change_at: null,
   }
 }
@@ -1203,23 +1229,38 @@ function extractSavedPaymentMethod(data: unknown): SavedPaymentMethod | null {
   const paymentMethod = (data as { paymentMethod?: Record<string, unknown> }).paymentMethod
   if (!paymentMethod || typeof paymentMethod !== 'object') return null
 
+  const provider = typeof paymentMethod.provider === 'string' && paymentMethod.provider === 'asaas' ? 'asaas' : 'mercadopago'
   const providerCustomerId = typeof paymentMethod.providerCustomerId === 'string' ? paymentMethod.providerCustomerId : ''
   const providerCardId = typeof paymentMethod.providerCardId === 'string' ? paymentMethod.providerCardId : ''
   const providerPaymentProfileId = typeof paymentMethod.providerPaymentProfileId === 'string'
     ? paymentMethod.providerPaymentProfileId
     : ''
+  const providerPaymentMethodToken = typeof paymentMethod.providerPaymentMethodToken === 'string'
+    ? paymentMethod.providerPaymentMethodToken
+    : null
+  const providerSubscriptionId = typeof paymentMethod.providerSubscriptionId === 'string'
+    ? paymentMethod.providerSubscriptionId
+    : null
+  const brand = typeof paymentMethod.brand === 'string' ? paymentMethod.brand : null
+  const lastFour = typeof paymentMethod.lastFour === 'string' ? paymentMethod.lastFour : null
 
-  if (!providerCustomerId || (!providerCardId && !providerPaymentProfileId)) return null
+  const hasReusableMethod = provider === 'asaas'
+    ? Boolean(providerSubscriptionId || providerPaymentMethodToken || brand || lastFour)
+    : Boolean(providerCardId || providerPaymentProfileId)
+
+  if (!providerCustomerId || !hasReusableMethod) return null
 
   return {
-    provider: 'mercadopago',
+    provider,
     providerCustomerId,
     providerCardId: providerCardId || null,
     providerPaymentProfileId: providerPaymentProfileId || null,
+    providerPaymentMethodToken,
+    providerSubscriptionId,
     paymentMethodId: typeof paymentMethod.paymentMethodId === 'string' ? paymentMethod.paymentMethodId : null,
     issuerId: typeof paymentMethod.issuerId === 'string' ? paymentMethod.issuerId : null,
-    brand: typeof paymentMethod.brand === 'string' ? paymentMethod.brand : null,
-    lastFour: typeof paymentMethod.lastFour === 'string' ? paymentMethod.lastFour : null,
+    brand,
+    lastFour,
     firstPaymentProviderPaymentId: typeof paymentMethod.firstPaymentProviderPaymentId === 'string' ? paymentMethod.firstPaymentProviderPaymentId : null,
     updatedAt: typeof paymentMethod.updatedAt === 'string' ? paymentMethod.updatedAt : null,
   }
@@ -1228,23 +1269,38 @@ function extractSavedPaymentMethod(data: unknown): SavedPaymentMethod | null {
 function mapStoredPaymentMethod(row: StoredPaymentMethodRow | null | undefined): SavedPaymentMethod | null {
   if (!row) return null
 
+  const provider = row.provider === 'asaas' ? 'asaas' : 'mercadopago'
   const providerCustomerId = typeof row.provider_customer_id === 'string' ? row.provider_customer_id : ''
   const providerCardId = typeof row.provider_card_id === 'string' ? row.provider_card_id : ''
   const providerPaymentProfileId = typeof row.provider_payment_profile_id === 'string'
     ? row.provider_payment_profile_id
     : ''
+  const providerPaymentMethodToken = typeof row.provider_payment_method_token === 'string'
+    ? row.provider_payment_method_token
+    : null
+  const providerSubscriptionId = typeof row.provider_subscription_id === 'string'
+    ? row.provider_subscription_id
+    : null
+  const brand = typeof row.brand === 'string' ? row.brand : null
+  const lastFour = typeof row.last_four === 'string' ? row.last_four : null
 
-  if (!providerCustomerId || (!providerCardId && !providerPaymentProfileId)) return null
+  const hasReusableMethod = provider === 'asaas'
+    ? Boolean(providerSubscriptionId || providerPaymentMethodToken || brand || lastFour)
+    : Boolean(providerCardId || providerPaymentProfileId)
+
+  if (!providerCustomerId || !hasReusableMethod) return null
 
   return {
-    provider: 'mercadopago',
+    provider,
     providerCustomerId,
     providerCardId: providerCardId || null,
     providerPaymentProfileId: providerPaymentProfileId || null,
+    providerPaymentMethodToken,
+    providerSubscriptionId,
     paymentMethodId: typeof row.payment_method_id === 'string' ? row.payment_method_id : null,
     issuerId: typeof row.issuer_id === 'string' ? row.issuer_id : null,
-    brand: typeof row.brand === 'string' ? row.brand : null,
-    lastFour: typeof row.last_four === 'string' ? row.last_four : null,
+    brand,
+    lastFour,
     firstPaymentProviderPaymentId: typeof row.first_payment_provider_payment_id === 'string' ? row.first_payment_provider_payment_id : null,
     updatedAt: typeof row.updated_at === 'string' ? row.updated_at : null,
   }
@@ -1277,6 +1333,8 @@ function extractPaymentActionData(rawPayload: Record<string, unknown> | null | u
     'checkoutUrl',
     'ticket_url',
     'ticketUrl',
+    'invoice_url',
+    'invoiceUrl',
     'init_point',
     'sandbox_init_point',
     'payment_url',
@@ -1290,6 +1348,7 @@ function extractPaymentActionData(rawPayload: Record<string, unknown> | null | u
     'qrCode',
     'qr_code_text',
     'qrCodeText',
+    'payload',
     'copy_paste',
     'copyPaste',
   ])
@@ -1297,11 +1356,16 @@ function extractPaymentActionData(rawPayload: Record<string, unknown> | null | u
   const qrCodeBase64 = findNestedString(rawPayload, [
     'qr_code_base64',
     'qrCodeBase64',
+    'encodedImage',
   ])
 
   const ticketUrl = findNestedString(rawPayload, [
     'ticket_url',
     'ticketUrl',
+    'invoice_url',
+    'invoiceUrl',
+    'bank_slip_url',
+    'bankSlipUrl',
   ])
 
   return { checkoutUrl, pixCode, qrCodeBase64, ticketUrl }

@@ -2,14 +2,19 @@ import { supabase } from './supabase'
 
 type RequestDowngradeInput = {
   targetPlan: string
+  targetBillingCycle?: 'monthly' | 'quarterly' | 'yearly'
 }
 
 type RequestDowngradeResponse = {
   success: boolean
   currentPlan: string
+  currentBillingCycle: 'monthly' | 'quarterly' | 'yearly'
   targetPlan: string
+  targetBillingCycle: 'monthly' | 'quarterly' | 'yearly'
+  targetAmount: number
   targetStudentLimit: number
   activeStudents: number
+  changeType: 'plan_change' | 'billing_cycle_change' | 'plan_and_billing_cycle_change'
   effectiveAt: string
 }
 
@@ -111,11 +116,11 @@ export async function requestSubscriptionDowngrade(input: RequestDowngradeInput)
   })
 
   if (error) {
-    throw new Error(await extractFunctionErrorMessage(error, 'Não foi possível solicitar o downgrade do plano.'))
+    throw new Error(await extractFunctionErrorMessage(error, 'Não foi possível solicitar a mudança do plano.'))
   }
 
   if (data?.error) throw new Error(data.error)
-  if (!data?.success) throw new Error('Resposta inválida ao solicitar downgrade.')
+  if (!data?.success) throw new Error('Resposta inválida ao solicitar a mudança do plano.')
 
   return data as RequestDowngradeResponse
 }
@@ -128,11 +133,11 @@ export async function cancelSubscriptionDowngrade(): Promise<CancelDowngradeResp
   })
 
   if (error) {
-    throw new Error(await extractFunctionErrorMessage(error, 'Não foi possível cancelar o downgrade agendado.'))
+    throw new Error(await extractFunctionErrorMessage(error, 'Não foi possível cancelar a mudança agendada.'))
   }
 
   if (data?.error) throw new Error(data.error)
-  if (!data?.success) throw new Error('Resposta inválida ao cancelar o downgrade.')
+  if (!data?.success) throw new Error('Resposta inválida ao cancelar a mudança agendada.')
 
   return data as CancelDowngradeResponse
 }
