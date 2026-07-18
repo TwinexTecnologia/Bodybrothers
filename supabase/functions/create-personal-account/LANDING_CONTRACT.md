@@ -33,8 +33,8 @@ Usado quando o plano for `free`.
 
 Usado quando o pagamento ja foi aprovado na landing e a landing tambem recebeu os dados do metodo recorrente.
 
-Para recorrencia sem CVV via Orders API, o campo recomendado e `providerPaymentProfileId`.
-Os campos antigos com `providerCardId` continuam aceitos por compatibilidade, mas nao sao o formato alvo da migracao.
+O provider alvo agora e `asaas`.
+O payload legado de `mercadopago` continua aceito temporariamente por compatibilidade, mas o formato recomendado para novas contas e o do Asaas.
 
 ```json
 {
@@ -47,24 +47,21 @@ Os campos antigos com `providerCardId` continuam aceitos por compatibilidade, ma
   "plan": "starter",
   "billingCycle": "monthly",
   "paymentStatus": "approved",
-  "paymentProvider": "mercadopago",
-  "paymentId": "166424321888",
+  "paymentProvider": "asaas",
+  "paymentId": "pay_123456",
   "paymentAmount": 14.90,
   "paymentCurrency": "BRL",
-  "providerReference": "landing_starter_20260630_001",
+  "providerReference": "landing_starter_20260714_001",
   "paymentDescription": "Assinatura FitBody Starter",
-  "providerCustomerId": "123456789-abcd",
-  "providerPaymentProfileId": "profile_abc123",
-  "providerCardId": "abcdef123456",
-  "paymentMethodId": "master",
-  "issuerId": "1234",
-  "cardBrand": "Mastercard",
+  "providerCustomerId": "cus_000001",
+  "providerSubscriptionId": "sub_000001",
+  "providerPaymentMethodToken": "a9a4d7c4-1234-5678-9abc-1234567890ab",
+  "cardBrand": "Visa",
   "cardLastFour": "0406",
-  "firstPaymentProviderPaymentId": "166424321888",
-  "providerSubscriptionId": "sub_optional_123",
+  "firstPaymentProviderPaymentId": "pay_123456",
   "paymentRawPayload": {
-    "id": 166424321888,
-    "status": "approved"
+    "id": "pay_123456",
+    "status": "RECEIVED"
   }
 }
 ```
@@ -72,25 +69,31 @@ Os campos antigos com `providerCardId` continuam aceitos por compatibilidade, ma
 ## Campos aceitos para recorrencia
 
 - `providerCustomerId`
+- `providerSubscriptionId`
+- `providerPaymentMethodToken`
+- `cardBrand`
+- `cardLastFour`
+- `firstPaymentProviderPaymentId`
+- `paymentRawPayload`
+
+## Campos legados ainda aceitos
+
 - `providerPaymentProfileId`
 - `providerCardId`
 - `paymentMethodId`
 - `issuerId`
-- `cardBrand`
-- `cardLastFour`
-- `firstPaymentProviderPaymentId`
-- `providerSubscriptionId`
-- `paymentRawPayload`
 
 ## Regras atuais
 
-- Plano pago via landing exige `paymentStatus = "approved"`.
+- Plano pago via landing exige status de pagamento aprovado pelo provider.
+- Para Asaas, os status equivalentes aceitos pelo backend sao `RECEIVED`, `CONFIRMED` e `RECEIVED_IN_CASH`.
+- Para Mercado Pago, o status aceito continua sendo `approved`.
 - Plano pago via landing exige `paymentProvider` e `paymentId`.
 - A API aceita dois formatos de recorrencia:
-- Formato novo recomendado: `providerCustomerId + providerPaymentProfileId + paymentId`.
-- Formato legado de compatibilidade: `providerCustomerId + providerCardId + paymentMethodId + paymentId`.
+- Formato novo recomendado para Asaas: `providerCustomerId + providerSubscriptionId + paymentId`.
+- Formato legado de compatibilidade do Mercado Pago: `providerCustomerId + providerPaymentProfileId + paymentId` ou `providerCustomerId + providerCardId + paymentMethodId + paymentId`.
 - Sem esses dados, a resposta volta com `recurringReady = false`.
-- A resposta tambem informa `ordersApiReady` e `missingOrdersApiFields` para deixar claro se a landing ja esta pronta para a migracao estrutural da Orders API.
+- A resposta tambem informa `asaasReady` e `missingAsaasFields` para deixar claro se a landing ja esta pronta para o fluxo nativo do Asaas.
 
 ## Resposta relevante
 
@@ -106,9 +109,11 @@ Os campos antigos com `providerCardId` continuam aceitos por compatibilidade, ma
   "paymentRequired": true,
   "subscriptionStatus": "active",
   "recurringReady": true,
-  "ordersApiReady": true,
+  "asaasReady": true,
+  "ordersApiReady": false,
   "paymentMethodStored": true,
   "missingRecurringFields": [],
+  "missingAsaasFields": [],
   "missingOrdersApiFields": []
 }
 ```
@@ -123,6 +128,7 @@ Os campos antigos com `providerCardId` continuam aceitos por compatibilidade, ma
 
 ## Observacao para o dev da landing
 
-- Se a landing ja estiver usando Orders API / Automatic Payments, envie `providerPaymentProfileId`.
-- Se a landing ainda estiver no fluxo antigo com customer + card, a API continua aceitando temporariamente esse payload legado.
-- Para renovacao automatica sem CVV, o payload alvo e o da Orders API com `providerPaymentProfileId`.
+- Para novas contas pagas, envie `paymentProvider = "asaas"`.
+- O minimo para recorrencia pronta no Asaas e: `providerCustomerId`, `providerSubscriptionId` e `paymentId`.
+- Se houver `providerPaymentMethodToken` e dados do cartao (`cardBrand`, `cardLastFour`), a API tambem persiste essas informacoes para compatibilidade de exibicao e futuras acoes.
+- O payload antigo do Mercado Pago continua aceito temporariamente apenas para nao quebrar cadastros antigos enquanto a migracao total nao termina.
