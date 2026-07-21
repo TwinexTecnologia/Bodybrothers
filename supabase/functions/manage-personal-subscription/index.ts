@@ -85,6 +85,27 @@ type CardTokenPaymentInput = {
   identificationNumber: string;
 };
 
+type AsaasCardUpdateInput = {
+  creditCard: {
+    holderName: string;
+    number: string;
+    expiryMonth: string;
+    expiryYear: string;
+    ccv: string;
+  };
+  creditCardHolderInfo: {
+    name: string;
+    email: string;
+    cpfCnpj: string;
+    postalCode: string;
+    addressNumber: string;
+    addressComplement: string | null;
+    phone: string | null;
+    mobilePhone: string | null;
+  };
+  remoteIp: string;
+};
+
 type SavedPaymentMethod = {
   provider: "mercadopago" | "asaas";
   providerCustomerId: string;
@@ -98,6 +119,22 @@ type SavedPaymentMethod = {
   lastFour: string | null;
   firstPaymentProviderPaymentId: string | null;
   updatedAt: string;
+};
+
+type PersonalPaymentMethodRow = {
+  provider: string | null;
+  provider_customer_id: string | null;
+  provider_card_id: string | null;
+  provider_payment_profile_id: string | null;
+  provider_payment_method_token: string | null;
+  provider_subscription_id: string | null;
+  payment_method_id: string | null;
+  issuer_id: string | null;
+  brand: string | null;
+  last_four: string | null;
+  first_payment_provider_payment_id: string | null;
+  updated_at: string | null;
+  raw_payload?: Record<string, unknown> | null;
 };
 
 serve(async (req) => {
@@ -211,6 +248,7 @@ serve(async (req) => {
 
     if (action === "save_card_token") {
       return await handleSaveCardToken({
+        req,
         supabase,
         requesterId: requesterUser.id,
         requesterRole: requesterProfile.role ?? "",
@@ -919,7 +957,83 @@ async function handleChargeSavedCard({
     body,
   });
   if (paymentProvider === "asaas") {
-    throw new Error("A cobranca automatica com cartao salvo ainda nao foi migrada para o Asaas no painel. Use o PIX/manual por enquanto.");
+    if (!["blocked", "past_due"].includes(normalizePlan(subscription.status || ""))) {
+      throw new Error("O pagamento com cartao salvo so pode ser usado quando a assinatura estiver vencida ou em atraso.");
+    }
+
+    const paymentMethodRow = await getActivePersonalPaymentMethodRow({
+      supabase,
+      personalId,
+    });
+    const asaasContext = extractAsaasStoredPaymentContext({
+      paymentMethodRow,
+      savedPaymentMethod: existingMethod,
+    });
+    if (!existingMethod?.providerCustomerId || !asaasContext.creditCardToken) {
+      throw new Error("Nao foi possivel identificar o cartao salvo para pagar a cobranca vencida.");
+    }
+    if (!asaasContext.remoteIp) {
+      throw new Error("Nao foi possivel identificar o contexto de tokenizacao do cartao salvo.");
+    }
+
+    const config = getAsaasConfig();
+    const payablePayment = await resolveOpenAsaasPaymentForSavedCard({
+      supabase,
+      subscription,
+      config,
+    });
+    const chargedGatewayPayment = await payAsaasPaymentWithSavedCard({
+      paymentId: payablePayment.providerPaymentId,
+      creditCardToken: asaasContext.creditCardToken,
+      remoteIp: asaasContext.remoteIp,
+      creditCardHolderInfo: asaasContext.creditCardHolderInfo,
+      config,
+    });
+    const normalizedStatus = normalizeAsaasPaymentStatus(
+      getString(chargedGatewayPayment, ["status"]) || "PENDING",
+    );
+    const paidAt = resolveAsaasPaidAt(chargedGatewayPayment);
+    const dueAt = resolveAsaasDueAt(chargedGatewayPayment) || payablePayment.localPayment.due_at;
+
+    const { data: updatedPayment, error: paymentUpdateError } = await supabase
+      .from("subscription_payments")
+      .update({
+        status: normalizedStatus,
+        provider: "asaas",
+        provider_payment_id: payablePayment.providerPaymentId,
+        paid_at: normalizedStatus === "approved" ? paidAt || new Date().toISOString() : null,
+        due_at: dueAt || null,
+        raw_payload: chargedGatewayPayment,
+      })
+      .eq("id", payablePayment.localPayment.id)
+      .select("*")
+      .single<SubscriptionPaymentRow>();
+
+    if (paymentUpdateError || !updatedPayment) {
+      throw paymentUpdateError ?? new Error("Nao foi possivel atualizar a cobranca paga com cartao salvo.");
+    }
+
+    await syncSubscriptionWithPayment({
+      supabase,
+      subscription,
+      payment: updatedPayment,
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        action: "charge_saved_card",
+        paymentId: updatedPayment.id,
+        providerPaymentId: updatedPayment.provider_payment_id,
+        status: updatedPayment.status,
+        approved: updatedPayment.status === "approved",
+        statusDetail: getString(chargedGatewayPayment, ["status"]) || null,
+        payment: updatedPayment,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
   if (!existingMethod?.providerCustomerId || (!existingMethod.providerCardId && !existingMethod.providerPaymentProfileId)) {
     throw new Error("Nenhum cartão salvo foi encontrado para este perfil.");
@@ -1049,11 +1163,13 @@ async function handleChargeSavedCard({
 }
 
 async function handleSaveCardToken({
+  req,
   supabase,
   requesterId,
   requesterRole,
   body,
 }: {
+  req: Request;
   supabase: ReturnType<typeof createClient>;
   requesterId: string;
   requesterRole: string;
@@ -1063,7 +1179,6 @@ async function handleSaveCardToken({
     ? getString(body, ["personalId"]) || requesterId
     : requesterId;
 
-  const cardInput = parseCardTokenPaymentInput(body);
   const { subscription, personalProfile } = await getSubscriptionContext({
     supabase,
     personalId,
@@ -1073,22 +1188,129 @@ async function handleSaveCardToken({
     throw new Error("Somente planos pagos podem cadastrar cartão.");
   }
 
+  const existingMethod = extractSavedPaymentMethod(personalProfile.data);
   const paymentProvider = resolveSubscriptionPaymentProvider({
     subscription,
-    savedPaymentMethod: extractSavedPaymentMethod(personalProfile.data),
+    savedPaymentMethod: existingMethod,
     body,
   });
   if (paymentProvider === "asaas") {
-    throw new Error("O cadastro de cartao no painel ainda esta no fluxo antigo do Mercado Pago. Para Asaas, vamos concluir esse trecho no proximo passo.");
+    const providerCustomerId = existingMethod?.providerCustomerId?.trim() || "";
+    const providerSubscriptionId = subscription.provider_subscription_id?.trim() ||
+      existingMethod?.providerSubscriptionId?.trim() ||
+      "";
+
+    if (!providerCustomerId) {
+      throw new Error("Nao foi possivel identificar o cliente da assinatura para atualizar o cartao.");
+    }
+
+    if (!providerSubscriptionId) {
+      throw new Error("Nao foi possivel identificar a assinatura ativa para atualizar o cartao.");
+    }
+
+    const asaasInput = parseAsaasCardUpdateInput({
+      body,
+      req,
+      fallbackEmail: normalizeEmail(personalProfile.email || ""),
+    });
+    const config = getAsaasConfig();
+    const tokenizationResponse = await tokenizeAsaasCreditCard({
+      customerId: providerCustomerId,
+      cardInput: asaasInput,
+      config,
+    });
+    const creditCardToken = getString(tokenizationResponse, [
+      "creditCardToken",
+      "credit_card_token",
+      "token",
+    ]);
+
+    if (!creditCardToken) {
+      throw new Error("O Asaas nao retornou o token do novo cartao.");
+    }
+
+    const updateResponse = await updateAsaasSubscriptionCreditCard({
+      subscriptionId: providerSubscriptionId,
+      cardInput: {
+        ...asaasInput,
+        creditCardToken,
+      },
+      config,
+    });
+    const brand = getString(tokenizationResponse, [
+      "creditCardBrand",
+      "creditCardBrandCode",
+      "brand",
+      "paymentMethodId",
+    ]) || detectCardBrand(asaasInput.creditCard.number) || existingMethod?.brand || null;
+    const lastFour = getString(tokenizationResponse, [
+      "creditCardNumberLastFour",
+      "lastFour",
+      "last4",
+      "last_four",
+    ]) || asaasInput.creditCard.number.slice(-4) || existingMethod?.lastFour || null;
+    const savedPaymentMethod: SavedPaymentMethod = {
+      provider: "asaas",
+      providerCustomerId,
+      providerCardId: null,
+      providerPaymentProfileId: null,
+      providerPaymentMethodToken: creditCardToken,
+      providerSubscriptionId,
+      paymentMethodId: brand,
+      issuerId: null,
+      brand,
+      lastFour,
+      firstPaymentProviderPaymentId: existingMethod?.firstPaymentProviderPaymentId || null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await upsertPersonalPaymentMethod({
+      supabase,
+      personalId,
+      paymentMethod: savedPaymentMethod,
+      providerSubscriptionId,
+      rawPayload: buildSafeAsaasPaymentMethodRawPayload({
+        providerCustomerId,
+        providerSubscriptionId,
+        remoteIp: asaasInput.remoteIp,
+        creditCardToken,
+        creditCardHolderInfo: asaasInput.creditCardHolderInfo,
+        tokenizationResponse,
+        subscriptionCreditCardUpdate: updateResponse,
+        brand,
+        lastFour,
+      }),
+    });
+    await savePaymentMethodToProfile({
+      supabase,
+      personalId,
+      currentData: personalProfile.data,
+      paymentMethod: savedPaymentMethod,
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        action: "save_card_token",
+        provider: savedPaymentMethod.provider,
+        providerCustomerId: savedPaymentMethod.providerCustomerId,
+        providerPaymentMethodToken: savedPaymentMethod.providerPaymentMethodToken,
+        brand: savedPaymentMethod.brand,
+        lastFour: savedPaymentMethod.lastFour,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 
+  const cardInput = parseCardTokenPaymentInput(body);
   const email = normalizeEmail(personalProfile.email || "");
   if (!email) {
     throw new Error("Não foi possível identificar o email do titular para salvar o cartão.");
   }
 
   const config = getMercadoPagoConfig();
-  const existingMethod = extractSavedPaymentMethod(personalProfile.data);
   const providerCustomerId = existingMethod?.providerCustomerId ||
     await createMercadoPagoCustomer({
       email,
@@ -1520,6 +1742,131 @@ function parseCardTokenPaymentInput(body: Record<string, unknown>): CardTokenPay
   };
 }
 
+function parseAsaasCardUpdateInput({
+  body,
+  req,
+  fallbackEmail,
+}: {
+  body: Record<string, unknown>;
+  req: Request;
+  fallbackEmail: string;
+}): AsaasCardUpdateInput {
+  const rawCreditCard = isRecord(body.creditCard) ? body.creditCard : {};
+  const rawHolderInfo = isRecord(body.creditCardHolderInfo) ? body.creditCardHolderInfo : {};
+  const holderName = getString(rawCreditCard, ["holderName", "holder_name"]) ||
+    getString(rawHolderInfo, ["name"]) ||
+    getString(body, ["holderName", "holder_name"]);
+  const number = normalizeDigitsOnly(
+    getString(rawCreditCard, ["number", "cardNumber"]) || getString(body, ["cardNumber", "number"]),
+  );
+  const expiryMonth = normalizeExpiryMonth(
+    getString(rawCreditCard, ["expiryMonth", "expirationMonth"]) || getString(body, ["expiryMonth", "expirationMonth"]),
+  );
+  const expiryYear = normalizeExpiryYear(
+    getString(rawCreditCard, ["expiryYear", "expirationYear"]) || getString(body, ["expiryYear", "expirationYear"]),
+  );
+  const ccv = normalizeDigitsOnly(
+    getString(rawCreditCard, ["ccv", "cvv", "securityCode"]) || getString(body, ["ccv", "cvv", "securityCode"]),
+  );
+  const holderEmail = normalizeEmail(
+    getString(rawHolderInfo, ["email"]) || getString(body, ["email"]) || fallbackEmail,
+  );
+  const cpfCnpj = normalizeDigitsOnly(
+    getString(rawHolderInfo, ["cpfCnpj", "cpf_cnpj", "document"]) || getString(body, ["cpfCnpj", "cpf_cnpj", "document"]),
+  );
+  const postalCode = normalizeDigitsOnly(
+    getString(rawHolderInfo, ["postalCode", "postal_code", "zipCode"]) ||
+      getString(body, ["postalCode", "postal_code", "zipCode"]),
+  );
+  const addressNumber = getString(rawHolderInfo, ["addressNumber", "address_number"]) ||
+    getString(body, ["addressNumber", "address_number"]);
+  const addressComplement = getString(rawHolderInfo, ["addressComplement", "address_complement"]) ||
+    getString(body, ["addressComplement", "address_complement"]) ||
+    null;
+  const phone = normalizeDigitsOnly(
+    getString(rawHolderInfo, ["phone"]) || getString(body, ["phone"]),
+  ) || null;
+  const mobilePhone = normalizeDigitsOnly(
+    getString(rawHolderInfo, ["mobilePhone", "mobile_phone"]) || getString(body, ["mobilePhone", "mobile_phone"]),
+  ) || null;
+  const remoteIp = resolveRequestRemoteIp(req, body);
+
+  if (!holderName) throw new Error("Titular do cartao nao informado.");
+  if (!number || number.length < 13) throw new Error("Numero do cartao invalido.");
+  if (!expiryMonth) throw new Error("Mes de validade nao informado.");
+  if (!expiryYear) throw new Error("Ano de validade nao informado.");
+  if (!ccv || ccv.length < 3) throw new Error("Codigo de seguranca invalido.");
+  if (!holderEmail) throw new Error("Email do titular nao informado.");
+  if (!cpfCnpj) throw new Error("CPF/CNPJ do titular nao informado.");
+  if (!postalCode) throw new Error("CEP do titular nao informado.");
+  if (!addressNumber) throw new Error("Numero do endereco nao informado.");
+  if (!remoteIp) throw new Error("Nao foi possivel identificar o IP do comprador para atualizar o cartao.");
+
+  return {
+    creditCard: {
+      holderName,
+      number,
+      expiryMonth,
+      expiryYear,
+      ccv,
+    },
+    creditCardHolderInfo: {
+      name: getString(rawHolderInfo, ["name"]) || holderName,
+      email: holderEmail,
+      cpfCnpj,
+      postalCode,
+      addressNumber,
+      addressComplement,
+      phone,
+      mobilePhone,
+    },
+    remoteIp,
+  };
+}
+
+function resolveRequestRemoteIp(req: Request, body: Record<string, unknown>) {
+  const explicitRemoteIp = getString(body, ["remoteIp", "remote_ip"]);
+  if (explicitRemoteIp) return explicitRemoteIp;
+
+  const forwarded = req.headers.get("x-forwarded-for")?.trim() || "";
+  if (forwarded) {
+    const firstIp = forwarded.split(",")[0]?.trim();
+    if (firstIp) return firstIp;
+  }
+
+  return req.headers.get("cf-connecting-ip")?.trim() ||
+    req.headers.get("x-real-ip")?.trim() ||
+    "";
+}
+
+function normalizeDigitsOnly(value: string) {
+  return value.replace(/\D+/g, "").trim();
+}
+
+function normalizeExpiryMonth(value: string) {
+  const digits = normalizeDigitsOnly(value);
+  if (!digits) return "";
+  return digits.padStart(2, "0").slice(-2);
+}
+
+function normalizeExpiryYear(value: string) {
+  const digits = normalizeDigitsOnly(value);
+  if (!digits) return "";
+  if (digits.length === 2) return `20${digits}`;
+  return digits.slice(-4);
+}
+
+function detectCardBrand(cardNumber: string) {
+  const normalized = normalizeDigitsOnly(cardNumber);
+  if (/^4\d{12}(\d{3})?(\d{3})?$/.test(normalized)) return "visa";
+  if (/^(5[1-5]\d{14}|2(2[2-9]|[3-6]\d|7[01])\d{12})$/.test(normalized)) return "mastercard";
+  if (/^3[47]\d{13}$/.test(normalized)) return "amex";
+  if (/^6(?:011|5\d{2})\d{12}$/.test(normalized)) return "discover";
+  if (/^(4011(78|79)|431274|438935|451416|457393|457631|457632|504175|5067|509\d|627780|636297|636368)\d*$/.test(normalized)) return "elo";
+  if (/^(606282\d{10}(\d{3})?|3841\d{15})$/.test(normalized)) return "hipercard";
+  return null;
+}
+
 function calculateNextBillingAt(startedAtIso: string, billingCycle: string) {
   const date = new Date(startedAtIso);
 
@@ -1635,6 +1982,69 @@ async function asaasRequest(
   }
 
   return isRecord(data) ? data : {};
+}
+
+async function tokenizeAsaasCreditCard({
+  customerId,
+  cardInput,
+  config,
+}: {
+  customerId: string;
+  cardInput: AsaasCardUpdateInput;
+  config: { accessToken: string; baseUrl: string; userAgent: string };
+}) {
+  return await asaasRequest("/creditCard/tokenizeCreditCard", config, {
+    method: "POST",
+    body: {
+      customer: customerId,
+      creditCard: cardInput.creditCard,
+      creditCardHolderInfo: cardInput.creditCardHolderInfo,
+      remoteIp: cardInput.remoteIp,
+    },
+  });
+}
+
+async function updateAsaasSubscriptionCreditCard({
+  subscriptionId,
+  cardInput,
+  config,
+}: {
+  subscriptionId: string;
+  cardInput: AsaasCardUpdateInput & { creditCardToken?: string | null };
+  config: { accessToken: string; baseUrl: string; userAgent: string };
+}) {
+  return await asaasRequest(`/subscriptions/${subscriptionId}/creditCard`, config, {
+    method: "PUT",
+    body: {
+      creditCard: cardInput.creditCard,
+      creditCardHolderInfo: cardInput.creditCardHolderInfo,
+      remoteIp: cardInput.remoteIp,
+      ...(cardInput.creditCardToken ? { creditCardToken: cardInput.creditCardToken } : {}),
+    },
+  });
+}
+
+async function payAsaasPaymentWithSavedCard({
+  paymentId,
+  creditCardToken,
+  remoteIp,
+  creditCardHolderInfo,
+  config,
+}: {
+  paymentId: string;
+  creditCardToken: string;
+  remoteIp: string;
+  creditCardHolderInfo: Record<string, unknown> | null;
+  config: { accessToken: string; baseUrl: string; userAgent: string };
+}) {
+  return await asaasRequest(`/payments/${paymentId}/payWithCreditCard`, config, {
+    method: "POST",
+    body: {
+      creditCardToken,
+      remoteIp,
+      ...(creditCardHolderInfo ? { creditCardHolderInfo } : {}),
+    },
+  });
 }
 
 async function mercadoPagoRequest(
@@ -1969,6 +2379,162 @@ function extractSavedPaymentMethod(data: Record<string, unknown> | null): SavedP
   };
 }
 
+async function getActivePersonalPaymentMethodRow({
+  supabase,
+  personalId,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  personalId: string;
+}) {
+  const { data, error } = await supabase
+    .from("personal_payment_methods")
+    .select("provider, provider_customer_id, provider_card_id, provider_payment_profile_id, provider_payment_method_token, provider_subscription_id, payment_method_id, issuer_id, brand, last_four, first_payment_provider_payment_id, updated_at, raw_payload")
+    .eq("personal_id", personalId)
+    .eq("status", "active")
+    .maybeSingle<PersonalPaymentMethodRow>();
+
+  if (error) throw error;
+  return data || null;
+}
+
+function extractAsaasStoredPaymentContext({
+  paymentMethodRow,
+  savedPaymentMethod,
+}: {
+  paymentMethodRow: PersonalPaymentMethodRow | null;
+  savedPaymentMethod: SavedPaymentMethod | null;
+}) {
+  const rawPayload = isRecord(paymentMethodRow?.raw_payload) ? paymentMethodRow.raw_payload : {};
+  const explicitHolderInfo = isRecord(rawPayload.creditCardHolderInfo)
+    ? rawPayload.creditCardHolderInfo
+    : isRecord(rawPayload.credit_card_holder_info)
+      ? rawPayload.credit_card_holder_info
+      : null;
+  const customerPayload = isRecord(rawPayload.customer) ? rawPayload.customer : null;
+  const paymentPayload = isRecord(rawPayload.payment) ? rawPayload.payment : null;
+  const creditCardToken = savedPaymentMethod?.providerPaymentMethodToken ||
+    paymentMethodRow?.provider_payment_method_token?.trim() ||
+    getString(rawPayload, ["creditCardToken", "credit_card_token", "providerPaymentMethodToken", "paymentMethodToken"]) ||
+    (paymentPayload ? getString(paymentPayload, ["creditCardToken", "credit_card_token"]) : "");
+  const remoteIp = getString(rawPayload, ["remoteIp", "remote_ip"]) ||
+    (paymentPayload ? getString(paymentPayload, ["remoteIp", "remote_ip"]) : "");
+
+  return {
+    creditCardToken,
+    remoteIp,
+    creditCardHolderInfo: explicitHolderInfo || buildAsaasCreditCardHolderInfo(customerPayload),
+  };
+}
+
+function buildAsaasCreditCardHolderInfo(customerPayload: Record<string, unknown> | null) {
+  if (!customerPayload) return null;
+
+  const name = getString(customerPayload, ["name"]);
+  const email = getString(customerPayload, ["email"]);
+  const cpfCnpj = getString(customerPayload, ["cpfCnpj"]);
+  const postalCode = getString(customerPayload, ["postalCode"]);
+  const addressNumber = getString(customerPayload, ["addressNumber"]);
+
+  if (!name || !email || !cpfCnpj || !postalCode || !addressNumber) {
+    return null;
+  }
+
+  return {
+    name,
+    email,
+    cpfCnpj,
+    postalCode,
+    addressNumber,
+    addressComplement: getString(customerPayload, ["complement", "addressComplement"]) || null,
+    phone: getString(customerPayload, ["phone"]) || null,
+    mobilePhone: getString(customerPayload, ["mobilePhone"]) || null,
+  };
+}
+
+async function resolveOpenAsaasPaymentForSavedCard({
+  supabase,
+  subscription,
+  config,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  subscription: SubscriptionRow;
+  config: { accessToken: string; baseUrl: string; userAgent: string };
+}) {
+  const { data, error } = await supabase
+    .from("subscription_payments")
+    .select("*")
+    .eq("subscription_id", subscription.id)
+    .eq("provider", "asaas")
+    .order("due_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(10)
+    .returns<SubscriptionPaymentRow[]>();
+
+  if (error) throw error;
+
+  const candidates = [...(data || [])].sort((left, right) => {
+    if (left.provider_payment_id === subscription.last_payment_id) return -1;
+    if (right.provider_payment_id === subscription.last_payment_id) return 1;
+    return 0;
+  });
+
+  for (const payment of candidates) {
+    const providerPaymentId = payment.provider_payment_id?.trim() || "";
+    if (!providerPaymentId) continue;
+
+    const gatewayPayment = await getAsaasPaymentById({
+      paymentId: providerPaymentId,
+      config,
+    });
+    const rawStatus = getString(gatewayPayment, ["status"]).trim().toLowerCase();
+    if (rawStatus === "pending" || rawStatus === "overdue") {
+      return {
+        localPayment: payment,
+        providerPaymentId,
+        gatewayPayment,
+      };
+    }
+  }
+
+  throw new Error("Nao existe cobranca vencida/em aberto apta para pagamento com cartao salvo.");
+}
+
+async function upsertPersonalPaymentMethod({
+  supabase,
+  personalId,
+  paymentMethod,
+  providerSubscriptionId,
+  rawPayload,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  personalId: string;
+  paymentMethod: SavedPaymentMethod;
+  providerSubscriptionId: string | null;
+  rawPayload: Record<string, unknown>;
+}) {
+  const { error } = await supabase
+    .from("personal_payment_methods")
+    .upsert({
+      personal_id: personalId,
+      provider: paymentMethod.provider,
+      provider_customer_id: paymentMethod.providerCustomerId,
+      provider_card_id: paymentMethod.providerCardId,
+      provider_payment_profile_id: paymentMethod.providerPaymentProfileId,
+      provider_payment_method_token: paymentMethod.providerPaymentMethodToken,
+      payment_method_id: paymentMethod.paymentMethodId,
+      issuer_id: paymentMethod.issuerId,
+      brand: paymentMethod.brand,
+      last_four: paymentMethod.lastFour,
+      first_payment_provider_payment_id: paymentMethod.firstPaymentProviderPaymentId,
+      provider_subscription_id: providerSubscriptionId,
+      status: "active",
+      raw_payload: rawPayload,
+      updated_at: paymentMethod.updatedAt,
+    }, { onConflict: "personal_id" });
+
+  if (error) throw error;
+}
+
 async function savePaymentMethodToProfile({
   supabase,
   personalId,
@@ -1999,6 +2565,64 @@ async function savePaymentMethodToProfile({
     .eq("id", personalId);
 
   if (error) throw error;
+}
+
+function buildSafeAsaasPaymentMethodRawPayload({
+  providerCustomerId,
+  providerSubscriptionId,
+  remoteIp,
+  creditCardToken,
+  creditCardHolderInfo,
+  tokenizationResponse,
+  subscriptionCreditCardUpdate,
+  brand,
+  lastFour,
+}: {
+  providerCustomerId: string;
+  providerSubscriptionId: string;
+  remoteIp: string;
+  creditCardToken: string;
+  creditCardHolderInfo: AsaasCardUpdateInput["creditCardHolderInfo"];
+  tokenizationResponse: Record<string, unknown>;
+  subscriptionCreditCardUpdate: Record<string, unknown>;
+  brand: string | null;
+  lastFour: string | null;
+}) {
+  return {
+    source: "profile-save-card-token",
+    customer: {
+      id: providerCustomerId,
+    },
+    subscription: {
+      id: providerSubscriptionId,
+    },
+    remoteIp,
+    creditCardToken,
+    creditCardHolderInfo,
+    card: {
+      brand,
+      lastFour,
+    },
+    tokenization: {
+      creditCardToken,
+      creditCardBrand: getString(tokenizationResponse, [
+        "creditCardBrand",
+        "creditCardBrandCode",
+        "brand",
+      ]) || brand,
+      creditCardNumberLastFour: getString(tokenizationResponse, [
+        "creditCardNumberLastFour",
+        "lastFour",
+        "last4",
+        "last_four",
+      ]) || lastFour,
+    },
+    subscriptionCreditCardUpdate: {
+      id: getString(subscriptionCreditCardUpdate, ["id"]) || providerSubscriptionId,
+      status: getString(subscriptionCreditCardUpdate, ["status"]) || null,
+      updatedAt: new Date().toISOString(),
+    },
+  };
 }
 
 function buildBackUrls(config: { baseUrl: string; successPath: string; failurePath: string; pendingPath: string }, plan: string) {
