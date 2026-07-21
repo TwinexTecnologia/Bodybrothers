@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
+import AsaasCardForm, { type AsaasCardFormSubmitData } from '../../components/AsaasCardForm'
 import ConfirmModal from '../../components/ConfirmModal'
 import MercadoPagoCardForm from '../../components/MercadoPagoCardForm'
 import { cancelSubscriptionDowngrade, chargeSavedCard, checkSubscriptionPaymentStatus, createRegularizationPayment, payWithCardToken, removeSavedPaymentMethod, requestSubscriptionDowngrade, saveCardToken } from '../../lib/subscription'
@@ -405,7 +406,7 @@ export default function Profile() {
   }
 
   async function openCardForm(mode: 'regularization' | 'save-card') {
-    if (!mercadoPagoPublicKey) {
+    if (!isAsaasSubscriptionFlow && !mercadoPagoPublicKey) {
       throw new Error('A public key do Mercado Pago ainda não foi configurada no front.')
     }
 
@@ -429,8 +430,8 @@ export default function Profile() {
       setError('')
       setCopyPixMsg('')
 
-      if (isAsaasSubscriptionFlow && action !== 'pix') {
-        throw new Error('Esse perfil ja esta no fluxo Asaas. No painel, por enquanto, a regularizacao com cartao ainda esta em migracao. Use o PIX.')
+      if (isAsaasSubscriptionFlow && action === 'card-pay' && !hasSavedPaymentMethod) {
+        throw new Error('Nenhum cartao salvo foi encontrado para pagar essa cobranca. Atualize o cartao da assinatura ou use o PIX.')
       }
 
       if (action === 'card-pay' && hasSavedPaymentMethod && savedPaymentMethodValidated) {
@@ -445,13 +446,17 @@ export default function Profile() {
 
       if (action !== 'pix') {
         await openCardForm(action === 'card-change' ? 'save-card' : 'regularization')
-        setMsg(action === 'card-change'
-          ? hasSavedPaymentMethod
-            ? 'Preencha o formulário abaixo para trocar o cartão cadastrado.'
-            : 'Preencha o formulário abaixo para cadastrar um cartão no seu perfil.'
-          : hasSavedPaymentMethod && !savedPaymentMethodValidated
+        if (action === 'card-change') {
+          setMsg(isAsaasSubscriptionFlow
+            ? 'Preencha o formulário abaixo para trocar o cartão salvo da sua assinatura.'
+            : hasSavedPaymentMethod
+              ? 'Preencha o formulário abaixo para trocar o cartão cadastrado.'
+              : 'Preencha o formulário abaixo para cadastrar um cartão no seu perfil.')
+        } else {
+          setMsg(hasSavedPaymentMethod && !savedPaymentMethodValidated
             ? 'Esse cartao salvo ainda precisa da primeira validacao com CVV. Preencha o formulario para concluir essa etapa e liberar as proximas cobrancas automaticas.'
-          : 'Preencha o formulário abaixo para pagar com cartão sem sair da tela.')
+            : 'Preencha o formulário abaixo para pagar com cartão sem sair da tela.')
+        }
         return
       }
 
@@ -496,7 +501,7 @@ export default function Profile() {
     installments: number
     identificationType: string
     identificationNumber: string
-  }) {
+  } | AsaasCardFormSubmitData) {
     try {
       setPaymentActionLoading('card')
       setMsg('')
@@ -509,7 +514,11 @@ export default function Profile() {
         setShowCardForm(false)
         setCardFormMode(null)
         await loadProfile()
-        setMsg(`Cartão ${formatSavedCardBrand(response.brand)} final ${response.lastFour || '****'} cadastrado com sucesso.`)
+        setMsg(
+          response.provider === 'asaas'
+            ? `Cartão ${formatSavedCardBrand(response.brand)} final ${response.lastFour || '****'} atualizado com sucesso para as próximas cobranças.`
+            : `Cartão ${formatSavedCardBrand(response.brand)} final ${response.lastFour || '****'} cadastrado com sucesso.`,
+        )
         return
       }
 
@@ -644,14 +653,14 @@ export default function Profile() {
                 <div style={{ display: 'grid', gap: 6 }}>
                   <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
                     {isAsaasSubscriptionFlow && hasSavedPaymentMethod
-                      ? `Asaas vinculado${savedPaymentMethod?.lastFour ? ` final ${savedPaymentMethod.lastFour}` : ''}`
+                      ? `Cartao salvo${savedPaymentMethod?.lastFour ? ` final ${savedPaymentMethod.lastFour}` : ''}`
                       : hasSavedPaymentMethod
                       ? `${formatSavedCardBrand(savedPaymentMethod?.brand)} final ${savedPaymentMethod?.lastFour || '****'}`
                       : 'Nenhum cartao cadastrado'}
                   </div>
                   <div style={{ fontSize: '0.9rem', color: '#475569' }}>
                     {isAsaasSubscriptionFlow
-                      ? 'Esse perfil ja esta usando o Asaas. O painel ja gera PIX e consulta status, mas o gerenciamento de cartao ainda esta sendo migrado.'
+                      ? 'Ja existe um cartao salvo para as cobrancas recorrentes. Se precisar, voce pode trocar esse cartao por aqui.'
                       : hasSavedPaymentMethod
                       ? 'Esse cartao fica salvo para tentativas manuais agora e para as proximas renovacoes automaticas.'
                       : 'Cadastre um cartao para manter o metodo de pagamento salvo e liberar a renovacao automatica.'}
@@ -665,22 +674,21 @@ export default function Profile() {
                       try {
                         setMsg('')
                         setError('')
-                        if (isAsaasSubscriptionFlow) {
-                          throw new Error('O gerenciamento de cartao do Asaas ainda esta sendo finalizado no painel.')
-                        }
                         await openCardForm('save-card')
-                        setMsg(hasSavedPaymentMethod
-                          ? 'Preencha o formulário abaixo para trocar o cartão cadastrado.'
-                          : 'Preencha o formulário abaixo para cadastrar um cartão no seu perfil.')
+                        setMsg(isAsaasSubscriptionFlow
+                          ? 'Preencha o formulário abaixo para trocar o cartão salvo da sua assinatura.'
+                          : hasSavedPaymentMethod
+                            ? 'Preencha o formulário abaixo para trocar o cartão cadastrado.'
+                            : 'Preencha o formulário abaixo para cadastrar um cartão no seu perfil.')
                       } catch (err: any) {
                         console.error(err)
                         setError(err.message || 'Não foi possível abrir o formulário do cartão.')
                       }
                     }}
-                    disabled={paymentActionLoading !== null || removeSavedCardLoading || isAsaasSubscriptionFlow}
-                    style={paymentActionLoading !== null || removeSavedCardLoading || isAsaasSubscriptionFlow ? disabledActionButtonStyle : actionButtonStyle}
+                    disabled={paymentActionLoading !== null || removeSavedCardLoading}
+                    style={paymentActionLoading !== null || removeSavedCardLoading ? disabledActionButtonStyle : actionButtonStyle}
                   >
-                    {isAsaasSubscriptionFlow ? 'Cartao em migracao' : hasSavedPaymentMethod ? 'Trocar cartao' : 'Cadastrar cartao'}
+                    {isAsaasSubscriptionFlow ? 'Trocar cartao' : hasSavedPaymentMethod ? 'Trocar cartao' : 'Cadastrar cartao'}
                   </button>
 
                   {hasSavedPaymentMethod && !isAsaasSubscriptionFlow && (
@@ -699,8 +707,26 @@ export default function Profile() {
                   )}
                 </div>
 
-                {!isAsaasSubscriptionFlow && showCardForm && cardFormMode === 'save-card' && (
-                  mercadoPagoPublicKey ? (
+                {showCardForm && cardFormMode === 'save-card' && (
+                  isAsaasSubscriptionFlow ? (
+                    <AsaasCardForm
+                      payerName={name}
+                      payerEmail={email}
+                      payerPhone={phone}
+                      loading={paymentActionLoading === 'card'}
+                      title={hasSavedPaymentMethod ? 'Trocar cartao salvo' : 'Cadastrar cartao'}
+                      submitLabel={hasSavedPaymentMethod ? 'Salvar novo cartao' : 'Salvar cartao'}
+                      processingTitle="Salvando cartao..."
+                      processingText="Aguarde um instante enquanto atualizamos o cartao da sua assinatura."
+                      onSubmit={handleCardFormSubmit}
+                      onCancel={() => {
+                        if (paymentActionLoading !== 'card') {
+                          setShowCardForm(false)
+                          setCardFormMode(null)
+                        }
+                      }}
+                    />
+                  ) : mercadoPagoPublicKey ? (
                     <MercadoPagoCardForm
                       publicKey={mercadoPagoPublicKey}
                       amount={cardPaymentAmount}
@@ -733,12 +759,12 @@ export default function Profile() {
                 <div style={{ fontWeight: 700, color: '#0f172a' }}>Regularizacao do pagamento</div>
 
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  <button type="button" onClick={() => handleGenerateRegularizationPayment('card-pay')} disabled={paymentActionLoading !== null || isAsaasSubscriptionFlow} style={paymentActionLoading !== null || isAsaasSubscriptionFlow ? disabledActionButtonStyle : actionButtonStyle}>
-                    {isAsaasSubscriptionFlow ? 'Cartao em migracao' : paymentActionLoading === 'card' ? 'Processando...' : hasSavedPaymentMethod ? (savedPaymentMethodValidated ? 'Pagar com cartao salvo' : 'Validar cartao salvo') : 'Pagar com cartao'}
+                  <button type="button" onClick={() => handleGenerateRegularizationPayment('card-pay')} disabled={paymentActionLoading !== null || (isAsaasSubscriptionFlow && !hasSavedPaymentMethod)} style={paymentActionLoading !== null || (isAsaasSubscriptionFlow && !hasSavedPaymentMethod) ? disabledActionButtonStyle : actionButtonStyle}>
+                    {isAsaasSubscriptionFlow ? (paymentActionLoading === 'card' ? 'Processando...' : 'Pagar com cartao salvo') : paymentActionLoading === 'card' ? 'Processando...' : hasSavedPaymentMethod ? (savedPaymentMethodValidated ? 'Pagar com cartao salvo' : 'Validar cartao salvo') : 'Pagar com cartao'}
                   </button>
 
-                  <button type="button" onClick={() => handleGenerateRegularizationPayment('card-change')} disabled={paymentActionLoading !== null || isAsaasSubscriptionFlow} style={paymentActionLoading !== null || isAsaasSubscriptionFlow ? disabledActionButtonStyle : actionButtonStyle}>
-                    {isAsaasSubscriptionFlow ? 'Cartao em migracao' : paymentActionLoading === 'card' ? 'Processando...' : hasSavedPaymentMethod ? 'Trocar cartao salvo' : 'Cadastrar cartao'}
+                  <button type="button" onClick={() => handleGenerateRegularizationPayment('card-change')} disabled={paymentActionLoading !== null} style={paymentActionLoading !== null ? disabledActionButtonStyle : actionButtonStyle}>
+                    {isAsaasSubscriptionFlow ? 'Trocar cartao' : paymentActionLoading === 'card' ? 'Processando...' : hasSavedPaymentMethod ? 'Trocar cartao salvo' : 'Cadastrar cartao'}
                   </button>
 
                   <button type="button" onClick={() => handleGenerateRegularizationPayment('pix')} disabled={paymentActionLoading !== null} style={paymentActionLoading !== null ? disabledActionButtonStyle : actionButtonStyle}>
@@ -773,7 +799,7 @@ export default function Profile() {
 
                 {isAsaasSubscriptionFlow && (
                   <div style={downgradeWarningStyle}>
-                    Esse perfil ja esta usando Asaas. Aqui no painel ja liberamos PIX e consulta de status, mas o pagamento embutido com cartao ainda esta em migracao.
+                    O pagamento com cartao salvo so tenta liquidar a cobranca vencida que ja existe, sem criar uma nova. Se o cartao expirou ou mudou, voce pode atualiza-lo aqui para as proximas cobrancas.
                   </div>
                 )}
 

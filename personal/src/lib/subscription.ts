@@ -84,20 +84,39 @@ type ChargeSavedCardResponse = {
 }
 
 type SaveCardTokenInput = {
-  token: string
-  paymentMethodId: string
+  token?: string
+  paymentMethodId?: string
   issuerId?: string | null
-  installments: number
-  identificationType: string
-  identificationNumber: string
+  installments?: number
+  identificationType?: string
+  identificationNumber?: string
+  creditCard?: {
+    holderName: string
+    number: string
+    expiryMonth: string
+    expiryYear: string
+    ccv: string
+  }
+  creditCardHolderInfo?: {
+    name: string
+    email: string
+    cpfCnpj: string
+    postalCode: string
+    addressNumber: string
+    addressComplement: string | null
+    phone: string | null
+    mobilePhone: string | null
+  }
+  remoteIp?: string
 }
 
 type SaveCardTokenResponse = {
   success: boolean
   action: 'save_card_token'
-  provider: 'mercadopago'
+  provider: 'mercadopago' | 'asaas'
   providerCustomerId: string
-  providerCardId: string
+  providerCardId?: string
+  providerPaymentMethodToken?: string | null
   brand: string | null
   lastFour: string | null
 }
