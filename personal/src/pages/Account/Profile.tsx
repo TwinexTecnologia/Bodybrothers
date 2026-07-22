@@ -94,6 +94,15 @@ const BILLING_CYCLE_LABELS: Record<string, string> = {
   yearly: 'Anual',
 }
 
+const PLAN_CHANGE_RANKS: Record<string, number> = {
+  free: 0,
+  starter: 1,
+  premium: 2,
+  pro: 2,
+  elite: 3,
+  unlimited: 3,
+}
+
 export default function Profile() {
   const { refreshAuthState } = useAuth()
   const mercadoPagoPublicKey = import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY || ''
@@ -114,11 +123,14 @@ export default function Profile() {
   const [latestPayment, setLatestPayment] = useState<SubscriptionPaymentRow | null>(null)
   const [activeStudents, setActiveStudents] = useState(0)
   const [selectedBillingCycle, setSelectedBillingCycle] = useState<SubscriptionRow['billing_cycle']>('monthly')
+  const [showPlanChangeOptions, setShowPlanChangeOptions] = useState(false)
+  const [planChangeMode, setPlanChangeMode] = useState<'downgrade' | 'upgrade' | null>(null)
+  const [selectedTargetPlan, setSelectedTargetPlan] = useState('')
+  const [planChangeModalOpen, setPlanChangeModalOpen] = useState(false)
+  const [planChangeLoading, setPlanChangeLoading] = useState(false)
   const [billingCycleModalOpen, setBillingCycleModalOpen] = useState(false)
   const [showBillingCycleOptions, setShowBillingCycleOptions] = useState(false)
   const [billingCycleChangeLoading, setBillingCycleChangeLoading] = useState(false)
-  const [freeCancellationModalOpen, setFreeCancellationModalOpen] = useState(false)
-  const [freeCancellationLoading, setFreeCancellationLoading] = useState(false)
   const [cancelScheduledChangeLoading, setCancelScheduledChangeLoading] = useState(false)
   const [copyPixMsg, setCopyPixMsg] = useState('')
   const [paymentActionLoading, setPaymentActionLoading] = useState<'pix' | 'card' | 'check' | null>(null)
@@ -139,14 +151,30 @@ export default function Profile() {
 
   const currentPlan = subscription?.plan_slug || 'free'
   const currentBillingCycle = subscription?.billing_cycle || 'monthly'
+  const currentPlanRank = PLAN_CHANGE_RANKS[currentPlan] || 0
   const scheduledTargetPlan = subscription?.scheduled_plan_slug || currentPlan
   const scheduledTargetBillingCycle = subscription?.scheduled_billing_cycle || null
   const hasScheduledChange = Boolean(subscription?.scheduled_change_at && (subscription?.scheduled_plan_slug || subscription?.scheduled_billing_cycle))
+  const canManagePlanChange = currentPlan !== 'free'
   const billingCycleOptions = useMemo(() => {
     return (Object.entries(BILLING_CYCLE_LABELS) as Array<[NonNullable<SubscriptionRow['billing_cycle']>, string]>)
       .filter(([cycle]) => cycle !== currentBillingCycle)
   }, [currentBillingCycle])
+  const planChangeOptions = useMemo(() => {
+    if (!canManagePlanChange || !planChangeMode) return [] as Array<[string, string]>
+
+    return (Object.entries(PLAN_LABELS) as Array<[string, string]>)
+      .filter(([plan]) => {
+        if (plan === currentPlan) return false
+
+        const rank = PLAN_CHANGE_RANKS[plan] ?? -1
+        return planChangeMode === 'downgrade'
+          ? rank < currentPlanRank
+          : rank > currentPlanRank
+      })
+  }, [canManagePlanChange, currentPlan, currentPlanRank, planChangeMode])
   const canScheduleBillingCycleChange = canManageBillingCycle && !hasScheduledChange
+  const canSchedulePlanChange = canManagePlanChange && !hasScheduledChange
   const selectedBillingCycleLabel = selectedBillingCycle ? BILLING_CYCLE_LABELS[selectedBillingCycle] || selectedBillingCycle : ''
   const currentPlanLabel = PLAN_LABELS[currentPlan] || currentPlan
   const currentBillingCycleLabel = BILLING_CYCLE_LABELS[currentBillingCycle] || 'Mensal'
@@ -154,7 +182,9 @@ export default function Profile() {
   const scheduledTargetBillingCycleLabel = scheduledTargetBillingCycle
     ? BILLING_CYCLE_LABELS[scheduledTargetBillingCycle] || scheduledTargetBillingCycle
     : null
+  const selectedTargetPlanLabel = PLAN_LABELS[selectedTargetPlan] || selectedTargetPlan
   const isFreeCancellationScheduled = hasScheduledChange && scheduledTargetPlan === 'free'
+  const isFreePlanSelection = planChangeMode === 'downgrade' && selectedTargetPlan === 'free'
   const paymentActionData = useMemo(() => extractPaymentActionData(latestPayment?.raw_payload), [latestPayment])
   const canCopyPix = Boolean(paymentActionData.pixCode)
   const needsRegularization = subscription?.status === 'blocked' || subscription?.status === 'past_due'
@@ -193,6 +223,18 @@ export default function Profile() {
       setSelectedBillingCycle(billingCycleOptions[0][0])
     }
   }, [billingCycleOptions, currentBillingCycle, selectedBillingCycle])
+
+  useEffect(() => {
+    if (!planChangeOptions.length) {
+      setSelectedTargetPlan('')
+      return
+    }
+
+    const hasCurrentOption = planChangeOptions.some(([plan]) => plan === selectedTargetPlan)
+    if (!hasCurrentOption) {
+      setSelectedTargetPlan(planChangeOptions[0][0])
+    }
+  }, [planChangeOptions, selectedTargetPlan])
 
   async function loadProfile() {
     try {
@@ -381,6 +423,8 @@ export default function Profile() {
       setError('')
 
       const response = await cancelSubscriptionDowngrade()
+      setShowPlanChangeOptions(false)
+      setPlanChangeMode(null)
       setShowBillingCycleOptions(false)
       setMsg(
         cancelingFreeSchedule
@@ -398,28 +442,34 @@ export default function Profile() {
     }
   }
 
-  async function handleConfirmFreeCancellation() {
+  async function handleConfirmPlanChange() {
+    if (!selectedTargetPlan) return
+
     try {
-      setFreeCancellationLoading(true)
+      setPlanChangeLoading(true)
       setMsg('')
       setError('')
 
       const response = await requestSubscriptionDowngrade({
-        targetPlan: 'free',
-        targetBillingCycle: 'monthly',
+        targetPlan: selectedTargetPlan,
+        targetBillingCycle: currentBillingCycle,
       })
 
-      setFreeCancellationModalOpen(false)
+      setPlanChangeModalOpen(false)
+      setShowPlanChangeOptions(false)
+      setPlanChangeMode(null)
       setShowBillingCycleOptions(false)
       setMsg(
-        `Cancelamento agendado com sucesso. Seu plano ${currentPlanLabel} continua ativo ate ${formatDate(response.effectiveAt)}. Depois disso, a assinatura vira Free e nenhuma nova cobranca sera gerada.`,
+        response.targetPlan === 'free'
+          ? `Cancelamento agendado com sucesso. Seu plano ${currentPlanLabel} continua ativo ate ${formatDate(response.effectiveAt)}. Depois disso, a assinatura vira Free e nenhuma nova cobranca sera gerada.`
+          : `Mudança do plano ${currentPlanLabel} para ${PLAN_LABELS[response.targetPlan] || response.targetPlan} agendada para ${formatDate(response.effectiveAt)}. O novo plano entra em vigor somente nessa data.`,
       )
       await loadProfile()
     } catch (err: any) {
       console.error(err)
-      setError(err.message || 'Não foi possível agendar o cancelamento da assinatura.')
+      setError(err.message || 'Não foi possível agendar a mudança de plano.')
     } finally {
-      setFreeCancellationLoading(false)
+      setPlanChangeLoading(false)
     }
   }
 
@@ -949,35 +999,124 @@ export default function Profile() {
               </div>
             )}
 
-            {canManageBillingCycle && (
-              <div style={regularizationCardStyle}>
-                <div style={{ fontWeight: 700, color: '#0f172a' }}>Cancelar renovacao automatica</div>
-                <div style={{ fontSize: '0.92rem', color: '#475569', lineHeight: 1.5 }}>
-                  Ao agendar o plano Free, seu acesso pago continua normalmente ate o fim do ciclo atual. No vencimento, a recorrencia e encerrada e nenhuma nova cobranca automatica deve ser gerada.
-                </div>
+            <div style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', display: 'grid', gap: 10 }}>
+              <div style={{ fontWeight: 600, color: '#0f172a' }}>Trocar plano</div>
+              <div style={{ fontSize: '0.9rem' }}>
+                Seu plano atual é {currentPlanLabel}. Abra as opções abaixo para escolher se deseja fazer upgrade ou downgrade no próximo vencimento.
+              </div>
 
-                {hasScheduledChange ? (
-                  <div style={downgradeWarningStyle}>
-                    {isFreeCancellationScheduled
-                      ? 'O cancelamento para Free ja esta agendado. Se quiser mudar essa decisao antes da virada, basta cancelar o agendamento acima.'
-                      : 'Ja existe outra mudanca agendada para esta assinatura. Para cancelar a renovacao automatica, primeiro cancele o agendamento atual.'}
+              {hasScheduledChange && (
+                <div style={{ fontSize: '0.9rem', color: '#1d4ed8' }}>
+                  Existe uma mudança agendada. Se quiser escolher outro plano, primeiro cancele o agendamento atual.
+                </div>
+              )}
+
+              {!canManagePlanChange && (
+                <div style={{ fontSize: '0.9rem', color: '#475569' }}>
+                  A troca de plano fica disponível quando você estiver em um plano pago.
+                </div>
+              )}
+
+              {canSchedulePlanChange && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPlanChangeOptions(current => !current)
+                    if (showPlanChangeOptions) {
+                      setPlanChangeMode(null)
+                    }
+                  }}
+                  style={ghostButtonStyle}
+                >
+                  {showPlanChangeOptions ? 'Ocultar opções de plano' : 'Ver opções de plano'}
+                </button>
+              )}
+
+              {canSchedulePlanChange && showPlanChangeOptions && (
+                <div style={{ display: 'grid', gap: 12, padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff' }}>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => setPlanChangeMode('downgrade')}
+                      style={planChangeMode === 'downgrade' ? activeActionButtonStyle : actionButtonStyle}
+                    >
+                      Downgrade
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPlanChangeMode('upgrade')}
+                      style={planChangeMode === 'upgrade' ? activeActionButtonStyle : actionButtonStyle}
+                    >
+                      Upgrade
+                    </button>
                   </div>
-                ) : (
+
+                  {planChangeMode && !planChangeOptions.length && (
+                    <div style={{ fontSize: '0.9rem', color: '#475569' }}>
+                      Não existem opções de {planChangeMode} disponíveis para o seu plano atual.
+                    </div>
+                  )}
+
+                  {planChangeMode && planChangeOptions.length > 0 && (
+                    <>
+                      <label style={{ display: 'grid', gap: 8 }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
+                          {planChangeMode === 'downgrade' ? 'Plano de downgrade' : 'Plano de upgrade'}
+                        </span>
+                        <select
+                          value={selectedTargetPlan}
+                          onChange={e => setSelectedTargetPlan(e.target.value)}
+                          style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff' }}
+                        >
+                          {planChangeOptions.map(([plan, label]) => (
+                            <option key={plan} value={plan}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      {selectedTargetPlan && !isFreePlanSelection && (
+                        <div style={{ fontSize: '0.9rem', color: '#475569' }}>
+                          Seu plano será alterado de {currentPlanLabel} para {selectedTargetPlanLabel} somente após o fim do ciclo atual.
+                        </div>
+                      )}
+
+                      {isFreePlanSelection && (
+                        <div style={downgradeWarningStyle}>
+                          Ao escolher o downgrade para Free, seu acesso pago continua normalmente ate {subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'o fim do ciclo atual'}. Depois dessa data, a recorrencia e encerrada e nenhuma nova cobranca automatica deve ser gerada.
+                        </div>
+                      )}
+
+                      <div style={downgradeWarningStyle}>
+                        A mudança só será aplicada após o fim do ciclo atual, em {subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'sua próxima cobrança'}.
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {canSchedulePlanChange && showPlanChangeOptions && planChangeMode && selectedTargetPlan && (
                   <button
                     type="button"
-                    onClick={() => setFreeCancellationModalOpen(true)}
-                    disabled={freeCancellationLoading}
-                    style={freeCancellationLoading ? {
-                      ...subtleDangerButtonStyle,
-                      opacity: 0.7,
-                      cursor: 'not-allowed',
-                    } : subtleDangerButtonStyle}
+                    onClick={() => setPlanChangeModalOpen(true)}
+                    disabled={planChangeLoading}
+                    style={{
+                      ...(isFreePlanSelection ? subtleDangerButtonStyle : actionButtonStyle),
+                      opacity: planChangeLoading ? 0.7 : 1,
+                      cursor: planChangeLoading ? 'not-allowed' : 'pointer',
+                    }}
                   >
-                    {freeCancellationLoading ? 'Agendando cancelamento...' : 'Agendar cancelamento para Free'}
+                    {planChangeLoading
+                      ? 'Agendando...'
+                      : isFreePlanSelection
+                      ? 'Confirmar downgrade para Free'
+                      : `Confirmar ${planChangeMode}`}
                   </button>
                 )}
               </div>
-            )}
+            </div>
 
             <div style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', display: 'grid', gap: 10 }}>
               <div style={{ fontWeight: 600, color: '#0f172a' }}>Trocar ciclo do plano</div>
@@ -1110,19 +1249,27 @@ export default function Profile() {
       />
 
       <ConfirmModal
-        isOpen={freeCancellationModalOpen}
-        title="Agendar cancelamento para Free"
-        description={`Você confirma o cancelamento da renovação automática do plano ${currentPlanLabel}? Seu acesso pago continua normalmente até ${subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'o fim do ciclo atual'}. Depois dessa data, o plano vira Free e não deve haver nova cobrança automática.`}
-        cancelText="Manter assinatura"
-        confirmText={freeCancellationLoading ? 'Agendando...' : 'Sim, agendar cancelamento'}
+        isOpen={planChangeModalOpen}
+        title={isFreePlanSelection ? 'Confirmar downgrade para Free' : 'Confirmar mudança de plano'}
+        description={isFreePlanSelection
+          ? `Você confirma o downgrade do plano ${currentPlanLabel} para Free? Seu acesso pago continua normalmente até ${subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'o fim do ciclo atual'}. Depois dessa data, o plano vira Free e não deve haver nova cobrança automática.`
+          : selectedTargetPlan
+          ? `Você confirma a mudança do plano ${currentPlanLabel} para ${selectedTargetPlanLabel}? Lembrando que essa mudança só será aplicada após o fim do ciclo atual, em ${subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'sua próxima cobrança'}.`
+          : 'Deseja confirmar a mudança de plano?'}
+        cancelText={isFreePlanSelection ? 'Manter assinatura' : 'Não, manter plano atual'}
+        confirmText={planChangeLoading
+          ? 'Agendando...'
+          : isFreePlanSelection
+          ? 'Sim, agendar downgrade'
+          : 'Sim, agendar mudança'}
         onCancel={() => {
-          if (!freeCancellationLoading) setFreeCancellationModalOpen(false)
+          if (!planChangeLoading) setPlanChangeModalOpen(false)
         }}
-        onConfirm={handleConfirmFreeCancellation}
-        isDanger
+        onConfirm={handleConfirmPlanChange}
+        isDanger={isFreePlanSelection}
         stackActions
-        cancelDisabled={freeCancellationLoading}
-        confirmDisabled={freeCancellationLoading}
+        cancelDisabled={planChangeLoading}
+        confirmDisabled={planChangeLoading}
       />
     </div>
   )
@@ -1236,6 +1383,13 @@ const actionButtonStyle: CSSProperties = {
   color: '#0f172a',
   fontWeight: 600,
   cursor: 'pointer',
+}
+
+const activeActionButtonStyle: CSSProperties = {
+  ...actionButtonStyle,
+  border: '1px solid #0f172a',
+  background: '#0f172a',
+  color: '#fff',
 }
 
 const disabledActionButtonStyle: CSSProperties = {
