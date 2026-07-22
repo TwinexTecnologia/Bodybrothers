@@ -22,12 +22,32 @@ const PLAN_CONFIGS: Record<string, { studentLimit: number; paid: boolean }> = {
   unlimited: { studentLimit: 999999, paid: true },
 };
 
-const PLAN_PRICES: Record<string, number> = {
-  starter: 14.9,
-  pro: 39.9,
-  premium: 39.9,
-  elite: 39.9,
-  unlimited: 39.9,
+const PLAN_PRICES: Record<string, Record<string, number>> = {
+  starter: {
+    monthly: 9.9,
+    quarterly: 24.9,
+    yearly: 89.9,
+  },
+  premium: {
+    monthly: 29.9,
+    quarterly: 74.9,
+    yearly: 249.9,
+  },
+  pro: {
+    monthly: 29.9,
+    quarterly: 74.9,
+    yearly: 249.9,
+  },
+  elite: {
+    monthly: 29.9,
+    quarterly: 74.9,
+    yearly: 249.9,
+  },
+  unlimited: {
+    monthly: 29.9,
+    quarterly: 74.9,
+    yearly: 249.9,
+  },
 };
 
 type ProfileRow = {
@@ -718,7 +738,7 @@ function resolveLandingPaymentContext({
     "subscriptionId",
   ]) || null;
   const paymentAmount = getNumber(body, ["paymentAmount", "amount", "transactionAmount"]) ??
-    resolvePlanAmount(requestedPlan);
+    resolvePlanAmount(requestedPlan, billingCycle);
   const paymentCurrency = getString(body, ["paymentCurrency", "currency"]) || "BRL";
   const providerReference = getString(body, [
     "providerReference",
@@ -926,7 +946,7 @@ async function insertInitialSubscriptionPayment({
       subscription_id: subscription.id,
       plan_slug: requestedPlan,
       billing_cycle: billingCycle,
-      amount: paymentContext.paymentAmount ?? resolvePlanAmount(requestedPlan) ?? 0,
+      amount: paymentContext.paymentAmount ?? resolvePlanAmount(requestedPlan, billingCycle) ?? 0,
       currency: paymentContext.paymentCurrency || "BRL",
       status: normalizeSubscriptionPaymentStatus(
         paymentContext.paymentStatus || "approved",
@@ -1044,8 +1064,10 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function resolvePlanAmount(plan: string) {
-  return PLAN_PRICES[plan] ?? null;
+function resolvePlanAmount(plan: string, billingCycle: string) {
+  const normalizedPlan = normalizePlanSlug(plan);
+  const normalizedBillingCycle = normalizeBillingCycle(billingCycle);
+  return PLAN_PRICES[normalizedPlan]?.[normalizedBillingCycle] ?? null;
 }
 
 function buildPaymentDescription(plan: string) {

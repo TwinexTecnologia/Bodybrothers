@@ -95,15 +95,6 @@ const BILLING_CYCLE_LABELS: Record<string, string> = {
   yearly: 'Anual',
 }
 
-const PLAN_CHANGE_RANKS: Record<string, number> = {
-  free: 0,
-  starter: 1,
-  premium: 2,
-  pro: 2,
-  elite: 3,
-  unlimited: 3,
-}
-
 type CommercialPlan = 'free' | 'starter' | 'premium'
 
 type PlanFeature = {
@@ -113,10 +104,12 @@ type PlanFeature = {
   accentColor: string
 }
 
-const PLAN_BASE_PRICES: Record<CommercialPlan, number> = {
-  free: 0,
-  starter: 14.9,
-  premium: 39.9,
+type BillingCycle = NonNullable<SubscriptionRow['billing_cycle']>
+
+const PLAN_PRICES: Record<CommercialPlan, Record<BillingCycle, number>> = {
+  free: { monthly: 0, quarterly: 0, yearly: 0 },
+  starter: { monthly: 9.9, quarterly: 24.9, yearly: 89.9 },
+  premium: { monthly: 29.9, quarterly: 74.9, yearly: 249.9 },
 }
 
 const PLAN_FEATURES: Record<CommercialPlan, PlanFeature> = {
@@ -173,16 +166,12 @@ export default function Profile() {
   const [storedPaymentMethod, setStoredPaymentMethod] = useState<StoredPaymentMethodRow | null>(null)
   const [latestPayment, setLatestPayment] = useState<SubscriptionPaymentRow | null>(null)
   const [activeStudents, setActiveStudents] = useState(0)
-  const [selectedBillingCycle, setSelectedBillingCycle] = useState<SubscriptionRow['billing_cycle']>('monthly')
   const [selectedPlanChangeBillingCycle, setSelectedPlanChangeBillingCycle] = useState<SubscriptionRow['billing_cycle']>('monthly')
   const [showPlanChangeOptions, setShowPlanChangeOptions] = useState(false)
   const [planChangeMode, setPlanChangeMode] = useState<'downgrade' | 'upgrade' | null>(null)
   const [selectedTargetPlan, setSelectedTargetPlan] = useState('')
   const [planChangeModalOpen, setPlanChangeModalOpen] = useState(false)
   const [planChangeLoading, setPlanChangeLoading] = useState(false)
-  const [billingCycleModalOpen, setBillingCycleModalOpen] = useState(false)
-  const [showBillingCycleOptions, setShowBillingCycleOptions] = useState(false)
-  const [billingCycleChangeLoading, setBillingCycleChangeLoading] = useState(false)
   const [cancelScheduledChangeLoading, setCancelScheduledChangeLoading] = useState(false)
   const [copyPixMsg, setCopyPixMsg] = useState('')
   const [paymentActionLoading, setPaymentActionLoading] = useState<'pix' | 'card' | 'check' | null>(null)
@@ -198,20 +187,11 @@ export default function Profile() {
 
   const currentPlanRaw = subscription?.plan_slug || 'free'
   const currentPlan = normalizeCommercialPlan(currentPlanRaw)
-  const canManageBillingCycle = useMemo(() => {
-    const plan = normalizeCommercialPlan(subscription?.plan_slug || 'free')
-    return plan !== 'free'
-  }, [subscription])
-
   const currentBillingCycle = subscription?.billing_cycle || 'monthly'
   const scheduledTargetPlan = normalizeCommercialPlan(subscription?.scheduled_plan_slug || currentPlan)
   const scheduledTargetBillingCycle = subscription?.scheduled_billing_cycle || null
   const hasScheduledChange = Boolean(subscription?.scheduled_change_at && (subscription?.scheduled_plan_slug || subscription?.scheduled_billing_cycle))
   const canManagePlanChange = true
-  const billingCycleOptions = useMemo(() => {
-    return (Object.entries(BILLING_CYCLE_LABELS) as Array<[NonNullable<SubscriptionRow['billing_cycle']>, string]>)
-      .filter(([cycle]) => cycle !== currentBillingCycle)
-  }, [currentBillingCycle])
   const planChangeOptions = useMemo(() => {
     if (!canManagePlanChange || !planChangeMode) return [] as Array<[string, string]>
 
@@ -235,9 +215,7 @@ export default function Profile() {
 
     return []
   }, [canManagePlanChange, currentPlan, planChangeMode])
-  const canScheduleBillingCycleChange = canManageBillingCycle && !hasScheduledChange
   const canSchedulePlanChange = canManagePlanChange && !hasScheduledChange
-  const selectedBillingCycleLabel = selectedBillingCycle ? BILLING_CYCLE_LABELS[selectedBillingCycle] || selectedBillingCycle : ''
   const currentPlanLabel = PLAN_LABELS[currentPlan] || currentPlan
   const currentBillingCycleLabel = BILLING_CYCLE_LABELS[currentBillingCycle] || 'Mensal'
   const scheduledTargetPlanLabel = PLAN_LABELS[scheduledTargetPlan] || scheduledTargetPlan
@@ -255,20 +233,26 @@ export default function Profile() {
   const selectedTargetPlanMonthlyLabel = selectedTargetPlan && selectedTargetPlan !== 'free'
     ? formatCurrency(getMonthlyEquivalentAmount(selectedTargetPlanAmount, planChangeBillingCycle), 'BRL')
     : 'Gratis'
+  const selectedTargetPlanSavingsLabel = selectedTargetPlan ? getCycleSavingsLabel(selectedTargetPlan as CommercialPlan, planChangeBillingCycle) : null
   const availablePlanCards = useMemo(() => {
     return planChangeOptions
       .map(([plan]) => {
         const commercialPlan = plan as CommercialPlan
         const details = PLAN_FEATURES[commercialPlan]
+        const recommendedCycle = getRecommendedBillingCycle(commercialPlan)
         return {
           plan: commercialPlan,
           details,
-          amount: getPlanAmount(commercialPlan, planChangeBillingCycle),
-          priceLabel: formatPlanPrice(commercialPlan, planChangeBillingCycle),
+          recommendedCycle,
+          amount: getPlanAmount(commercialPlan, recommendedCycle),
+          priceLabel: formatPlanPrice(commercialPlan, recommendedCycle),
+          monthlyLabel: formatCurrency(getMonthlyEquivalentAmount(getPlanAmount(commercialPlan, recommendedCycle), recommendedCycle), 'BRL'),
+          highlightLabel: getCycleHighlightLabel(commercialPlan, recommendedCycle),
+          savingsLabel: getCycleSavingsLabel(commercialPlan, recommendedCycle),
         }
       })
-      .filter((entry): entry is { plan: CommercialPlan; details: PlanFeature; amount: number; priceLabel: string } => Boolean(entry.details))
-  }, [planChangeBillingCycle, planChangeOptions])
+      .filter((entry): entry is { plan: CommercialPlan; details: PlanFeature; recommendedCycle: BillingCycle; amount: number; priceLabel: string; monthlyLabel: string; highlightLabel: string | null; savingsLabel: string | null } => Boolean(entry.details))
+  }, [planChangeOptions])
   const planChangeCycleCards = useMemo(() => {
     if (!selectedTargetPlan || selectedTargetPlan === 'free') return [] as Array<{
       cycle: NonNullable<SubscriptionRow['billing_cycle']>
@@ -287,23 +271,11 @@ export default function Profile() {
         amount,
         perMonth: getMonthlyEquivalentAmount(amount, cycle),
         savingsLabel: getCycleSavingsLabel(selectedTargetPlan as CommercialPlan, cycle),
+        highlightLabel: getCycleHighlightLabel(selectedTargetPlan as CommercialPlan, cycle),
         description: getCycleDescription(cycle),
       }
     })
   }, [selectedTargetPlan])
-  const standaloneBillingCycleCards = useMemo(() => {
-    return billingCycleOptions.map(([cycle, label]) => {
-      const amount = getPlanAmount(currentPlan as CommercialPlan, cycle)
-      return {
-        cycle,
-        label,
-        amount,
-        perMonth: getMonthlyEquivalentAmount(amount, cycle),
-        savingsLabel: getCycleSavingsLabel(currentPlan as CommercialPlan, cycle),
-        description: getCycleDescription(cycle),
-      }
-    })
-  }, [billingCycleOptions, currentPlan])
   const isFreeCancellationScheduled = hasScheduledChange && scheduledTargetPlan === 'free'
   const isFreePlanSelection = planChangeMode === 'downgrade' && selectedTargetPlan === 'free'
   const paymentActionData = useMemo(() => extractPaymentActionData(latestPayment?.raw_payload), [latestPayment])
@@ -342,19 +314,13 @@ export default function Profile() {
   }, [])
 
   useEffect(() => {
-    if (!billingCycleOptions.length) {
-      setSelectedBillingCycle(currentBillingCycle)
+    if (!selectedTargetPlan) {
+      setSelectedPlanChangeBillingCycle(currentBillingCycle)
       return
     }
 
-    const hasCurrentOption = billingCycleOptions.some(([cycle]) => cycle === selectedBillingCycle)
-    if (!hasCurrentOption) {
-      setSelectedBillingCycle(billingCycleOptions[0][0])
-    }
-  }, [billingCycleOptions, currentBillingCycle, selectedBillingCycle])
-
-  useEffect(() => {
-    setSelectedPlanChangeBillingCycle(currentBillingCycle)
+    const recommendedCycle = getRecommendedBillingCycle(selectedTargetPlan as CommercialPlan)
+    setSelectedPlanChangeBillingCycle(recommendedCycle)
   }, [currentBillingCycle, selectedTargetPlan])
 
   useEffect(() => {
@@ -519,33 +485,6 @@ export default function Profile() {
     }
   }
 
-  async function handleConfirmBillingCycleChange() {
-    if (!selectedBillingCycle) return
-
-    try {
-      setBillingCycleChangeLoading(true)
-      setMsg('')
-      setError('')
-
-      const response = await requestSubscriptionDowngrade({
-        targetPlan: currentPlan,
-        targetBillingCycle: selectedBillingCycle,
-      })
-
-      setBillingCycleModalOpen(false)
-      setShowBillingCycleOptions(false)
-      setMsg(
-        `Mudança do plano ${PLAN_LABELS[response.targetPlan] || response.targetPlan} para o ciclo ${BILLING_CYCLE_LABELS[response.targetBillingCycle] || response.targetBillingCycle} agendada para ${formatDate(response.effectiveAt)}. A cobrança será feita somente a partir dessa data.`,
-      )
-      await loadProfile()
-    } catch (err: any) {
-      console.error(err)
-      setError(err.message || 'Não foi possível solicitar a troca de ciclo do plano.')
-    } finally {
-      setBillingCycleChangeLoading(false)
-    }
-  }
-
   async function handleCancelScheduledChange() {
     const canceledCycleLabel = scheduledTargetBillingCycleLabel
     const canceledPlanLabel = scheduledTargetPlanLabel
@@ -559,7 +498,6 @@ export default function Profile() {
       const response = await cancelSubscriptionDowngrade()
       setShowPlanChangeOptions(false)
       setPlanChangeMode(null)
-      setShowBillingCycleOptions(false)
       setMsg(
         cancelingFreeSchedule
           ? 'Cancelamento agendado removido com sucesso. Sua assinatura paga continuará renovando normalmente.'
@@ -592,7 +530,6 @@ export default function Profile() {
       setPlanChangeModalOpen(false)
       setShowPlanChangeOptions(false)
       setPlanChangeMode(null)
-      setShowBillingCycleOptions(false)
       setMsg(
         response.targetPlan === 'free'
           ? `Cancelamento agendado com sucesso. Seu plano ${currentPlanLabel} continua ativo ate ${formatDate(response.effectiveAt)}. Depois disso, a assinatura vira Free e nenhuma nova cobranca sera gerada.`
@@ -1189,7 +1126,7 @@ export default function Profile() {
                   {planChangeMode && planChangeOptions.length > 0 && (
                     <>
                       <div style={planCardsGridStyle}>
-                        {availablePlanCards.map(({ plan, details, amount, priceLabel }) => (
+                        {availablePlanCards.map(({ plan, details, amount, priceLabel, monthlyLabel, highlightLabel, savingsLabel }) => (
                           <div
                             key={plan}
                             onClick={() => setSelectedTargetPlan(plan)}
@@ -1204,19 +1141,36 @@ export default function Profile() {
                                 <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>{details.title}</div>
                                 <div style={{ fontSize: '0.85rem', color: '#475569' }}>{details.subtitle}</div>
                               </div>
-                              {selectedTargetPlan === plan && (
+                              <div style={{ display: 'grid', gap: 8, justifyItems: 'end' }}>
+                                {plan === 'premium' && (
+                                  <div style={recommendedBadgeStyle}>
+                                    ☆ Recomendado
+                                  </div>
+                                )}
+                                {selectedTargetPlan === plan && (
                                 <div style={selectedPlanBadgeStyle}>
                                   Selecionado
                                 </div>
-                              )}
+                                )}
+                              </div>
                             </div>
                             <div style={{ display: 'grid', gap: 2 }}>
-                              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>
-                                {priceLabel}
-                              </div>
-                              <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                                {amount > 0 ? `cobrado no ciclo ${planChangeBillingCycleLabel.toLowerCase()}` : 'sem cobranca recorrente'}
-                              </div>
+                              {amount > 0 ? (
+                                <>
+                                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>A partir de</div>
+                                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>
+                                    {monthlyLabel}/mes
+                                  </div>
+                                  <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                                    {`Cobranca ${highlightLabel?.toLowerCase() || 'no ciclo recomendado'} de ${priceLabel}`}
+                                  </div>
+                                </>
+                              ) : (
+                                <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
+                                  Sem cobranca recorrente
+                                </div>
+                              )}
+                              {savingsLabel && <div style={savingsBadgeStyle}>{savingsLabel}</div>}
                             </div>
                             <div style={{ display: 'grid', gap: 6 }}>
                               {details.bullets.map((bullet) => (
@@ -1241,16 +1195,24 @@ export default function Profile() {
                                   <div style={{ fontWeight: 700, color: '#0f172a' }}>{selectedTargetPlanFeatures.title}</div>
                                   <div style={{ fontSize: '0.88rem', color: '#475569' }}>{selectedTargetPlanFeatures.subtitle}</div>
                                 </div>
-                                <div style={{ textAlign: 'right' }}>
-                                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>A partir de</div>
-                                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>{selectedTargetPlanMonthlyLabel}/mes</div>
-                                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{selectedTargetPlanPriceLabel} no {planChangeBillingCycleLabel.toLowerCase()}</div>
+                                <div style={{ display: 'grid', gap: 8, justifyItems: 'end' }}>
+                                  {selectedTargetPlan === 'premium' && (
+                                    <div style={recommendedBadgeStyle}>
+                                      ☆ Recomendado
+                                    </div>
+                                  )}
+                                  <div style={{ textAlign: 'right' }}>
+                                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>A partir de</div>
+                                    <div style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{selectedTargetPlanMonthlyLabel}/mes</div>
+                                    <div style={{ fontSize: '0.92rem', color: '#64748b' }}>Cobranca {planChangeBillingCycleLabel.toLowerCase()} de {selectedTargetPlanPriceLabel}</div>
+                                  </div>
+                                  {selectedTargetPlanSavingsLabel && <div style={savingsBadgeStyle}>{selectedTargetPlanSavingsLabel}</div>}
                                 </div>
                               </div>
                               <div style={{ display: 'grid', gap: 10 }}>
                                 <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Escolha o ciclo de pagamento</div>
                                 <div style={billingCycleCardsGridStyle}>
-                                  {planChangeCycleCards.map(({ cycle, label, amount, perMonth, savingsLabel, description }) => (
+                                  {planChangeCycleCards.map(({ cycle, label, amount, perMonth, savingsLabel, highlightLabel, description }) => (
                                     <div
                                       key={cycle}
                                       onClick={() => setSelectedPlanChangeBillingCycle(cycle)}
@@ -1270,6 +1232,7 @@ export default function Profile() {
                                         <div style={{ fontSize: '0.82rem', color: '#475569' }}>
                                           {formatCurrency(amount, 'BRL')} no {label.toLowerCase()}
                                         </div>
+                                        {highlightLabel && <div style={cycleHighlightBadgeStyle}>{highlightLabel}</div>}
                                         {savingsLabel && <div style={savingsBadgeStyle}>{savingsLabel}</div>}
                                       </div>
                                     </div>
@@ -1278,7 +1241,7 @@ export default function Profile() {
                               </div>
                               <div style={{ fontSize: '0.88rem', color: '#334155' }}>
                                 {selectedTargetPlanAmount > 0
-                                  ? `A nova cobranca sera de ${selectedTargetPlanPriceLabel} por ${planChangeBillingCycleLabel.toLowerCase()}, iniciando apenas na proxima renovacao.`
+                                  ? `A nova cobranca sera de ${selectedTargetPlanPriceLabel} no ciclo ${planChangeBillingCycleLabel.toLowerCase()}, iniciando apenas na proxima renovacao.`
                                   : 'Depois da virada, sua conta continua no plano gratuito sem nova cobranca automatica.'}
                               </div>
                             </div>
@@ -1322,93 +1285,6 @@ export default function Profile() {
               </div>
             </div>
 
-            <div style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', display: 'grid', gap: 10 }}>
-              <div style={{ fontWeight: 600, color: '#0f172a' }}>Trocar ciclo do plano</div>
-              <div style={{ fontSize: '0.9rem' }}>
-                Seu plano atual é {currentPlanLabel} no ciclo {currentBillingCycleLabel}. Escolha abaixo para qual dos outros ciclos você deseja migrar no próximo vencimento.
-              </div>
-
-              {hasScheduledChange && (
-                <div style={{ fontSize: '0.9rem', color: '#1d4ed8' }}>
-                  Existe uma mudança agendada. Se quiser escolher outro ciclo, primeiro cancele o agendamento atual.
-                </div>
-              )}
-
-              {!canManageBillingCycle && (
-                <div style={{ fontSize: '0.9rem', color: '#475569' }}>
-                  A troca de ciclo fica disponível quando você estiver em um plano pago.
-                </div>
-              )}
-
-              {canScheduleBillingCycleChange && billingCycleOptions.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowBillingCycleOptions(current => !current)}
-                  style={ghostButtonStyle}
-                >
-                  {showBillingCycleOptions ? 'Ocultar opções de ciclo' : 'Ver opções de ciclo'}
-                </button>
-              )}
-
-              {canScheduleBillingCycleChange && billingCycleOptions.length > 0 && showBillingCycleOptions && (
-                <div style={{ display: 'grid', gap: 12, padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff' }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Novo ciclo do plano</div>
-                  <div style={billingCycleCardsGridStyle}>
-                    {standaloneBillingCycleCards.map(({ cycle, label, amount, perMonth, savingsLabel, description }) => (
-                      <div
-                        key={cycle}
-                        onClick={() => setSelectedBillingCycle(cycle)}
-                        style={{
-                          ...billingCycleCardStyle,
-                          ...(selectedBillingCycle === cycle ? selectedBillingCycleCardStyle : null),
-                        }}
-                      >
-                        <div style={{ display: 'grid', gap: 4 }}>
-                          <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>{label}</div>
-                          <div style={{ fontSize: '0.82rem', color: '#64748b' }}>{description}</div>
-                        </div>
-                        <div style={{ textAlign: 'right', display: 'grid', gap: 4 }}>
-                          <div style={{ fontSize: '1.02rem', fontWeight: 800, color: '#0f172a' }}>
-                            {formatCurrency(perMonth, 'BRL')}/mes
-                          </div>
-                          <div style={{ fontSize: '0.82rem', color: '#475569' }}>
-                            {formatCurrency(amount, 'BRL')} no {label.toLowerCase()}
-                          </div>
-                          {savingsLabel && <div style={savingsBadgeStyle}>{savingsLabel}</div>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {selectedBillingCycleLabel && (
-                    <div style={{ fontSize: '0.9rem', color: '#475569' }}>
-                      Você continuará no plano {currentPlanLabel}. Apenas o ciclo será alterado de {currentBillingCycleLabel} para {selectedBillingCycleLabel}.
-                    </div>
-                  )}
-
-                  <div style={downgradeWarningStyle}>
-                    A nova cobrança só será feita após o fim do ciclo atual, em {subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'sua próxima cobrança'}.
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                {canScheduleBillingCycleChange && showBillingCycleOptions && (
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycleModalOpen(true)}
-                    disabled={!selectedBillingCycle || billingCycleChangeLoading}
-                    style={{
-                      ...actionButtonStyle,
-                      opacity: !selectedBillingCycle || billingCycleChangeLoading ? 0.7 : 1,
-                      cursor: !selectedBillingCycle || billingCycleChangeLoading ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {billingCycleChangeLoading ? 'Agendando...' : 'Confirmar troca de ciclo'}
-                  </button>
-                )}
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1431,23 +1307,6 @@ export default function Profile() {
         </div>
 
       </div>
-
-      <ConfirmModal
-        isOpen={billingCycleModalOpen}
-        title="Confirmar troca de ciclo"
-        description={selectedBillingCycleLabel
-          ? `Você confirma a mudança do plano ${currentPlanLabel} do ciclo ${currentBillingCycleLabel} para ${selectedBillingCycleLabel}? A nova cobrança será de ${formatPlanPrice(currentPlan as CommercialPlan, selectedBillingCycle)} por ${selectedBillingCycleLabel.toLowerCase()}, aplicada somente após o fim do ciclo atual, em ${subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'sua próxima cobrança'}.`
-          : 'Deseja confirmar a troca de ciclo do plano?'}
-        cancelText="Não, manter ciclo atual"
-        confirmText={billingCycleChangeLoading ? 'Agendando...' : 'Sim, agendar troca'}
-        onCancel={() => {
-          if (!billingCycleChangeLoading) setBillingCycleModalOpen(false)
-        }}
-        onConfirm={handleConfirmBillingCycleChange}
-        stackActions
-        cancelDisabled={billingCycleChangeLoading}
-        confirmDisabled={billingCycleChangeLoading}
-      />
 
       <ConfirmModal
         isOpen={removeSavedCardModalOpen}
@@ -1663,9 +1522,9 @@ const selectedPlanSummaryStyle: CSSProperties = {
   padding: 12,
   borderRadius: 10,
   border: '1px solid #cbd5e1',
-  background: '#f8fafc',
+  background: 'linear-gradient(135deg, #ffffff 0%, #f8f5ff 100%)',
   display: 'grid',
-  gap: 6,
+  gap: 12,
 }
 
 const billingCycleCardsGridStyle: CSSProperties = {
@@ -1689,6 +1548,26 @@ const selectedBillingCycleCardStyle: CSSProperties = {
   border: '1px solid #a78bfa',
   background: '#f5f3ff',
   boxShadow: '0 12px 24px rgba(124, 58, 237, 0.1)',
+}
+
+const recommendedBadgeStyle: CSSProperties = {
+  justifySelf: 'end',
+  padding: '6px 12px',
+  borderRadius: 999,
+  background: '#dcfce7',
+  color: '#166534',
+  fontSize: '0.78rem',
+  fontWeight: 700,
+}
+
+const cycleHighlightBadgeStyle: CSSProperties = {
+  justifySelf: 'end',
+  padding: '4px 10px',
+  borderRadius: 999,
+  background: '#ede9fe',
+  color: '#6d28d9',
+  fontSize: '0.75rem',
+  fontWeight: 700,
 }
 
 const savingsBadgeStyle: CSSProperties = {
@@ -1725,8 +1604,9 @@ function getBillingCycleMultiplier(value: string) {
 }
 
 function getPlanAmount(planSlug: CommercialPlan, billingCycle: string) {
-  const baseAmount = PLAN_BASE_PRICES[planSlug]
-  return Number(((baseAmount || 0) * getBillingCycleMultiplier(billingCycle)).toFixed(2))
+  const normalizedCycle = normalizeBillingCycle(billingCycle) || 'monthly'
+  const planPricing = PLAN_PRICES[planSlug]
+  return Number((planPricing?.[normalizedCycle] || 0).toFixed(2))
 }
 
 function getMonthlyEquivalentAmount(totalAmount: number, billingCycle: string) {
@@ -1746,8 +1626,19 @@ function getCycleSavingsLabel(planSlug: CommercialPlan, billingCycle: string) {
   const selectedTotal = getPlanAmount(planSlug, billingCycle)
   if (monthlyTotal <= 0 || selectedTotal >= monthlyTotal) return null
 
-  const savingsPercent = Math.round(((monthlyTotal - selectedTotal) / monthlyTotal) * 100)
+  const savingsPercent = Math.floor(((monthlyTotal - selectedTotal) / monthlyTotal) * 100)
   return savingsPercent > 0 ? `Economize ${savingsPercent}%` : null
+}
+
+function getCycleHighlightLabel(planSlug: CommercialPlan, billingCycle: string) {
+  if (billingCycle !== 'yearly') return null
+  return planSlug === 'premium' ? 'Mais popular' : 'Mais economico'
+}
+
+function getRecommendedBillingCycle(planSlug: CommercialPlan): BillingCycle {
+  if (planSlug === 'premium') return 'yearly'
+  if (planSlug === 'starter') return 'yearly'
+  return 'monthly'
 }
 
 function formatPlanPrice(planSlug: CommercialPlan | '', billingCycle: string) {
