@@ -75,9 +75,9 @@ const PLAN_LABELS: Record<string, string> = {
   free: 'Free',
   starter: 'Starter',
   premium: 'Premium',
-  pro: 'Pro',
-  elite: 'Elite',
-  unlimited: 'Ilimitado',
+  pro: 'Premium',
+  elite: 'Premium',
+  unlimited: 'Premium',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -102,6 +102,37 @@ const PLAN_CHANGE_RANKS: Record<string, number> = {
   pro: 2,
   elite: 3,
   unlimited: 3,
+}
+
+const PLAN_FEATURES: Record<'free' | 'starter' | 'premium', { title: string; subtitle: string; bullets: string[] }> = {
+  free: {
+    title: 'FitBody Free',
+    subtitle: 'Plano gratuito',
+    bullets: [
+      'Acesso basico ao app',
+      'Ate 1 aluno cadastrado',
+      'Sem cobranca automatica',
+    ],
+  },
+  starter: {
+    title: 'FitBody Starter',
+    subtitle: 'Todos os acessos ate 5 alunos',
+    bullets: [
+      'Acesso completo ao app',
+      'Ate 5 alunos cadastrados',
+      'Relatorios avancados',
+    ],
+  },
+  premium: {
+    title: 'FitBody Premium',
+    subtitle: 'Tudo ilimitado',
+    bullets: [
+      'Acesso completo ao app',
+      'Alunos ilimitados',
+      'Relatorios avancados',
+      'Personalizacao completa',
+    ],
+  },
 }
 
 export default function Profile() {
@@ -146,18 +177,18 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
+  const currentPlanRaw = subscription?.plan_slug || 'free'
+  const currentPlan = normalizeCommercialPlan(currentPlanRaw)
   const canManageBillingCycle = useMemo(() => {
-    const plan = subscription?.plan_slug || 'free'
+    const plan = normalizeCommercialPlan(subscription?.plan_slug || 'free')
     return plan !== 'free'
   }, [subscription])
 
-  const currentPlan = subscription?.plan_slug || 'free'
   const currentBillingCycle = subscription?.billing_cycle || 'monthly'
-  const currentPlanRank = PLAN_CHANGE_RANKS[currentPlan] || 0
-  const scheduledTargetPlan = subscription?.scheduled_plan_slug || currentPlan
+  const scheduledTargetPlan = normalizeCommercialPlan(subscription?.scheduled_plan_slug || currentPlan)
   const scheduledTargetBillingCycle = subscription?.scheduled_billing_cycle || null
   const hasScheduledChange = Boolean(subscription?.scheduled_change_at && (subscription?.scheduled_plan_slug || subscription?.scheduled_billing_cycle))
-  const canManagePlanChange = currentPlan !== 'free'
+  const canManagePlanChange = true
   const billingCycleOptions = useMemo(() => {
     return (Object.entries(BILLING_CYCLE_LABELS) as Array<[NonNullable<SubscriptionRow['billing_cycle']>, string]>)
       .filter(([cycle]) => cycle !== currentBillingCycle)
@@ -165,16 +196,26 @@ export default function Profile() {
   const planChangeOptions = useMemo(() => {
     if (!canManagePlanChange || !planChangeMode) return [] as Array<[string, string]>
 
-    return (Object.entries(PLAN_LABELS) as Array<[string, string]>)
-      .filter(([plan]) => {
-        if (plan === currentPlan) return false
+    if (currentPlan === 'free') {
+      return planChangeMode === 'upgrade'
+        ? [['starter', PLAN_LABELS.starter], ['premium', PLAN_LABELS.premium]]
+        : []
+    }
 
-        const rank = PLAN_CHANGE_RANKS[plan] ?? -1
-        return planChangeMode === 'downgrade'
-          ? rank < currentPlanRank
-          : rank > currentPlanRank
-      })
-  }, [canManagePlanChange, currentPlan, currentPlanRank, planChangeMode])
+    if (currentPlan === 'starter') {
+      return planChangeMode === 'upgrade'
+        ? [['premium', PLAN_LABELS.premium]]
+        : [['free', PLAN_LABELS.free]]
+    }
+
+    if (currentPlan === 'premium') {
+      return planChangeMode === 'downgrade'
+        ? [['starter', PLAN_LABELS.starter], ['free', PLAN_LABELS.free]]
+        : []
+    }
+
+    return []
+  }, [canManagePlanChange, currentPlan, planChangeMode])
   const canScheduleBillingCycleChange = canManageBillingCycle && !hasScheduledChange
   const canSchedulePlanChange = canManagePlanChange && !hasScheduledChange
   const selectedBillingCycleLabel = selectedBillingCycle ? BILLING_CYCLE_LABELS[selectedBillingCycle] || selectedBillingCycle : ''
@@ -185,6 +226,12 @@ export default function Profile() {
     ? BILLING_CYCLE_LABELS[scheduledTargetBillingCycle] || scheduledTargetBillingCycle
     : null
   const selectedTargetPlanLabel = PLAN_LABELS[selectedTargetPlan] || selectedTargetPlan
+  const selectedTargetPlanFeatures = selectedTargetPlan ? PLAN_FEATURES[selectedTargetPlan as keyof typeof PLAN_FEATURES] : null
+  const availablePlanCards = useMemo(() => {
+    return planChangeOptions
+      .map(([plan]) => ({ plan, details: PLAN_FEATURES[plan as keyof typeof PLAN_FEATURES] }))
+      .filter((entry): entry is { plan: 'free' | 'starter' | 'premium'; details: (typeof PLAN_FEATURES)['free'] } => Boolean(entry.details))
+  }, [planChangeOptions])
   const isFreeCancellationScheduled = hasScheduledChange && scheduledTargetPlan === 'free'
   const isFreePlanSelection = planChangeMode === 'downgrade' && selectedTargetPlan === 'free'
   const paymentActionData = useMemo(() => extractPaymentActionData(latestPayment?.raw_payload), [latestPayment])
@@ -1023,12 +1070,6 @@ export default function Profile() {
                 </div>
               )}
 
-              {!canManagePlanChange && (
-                <div style={{ fontSize: '0.9rem', color: '#475569' }}>
-                  A troca de plano fica disponível quando você estiver em um plano pago.
-                </div>
-              )}
-
               {canSchedulePlanChange && (
                 <button
                   type="button"
@@ -1071,6 +1112,30 @@ export default function Profile() {
 
                   {planChangeMode && planChangeOptions.length > 0 && (
                     <>
+                      <div style={planCardsGridStyle}>
+                        {availablePlanCards.map(({ plan, details }) => (
+                          <div
+                            key={plan}
+                            style={{
+                              ...planPreviewCardStyle,
+                              ...(selectedTargetPlan === plan ? selectedPlanPreviewCardStyle : null),
+                            }}
+                          >
+                            <div style={{ display: 'grid', gap: 4 }}>
+                              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>{details.title}</div>
+                              <div style={{ fontSize: '0.85rem', color: '#475569' }}>{details.subtitle}</div>
+                            </div>
+                            <div style={{ display: 'grid', gap: 6 }}>
+                              {details.bullets.map((bullet) => (
+                                <div key={bullet} style={{ fontSize: '0.88rem', color: '#334155' }}>
+                                  {`- ${bullet}`}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
                       <label style={{ display: 'grid', gap: 8 }}>
                         <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
                           {planChangeMode === 'downgrade' ? 'Plano de downgrade' : 'Plano de upgrade'}
@@ -1089,9 +1154,17 @@ export default function Profile() {
                       </label>
 
                       {selectedTargetPlan && !isFreePlanSelection && (
-                        <div style={{ fontSize: '0.9rem', color: '#475569' }}>
-                          Seu plano será alterado de {currentPlanLabel} para {selectedTargetPlanLabel} somente após o fim do ciclo atual.
-                        </div>
+                        <>
+                          <div style={{ fontSize: '0.9rem', color: '#475569' }}>
+                            Seu plano será alterado de {currentPlanLabel} para {selectedTargetPlanLabel} somente após o fim do ciclo atual.
+                          </div>
+                          {selectedTargetPlanFeatures && (
+                            <div style={selectedPlanSummaryStyle}>
+                              <div style={{ fontWeight: 700, color: '#0f172a' }}>{selectedTargetPlanFeatures.title}</div>
+                              <div style={{ fontSize: '0.88rem', color: '#475569' }}>{selectedTargetPlanFeatures.subtitle}</div>
+                            </div>
+                          )}
+                        </>
                       )}
 
                       {isFreePlanSelection && (
@@ -1420,8 +1493,43 @@ const pixGuidanceStyle: CSSProperties = {
   lineHeight: 1.5,
 }
 
+const planCardsGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gap: 12,
+}
+
+const planPreviewCardStyle: CSSProperties = {
+  padding: 14,
+  borderRadius: 12,
+  border: '1px solid #e2e8f0',
+  background: '#f8fafc',
+  display: 'grid',
+  gap: 12,
+}
+
+const selectedPlanPreviewCardStyle: CSSProperties = {
+  border: '1px solid #bfdbfe',
+  background: '#eff6ff',
+}
+
+const selectedPlanSummaryStyle: CSSProperties = {
+  padding: 12,
+  borderRadius: 10,
+  border: '1px solid #cbd5e1',
+  background: '#f8fafc',
+  display: 'grid',
+  gap: 6,
+}
+
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('pt-BR')
+}
+
+function normalizeCommercialPlan(value: string | null | undefined) {
+  if (value === 'starter') return 'starter'
+  if (value === 'premium' || value === 'pro' || value === 'elite' || value === 'unlimited') return 'premium'
+  return 'free'
 }
 
 function formatCurrency(value: number, currency: string) {

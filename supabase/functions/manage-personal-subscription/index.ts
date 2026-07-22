@@ -10,7 +10,7 @@ const corsHeaders = {
 
 const PLAN_CONFIGS: Record<string, { studentLimit: number; paid: boolean; rank: number }> = {
   free: { studentLimit: 1, paid: false, rank: 0 },
-  starter: { studentLimit: 10, paid: true, rank: 1 },
+  starter: { studentLimit: 5, paid: true, rank: 1 },
   pro: { studentLimit: 30, paid: true, rank: 2 },
   premium: { studentLimit: 30, paid: true, rank: 2 },
   elite: { studentLimit: 999999, paid: true, rank: 3 },
