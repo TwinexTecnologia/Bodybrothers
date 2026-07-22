@@ -16,6 +16,7 @@ type SubscriptionRow = {
   billing_cycle: 'monthly' | 'quarterly' | 'yearly' | null
   status: string | null
   amount: number | null
+  payment_provider?: string | null
   next_billing_at: string | null
   scheduled_plan_slug: string | null
   scheduled_billing_cycle: 'monthly' | 'quarterly' | 'yearly' | null
@@ -199,6 +200,7 @@ export default function Profile() {
   const [phone, setPhone] = useState('')
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null)
   const [subscriptionAmount, setSubscriptionAmount] = useState(0)
+  const [profilePaymentProvider, setProfilePaymentProvider] = useState<'mercadopago' | 'asaas' | null>(null)
   const [savedPaymentMethod, setSavedPaymentMethod] = useState<SavedPaymentMethod | null>(null)
   const [storedPaymentMethod, setStoredPaymentMethod] = useState<StoredPaymentMethodRow | null>(null)
   const [latestPayment, setLatestPayment] = useState<SubscriptionPaymentRow | null>(null)
@@ -315,7 +317,14 @@ export default function Profile() {
   const hasPixPaymentData = Boolean(paymentActionData.pixCode || paymentActionData.qrCodeBase64)
   const canCopyPix = Boolean(paymentActionData.pixCode)
   const needsRegularization = subscription?.status === 'blocked' || subscription?.status === 'past_due'
-  const isAsaasSubscriptionFlow = savedPaymentMethod?.provider === 'asaas' || latestPayment?.provider === 'asaas'
+  const resolvedBillingProvider = normalizeFrontPaymentProvider(
+    savedPaymentMethod?.provider
+      || latestPayment?.provider
+      || subscription?.payment_provider
+      || profilePaymentProvider
+      || (currentPlan !== 'free' ? 'asaas' : null),
+  )
+  const isAsaasSubscriptionFlow = resolvedBillingProvider === 'asaas'
   const asaasCardHolderDefaults = useMemo<AsaasCardHolderInfoDefaults>(() => {
     return extractAsaasCardHolderDefaults(storedPaymentMethod?.raw_payload, {
       name,
@@ -437,7 +446,7 @@ export default function Profile() {
           .maybeSingle<StoredPaymentMethodRow>(),
         supabase
           .from('personal_subscriptions')
-          .select('id, plan_slug, student_limit, billing_cycle, status, amount, next_billing_at, scheduled_plan_slug, scheduled_billing_cycle, scheduled_change_at')
+          .select('id, plan_slug, student_limit, billing_cycle, status, amount, payment_provider, next_billing_at, scheduled_plan_slug, scheduled_billing_cycle, scheduled_change_at')
           .eq('personal_id', resolvedPersonalAccountId)
           .maybeSingle<SubscriptionRow>(),
         supabase
@@ -461,6 +470,7 @@ export default function Profile() {
 
       setSavedPaymentMethod(resolveSavedPaymentMethod(profile?.data, paymentMethodResult.data || null))
       setStoredPaymentMethod(paymentMethodResult.data || null)
+      setProfilePaymentProvider(normalizeFrontPaymentProvider(profile?.data?.saas?.paymentProvider))
 
       const fallbackSubscription = buildLegacySubscription(profile?.data)
       const resolvedSubscription = subscriptionResult.data || fallbackSubscription
@@ -2845,6 +2855,12 @@ function normalizeMoneyValue(value: unknown) {
     if (Number.isFinite(normalized)) return normalized
   }
   return 0
+}
+
+function normalizeFrontPaymentProvider(value: unknown): 'mercadopago' | 'asaas' | null {
+  if (value === 'asaas') return 'asaas'
+  if (value === 'mercadopago') return 'mercadopago'
+  return null
 }
 
 function normalizeEvolutionMode(value: unknown): EvolutionMode {
