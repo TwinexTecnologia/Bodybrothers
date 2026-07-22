@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { CheckCircle2, CircleAlert, Crown, Gift, ShieldCheck, TrendingDown, TrendingUp, Users } from 'lucide-react'
+import { CheckCircle2, CircleAlert, Crown, Gift, ReceiptText, ShieldCheck, TrendingDown, TrendingUp, Users } from 'lucide-react'
 import AsaasCardForm, { type AsaasCardFormSubmitData, type AsaasCardHolderInfoDefaults } from '../../components/AsaasCardForm'
 import ConfirmModal from '../../components/ConfirmModal'
 import MercadoPagoCardForm from '../../components/MercadoPagoCardForm'
@@ -23,6 +23,8 @@ type SubscriptionRow = {
 
 type SubscriptionPaymentRow = {
   id: string
+  plan_slug: string | null
+  billing_cycle: 'monthly' | 'quarterly' | 'yearly' | null
   status: 'pending' | 'approved' | 'failed' | 'canceled' | 'refunded'
   amount: number
   currency: string | null
@@ -31,6 +33,7 @@ type SubscriptionPaymentRow = {
   provider_reference: string | null
   description: string | null
   due_at: string | null
+  paid_at: string | null
   created_at: string
   raw_payload: Record<string, unknown> | null
 }
@@ -186,9 +189,11 @@ export default function Profile() {
   const [savedPaymentMethod, setSavedPaymentMethod] = useState<SavedPaymentMethod | null>(null)
   const [storedPaymentMethod, setStoredPaymentMethod] = useState<StoredPaymentMethodRow | null>(null)
   const [latestPayment, setLatestPayment] = useState<SubscriptionPaymentRow | null>(null)
+  const [subscriptionPayments, setSubscriptionPayments] = useState<SubscriptionPaymentRow[]>([])
   const [activeStudents, setActiveStudents] = useState(0)
   const [selectedPlanChangeBillingCycle, setSelectedPlanChangeBillingCycle] = useState<SubscriptionRow['billing_cycle']>('monthly')
   const [showPlanChangeOptions, setShowPlanChangeOptions] = useState(false)
+  const [showFinancialHistory, setShowFinancialHistory] = useState(false)
   const [planChangeMode, setPlanChangeMode] = useState<'downgrade' | 'upgrade' | null>(null)
   const [selectedTargetPlan, setSelectedTargetPlan] = useState('')
   const [planChangeModalOpen, setPlanChangeModalOpen] = useState(false)
@@ -419,18 +424,28 @@ export default function Profile() {
       setSubscriptionAmount(normalizeMoneyValue(subscriptionResult.data?.amount))
       setActiveStudents((studentsResult.data || []).filter((student: any) => (student?.data?.status || 'ativo') !== 'inativo').length)
 
-      if (subscriptionResult.data?.id && (resolvedSubscription?.status === 'blocked' || resolvedSubscription?.status === 'past_due')) {
-        const { data: paymentData } = await supabase
+      if (subscriptionResult.data?.id) {
+        const { data: paymentData, error: paymentsError } = await supabase
           .from('subscription_payments')
-          .select('id, status, amount, currency, provider, provider_payment_id, provider_reference, description, due_at, created_at, raw_payload')
+          .select('id, plan_slug, billing_cycle, status, amount, currency, provider, provider_payment_id, provider_reference, description, due_at, paid_at, created_at, raw_payload')
           .eq('subscription_id', subscriptionResult.data.id)
-          .in('status', ['pending', 'failed'])
           .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle<SubscriptionPaymentRow>()
+          .limit(50)
 
-        setLatestPayment(paymentData || null)
+        if (paymentsError) {
+          console.error('Erro ao carregar subscription_payments:', paymentsError)
+        }
+
+        const resolvedPayments = (paymentData || []) as SubscriptionPaymentRow[]
+        setSubscriptionPayments(resolvedPayments)
+
+        if (resolvedSubscription?.status === 'blocked' || resolvedSubscription?.status === 'past_due') {
+          setLatestPayment(resolvedPayments.find((payment) => payment.status === 'pending' || payment.status === 'failed') || null)
+        } else {
+          setLatestPayment(null)
+        }
       } else {
+        setSubscriptionPayments([])
         setLatestPayment(null)
         setShowCardForm(false)
         setCardFormMode(null)
@@ -787,8 +802,15 @@ export default function Profile() {
         </div>
 
         <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Plano e Assinatura</h3>
+            <button
+              type="button"
+              onClick={() => setShowFinancialHistory((current) => !current)}
+              style={ghostButtonStyle}
+            >
+              {showFinancialHistory ? 'Ocultar financeiro' : 'Ver financeiro'}
+            </button>
           </div>
           <div style={{ padding: 24, display: 'grid', gap: 20 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
@@ -799,6 +821,68 @@ export default function Profile() {
               <InfoCard label="Alunos ativos" value={String(activeStudents)} tone={typeof subscription?.student_limit === 'number' && activeStudents >= subscription.student_limit ? 'warning' : 'default'} />
               <InfoCard label="Próxima cobrança" value={subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : '-'} />
             </div>
+
+            {showFinancialHistory && (
+              <div style={financialHistoryCardStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={financialSectionIconStyle}>
+                      <ReceiptText size={18} color="#6D28D9" />
+                    </div>
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Financeiro</div>
+                      <div style={{ fontSize: '0.9rem', color: '#6B7280' }}>
+                        Acompanhe seus pagamentos, mensalidades e o tipo de cobrança da assinatura.
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#6B7280' }}>
+                    {subscriptionPayments.length} {subscriptionPayments.length === 1 ? 'pagamento encontrado' : 'pagamentos encontrados'}
+                  </div>
+                </div>
+
+                {subscriptionPayments.length ? (
+                  <div style={financialTableWrapStyle}>
+                    <table style={financialTableStyle}>
+                      <thead>
+                        <tr>
+                          <th style={financialHeaderCellStyle}>Data</th>
+                          <th style={financialHeaderCellStyle}>Fatura</th>
+                          <th style={financialHeaderCellStyle}>Descricao</th>
+                          <th style={financialHeaderCellStyle}>Tipo de cobranca</th>
+                          <th style={financialHeaderCellStyle}>Ciclo</th>
+                          <th style={financialHeaderCellStyle}>Valor</th>
+                          <th style={financialHeaderCellStyle}>Metodo</th>
+                          <th style={financialHeaderCellStyle}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {subscriptionPayments.map((payment) => (
+                          <tr key={payment.id}>
+                            <td style={financialBodyCellStyle}>{formatDate(payment.paid_at || payment.due_at || payment.created_at)}</td>
+                            <td style={financialBodyCellStyle}>
+                              <span style={invoiceReferenceStyle}>{formatPaymentInvoiceLabel(payment)}</span>
+                            </td>
+                            <td style={financialBodyCellStyle}>{formatPaymentLineDescription(payment)}</td>
+                            <td style={financialBodyCellStyle}>{getPaymentChargeTypeLabel(payment)}</td>
+                            <td style={financialBodyCellStyle}>{BILLING_CYCLE_LABELS[payment.billing_cycle || 'monthly'] || 'Mensal'}</td>
+                            <td style={financialBodyCellStyle}>{formatCurrency(payment.amount, payment.currency || 'BRL')}</td>
+                            <td style={financialBodyCellStyle}>{getPaymentMethodLabel(payment)}</td>
+                            <td style={financialBodyCellStyle}>
+                              <span style={getPaymentStatusPillStyle(payment.status)}>{getPaymentStatusLabel(payment.status)}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={financialEmptyStateStyle}>
+                    Ainda nao existem pagamentos registrados para esta assinatura.
+                  </div>
+                )}
+              </div>
+            )}
 
             {(subscription?.status === 'blocked' || subscription?.status === 'past_due') && (
               <div style={subscription?.status === 'blocked' ? blockedBannerStyle : pastDueBannerStyle}>
@@ -1783,6 +1867,78 @@ const securePaymentStyle: CSSProperties = {
   fontSize: '0.92rem',
 }
 
+const financialHistoryCardStyle: CSSProperties = {
+  display: 'grid',
+  gap: 16,
+  borderRadius: 16,
+  border: '1px solid #E5E7EB',
+  background: '#FFFFFF',
+  padding: 20,
+}
+
+const financialSectionIconStyle: CSSProperties = {
+  width: 40,
+  height: 40,
+  borderRadius: 12,
+  background: '#F5F3FF',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}
+
+const financialTableWrapStyle: CSSProperties = {
+  width: '100%',
+  overflowX: 'auto',
+  borderRadius: 14,
+  border: '1px solid #E5E7EB',
+}
+
+const financialTableStyle: CSSProperties = {
+  width: '100%',
+  borderCollapse: 'collapse',
+  minWidth: 920,
+  background: '#FFFFFF',
+}
+
+const financialHeaderCellStyle: CSSProperties = {
+  textAlign: 'left',
+  padding: '14px 16px',
+  fontSize: '0.8rem',
+  fontWeight: 700,
+  color: '#6B7280',
+  background: '#F9FAFB',
+  borderBottom: '1px solid #E5E7EB',
+  whiteSpace: 'nowrap',
+}
+
+const financialBodyCellStyle: CSSProperties = {
+  padding: '14px 16px',
+  fontSize: '0.9rem',
+  color: '#374151',
+  borderBottom: '1px solid #F3F4F6',
+  verticalAlign: 'middle',
+}
+
+const financialEmptyStateStyle: CSSProperties = {
+  borderRadius: 14,
+  border: '1px dashed #D1D5DB',
+  background: '#F9FAFB',
+  padding: 18,
+  fontSize: '0.92rem',
+  color: '#6B7280',
+}
+
+const invoiceReferenceStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '6px 10px',
+  borderRadius: 999,
+  background: '#F5F3FF',
+  color: '#6D28D9',
+  fontWeight: 600,
+  fontSize: '0.82rem',
+}
+
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('pt-BR')
 }
@@ -1940,6 +2096,116 @@ function getPaymentStatusLabel(status: SubscriptionPaymentRow['status']) {
   if (status === 'canceled') return 'Cancelado'
   if (status === 'refunded') return 'Estornado'
   return status
+}
+
+function getPaymentStatusPillStyle(status: SubscriptionPaymentRow['status']): CSSProperties {
+  if (status === 'approved') {
+    return {
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '6px 10px',
+      borderRadius: 999,
+      background: '#DCFCE7',
+      color: '#15803D',
+      fontWeight: 700,
+      fontSize: '0.82rem',
+      whiteSpace: 'nowrap',
+    }
+  }
+
+  if (status === 'pending') {
+    return {
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '6px 10px',
+      borderRadius: 999,
+      background: '#FEF3C7',
+      color: '#B45309',
+      fontWeight: 700,
+      fontSize: '0.82rem',
+      whiteSpace: 'nowrap',
+    }
+  }
+
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '6px 10px',
+    borderRadius: 999,
+    background: '#FEE2E2',
+    color: '#B91C1C',
+    fontWeight: 700,
+    fontSize: '0.82rem',
+    whiteSpace: 'nowrap',
+  }
+}
+
+function formatPaymentInvoiceLabel(payment: SubscriptionPaymentRow) {
+  const explicitInvoice = findNestedString(payment.raw_payload, [
+    'invoiceNumber',
+    'invoice_number',
+    'invoiceId',
+    'invoice_id',
+    'invoice',
+  ])
+
+  if (explicitInvoice) return explicitInvoice
+  if (payment.provider_reference) return payment.provider_reference
+  if (payment.provider_payment_id) return payment.provider_payment_id
+  return `PAG-${payment.id.slice(0, 8).toUpperCase()}`
+}
+
+function formatPaymentLineDescription(payment: SubscriptionPaymentRow) {
+  if (payment.description) return payment.description
+
+  const plan = normalizeCommercialPlan(payment.plan_slug)
+  if (plan === 'starter') return 'FitBody Starter'
+  if (plan === 'premium') return 'FitBody Premium'
+  return 'FitBody Free'
+}
+
+function getPaymentChargeTypeLabel(payment: SubscriptionPaymentRow) {
+  const description = (payment.description || '').toLowerCase()
+
+  if (description.includes('renovacao')) return 'Assinatura recorrente'
+  if (description.includes('regularizacao')) return 'Regularizacao'
+  if (normalizeCommercialPlan(payment.plan_slug) === 'free') return 'Plano gratuito'
+  return 'Cobranca da assinatura'
+}
+
+function getPaymentMethodLabel(payment: SubscriptionPaymentRow) {
+  const paymentActionData = extractPaymentActionData(payment.raw_payload)
+  if (paymentActionData.pixCode || paymentActionData.qrCodeBase64) return 'PIX'
+
+  const billingType = (findNestedString(payment.raw_payload, ['billingType', 'billing_type']) || '').toUpperCase()
+  if (billingType === 'PIX') return 'PIX'
+
+  const rawBrand = findNestedString(payment.raw_payload, [
+    'brand',
+    'cardBrand',
+    'payment_method_id',
+    'paymentMethodId',
+  ])
+  const rawLastFour = findNestedString(payment.raw_payload, [
+    'last4',
+    'last_four',
+    'lastDigits',
+    'creditCardNumber',
+  ])
+
+  if (rawBrand && rawLastFour) {
+    return `${formatSavedCardBrand(rawBrand)} final ${rawLastFour.slice(-4)}`
+  }
+
+  if (billingType === 'CREDIT_CARD' || payment.provider === 'mercadopago' || payment.provider === 'asaas') {
+    return 'Cartao'
+  }
+
+  if (payment.provider) {
+    return payment.provider.toUpperCase()
+  }
+
+  return '-'
 }
 
 function buildLegacySubscription(data: unknown): SubscriptionRow | null {
