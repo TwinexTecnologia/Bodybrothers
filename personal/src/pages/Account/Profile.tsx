@@ -186,6 +186,7 @@ export default function Profile() {
   const isFreeCancellationScheduled = hasScheduledChange && scheduledTargetPlan === 'free'
   const isFreePlanSelection = planChangeMode === 'downgrade' && selectedTargetPlan === 'free'
   const paymentActionData = useMemo(() => extractPaymentActionData(latestPayment?.raw_payload), [latestPayment])
+  const hasPixPaymentData = Boolean(paymentActionData.pixCode || paymentActionData.qrCodeBase64)
   const canCopyPix = Boolean(paymentActionData.pixCode)
   const needsRegularization = subscription?.status === 'blocked' || subscription?.status === 'past_due'
   const isAsaasSubscriptionFlow = savedPaymentMethod?.provider === 'asaas' || latestPayment?.provider === 'asaas'
@@ -546,7 +547,9 @@ export default function Profile() {
       setCardFormAmount(null)
       setShowCardForm(false)
       await loadProfile()
-      setMsg(response.pixCode ? 'PIX gerado com sucesso.' : 'Cobrança PIX gerada. Confira os dados abaixo.')
+      setMsg(response.pixCode || response.qrCodeBase64
+        ? 'PIX gerado com sucesso. O QR Code e o codigo para copia ja estao disponiveis abaixo.'
+        : 'Cobranca PIX gerada. Confira os dados abaixo.')
     } catch (err: any) {
       console.error(err)
       setError(err.message || 'Não foi possível gerar a cobrança.')
@@ -927,7 +930,7 @@ export default function Profile() {
                       </div>
                     )}
 
-                    {(paymentActionData.qrCodeBase64 || paymentActionData.ticketUrl) && (
+                    {hasPixPaymentData && (
                       <div style={{ display: 'grid', gap: 10 }}>
                         {paymentActionData.qrCodeBase64 && (
                           <div style={{ display: 'grid', gap: 8, justifyItems: 'start' }}>
@@ -939,14 +942,12 @@ export default function Profile() {
                             />
                           </div>
                         )}
+                      </div>
+                    )}
 
-                        {paymentActionData.ticketUrl && (
-                          <div>
-                            <a href={paymentActionData.ticketUrl} target="_blank" rel="noreferrer" style={primaryLinkButtonStyle}>
-                              Abrir PIX no navegador
-                            </a>
-                          </div>
-                        )}
+                    {hasPixPaymentData && (
+                      <div style={pixGuidanceStyle}>
+                        Esse PIX regulariza somente esta cobranca em atraso. A proxima renovacao continuara sendo tentada no cartao salvo da assinatura. Se esse cartao nao for mais utilizado, clique em `Trocar cartao` antes do proximo vencimento.
                       </div>
                     )}
                   </>
@@ -1398,16 +1399,14 @@ const disabledActionButtonStyle: CSSProperties = {
   cursor: 'not-allowed',
 }
 
-const primaryLinkButtonStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '10px 16px',
-  borderRadius: 8,
-  background: '#0f172a',
-  color: '#fff',
+const pixGuidanceStyle: CSSProperties = {
+  padding: 12,
+  borderRadius: 10,
+  background: '#eff6ff',
+  border: '1px solid #bfdbfe',
+  color: '#1d4ed8',
   fontWeight: 600,
-  textDecoration: 'none',
+  lineHeight: 1.5,
 }
 
 function formatDate(value: string) {
