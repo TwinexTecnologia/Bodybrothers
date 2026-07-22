@@ -8,12 +8,32 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const PLAN_PRICES: Record<string, number> = {
-  starter: 14.9,
-  premium: 39.9,
-  pro: 39.9,
-  elite: 39.9,
-  unlimited: 39.9,
+const PLAN_PRICES: Record<string, Record<string, number>> = {
+  starter: {
+    monthly: 9.9,
+    quarterly: 24.9,
+    yearly: 89.9,
+  },
+  premium: {
+    monthly: 29.9,
+    quarterly: 74.9,
+    yearly: 249.9,
+  },
+  pro: {
+    monthly: 29.9,
+    quarterly: 74.9,
+    yearly: 249.9,
+  },
+  elite: {
+    monthly: 29.9,
+    quarterly: 74.9,
+    yearly: 249.9,
+  },
+  unlimited: {
+    monthly: 29.9,
+    quarterly: 74.9,
+    yearly: 249.9,
+  },
 };
 
 type SubscriptionRow = {
@@ -2255,7 +2275,7 @@ function resolveSubscriptionAmount(subscription: SubscriptionRow) {
   }
 
   const planSlug = normalizePlan(subscription.plan_slug || "");
-  const defaultAmount = PLAN_PRICES[planSlug];
+  const defaultAmount = resolvePlanPrice(planSlug, subscription.billing_cycle || "monthly");
 
   if (typeof defaultAmount === "number") {
     return defaultAmount;
@@ -2271,13 +2291,19 @@ function resolveScheduledSubscriptionAmount({
   planSlug: string;
   billingCycle: string;
 }) {
-  const baseAmount = PLAN_PRICES[planSlug];
+  return resolvePlanPrice(planSlug, billingCycle);
+}
 
-  if (typeof baseAmount !== "number" || Number.isNaN(baseAmount)) {
+function resolvePlanPrice(planSlug: string, billingCycle: string) {
+  const planPrices = PLAN_PRICES[planSlug];
+  const normalizedBillingCycle = normalizeBillingCycle(billingCycle) || "monthly";
+  const amount = planPrices?.[normalizedBillingCycle];
+
+  if (typeof amount !== "number" || Number.isNaN(amount)) {
     throw new Error(`Nao foi possivel determinar o valor do plano ${planSlug || "informado"}.`);
   }
 
-  return Number((baseAmount * getBillingCycleMultiplier(billingCycle)).toFixed(2));
+  return Number(amount.toFixed(2));
 }
 
 function buildPaymentDescription(plan: string) {
