@@ -10,6 +10,8 @@ type Personal = {
     planSlug?: string
     billingCycle?: string
     subscriptionStatus?: string
+    billingModel?: string
+    isPermuta?: boolean
     studentLimit?: number | null
     activeStudents?: number
     nextBillingAt?: string | null
@@ -59,6 +61,9 @@ export default function FinancialByPersonal() {
     const [payments, setPayments] = useState<Payment[]>([])
     
     const [loading, setLoading] = useState(true)
+    const [actionLoading, setActionLoading] = useState(false)
+    const [feedback, setFeedback] = useState('')
+    const [actionError, setActionError] = useState('')
     const [q, setQ] = useState('')
 
     // Carrega lista de personais se não tiver ID
@@ -109,6 +114,8 @@ export default function FinancialByPersonal() {
                     planSlug: subscription?.plan_slug || p.data?.saas?.plan || 'free',
                     billingCycle: subscription?.billing_cycle || p.data?.saas?.billingCycle || 'monthly',
                     subscriptionStatus: subscription?.status || p.data?.saas?.subscriptionStatus || 'free',
+                    billingModel: p.data?.saas?.billingModel || 'normal',
+                    isPermuta: Boolean(p.data?.saas?.isPermuta) || p.data?.saas?.billingModel === 'permuta',
                     studentLimit: subscription?.student_limit ?? p.data?.saas?.studentLimit ?? 1,
                     activeStudents: activeStudentsMap.get(p.id) || 0,
                     nextBillingAt: subscription?.next_billing_at || p.data?.saas?.nextBillingAt || null,
@@ -155,6 +162,8 @@ export default function FinancialByPersonal() {
                 planSlug: subscription?.plan_slug || pData.data?.saas?.plan || 'free',
                 billingCycle: subscription?.billing_cycle || pData.data?.saas?.billingCycle || 'monthly',
                 subscriptionStatus: subscription?.status || pData.data?.saas?.subscriptionStatus || 'free',
+                billingModel: pData.data?.saas?.billingModel || 'normal',
+                isPermuta: Boolean(pData.data?.saas?.isPermuta) || pData.data?.saas?.billingModel === 'permuta',
                 studentLimit: subscription?.student_limit ?? pData.data?.saas?.studentLimit ?? 1,
                 activeStudents,
                 nextBillingAt: subscription?.next_billing_at || pData.data?.saas?.nextBillingAt || null,
@@ -173,6 +182,44 @@ export default function FinancialByPersonal() {
             }
         }
         setLoading(false)
+    }
+
+    async function handleRemovePermuta() {
+        if (!personalId || !personal?.isPermuta) return
+
+        const confirmed = window.confirm('Deseja remover a permuta deste personal? Ele ficará bloqueado até regularizar o pagamento no próprio painel.')
+        if (!confirmed) return
+
+        setActionLoading(true)
+        setFeedback('')
+        setActionError('')
+
+        try {
+            const { data, error } = await supabase.functions.invoke('manage-personal-subscription', {
+                body: {
+                    action: 'remove_permuta',
+                    personalId,
+                },
+            })
+
+            if (error) throw error
+            if (!data?.success) {
+                throw new Error(data?.error || 'Não foi possível remover a permuta.')
+            }
+
+            setFeedback('Permuta removida com sucesso. O personal agora precisa regularizar o pagamento no próprio painel.')
+            await loadPersonalFinancials(personalId)
+        } catch (err: any) {
+            console.error(err)
+            let message = err?.message || 'Não foi possível remover a permuta.'
+            if (err?.context && typeof err.context.json === 'function') {
+                const payload = await err.context.json().catch(() => null)
+                message = payload?.error || payload?.message || message
+            }
+            setActionError(message)
+        } finally {
+            setActionLoading(false)
+        }
     }
 
     const filteredPersonals = personalsList.filter(p => 
@@ -250,6 +297,7 @@ export default function FinancialByPersonal() {
                                     <Tag>{PLAN_LABELS[p.planSlug || 'free'] || 'Free'}</Tag>
                                     <Tag>{BILLING_CYCLE_LABELS[p.billingCycle || 'monthly'] || 'Mensal'}</Tag>
                                     <Tag tone={getStatusTone(p.subscriptionStatus)}>{STATUS_LABELS[p.subscriptionStatus || 'free'] || 'Free'}</Tag>
+                                    {p.isPermuta && <Tag tone="success">Permuta</Tag>}
                                 </div>
                                 <div style={{ marginTop: 10, fontSize: '0.8rem', color: '#64748b' }}>
                                     {p.activeStudents || 0} ativos / {p.studentLimit ?? 1} no plano
@@ -283,11 +331,60 @@ export default function FinancialByPersonal() {
                 </div>
             </div>
 
+            {personal?.isPermuta && (
+                <div style={{ background: '#ecfdf5', border: '1px solid #bbf7d0', borderRadius: 16, padding: 20, marginBottom: 24, display: 'grid', gap: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <div>
+                            <div style={{ fontSize: '1rem', fontWeight: 700, color: '#166534' }}>Permuta ativa</div>
+                            <div style={{ fontSize: '0.92rem', color: '#166534', marginTop: 4 }}>
+                                Este personal está usando o plano {PLAN_LABELS[personal.planSlug || 'free'] || 'Free'} sem cobrança automática.
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleRemovePermuta}
+                            disabled={actionLoading}
+                            style={{
+                                background: '#166534',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 10,
+                                padding: '12px 16px',
+                                fontWeight: 700,
+                                cursor: actionLoading ? 'not-allowed' : 'pointer',
+                                opacity: actionLoading ? 0.7 : 1,
+                            }}
+                        >
+                            {actionLoading ? 'Removendo permuta...' : 'Remover permuta'}
+                        </button>
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#166534' }}>
+                        Ao remover a permuta, o personal ficará bloqueado e precisará regularizar o pagamento no próprio painel escolhendo método e seguindo a assinatura normalmente.
+                    </div>
+                </div>
+            )}
+
+            {actionError && (
+                <div style={{ background: '#fef2f2', color: '#b91c1c', padding: 14, borderRadius: 12, marginBottom: 24 }}>
+                    {actionError}
+                </div>
+            )}
+
+            {feedback && (
+                <div style={{ background: '#dcfce7', color: '#166534', padding: 14, borderRadius: 12, marginBottom: 24 }}>
+                    {feedback}
+                </div>
+            )}
+
             {/* Cards de Resumo */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 24, marginBottom: 32 }}>
                 <div style={{ background: '#fff', padding: 24, borderRadius: 16, border: '1px solid #e2e8f0' }}>
                     <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: 8 }}>Plano atual</div>
                     <div style={{ fontSize: '2rem', fontWeight: 700, color: '#0f172a' }}>{PLAN_LABELS[personal?.planSlug || 'free'] || 'Free'}</div>
+                    {personal?.isPermuta && (
+                        <div style={{ marginTop: 12 }}>
+                            <Tag tone="success">Permuta</Tag>
+                        </div>
+                    )}
                 </div>
                 <div style={{ background: '#fff', padding: 24, borderRadius: 16, border: '1px solid #e2e8f0' }}>
                     <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: 8 }}>Status da assinatura</div>

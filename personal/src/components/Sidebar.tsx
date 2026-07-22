@@ -162,7 +162,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     }
 
     if (evolutionMode === 'standalone' && !isSubscriptionRestricted) {
-      items.push({ label: 'Configurar Evolução', to: '/account/profile', icon: Camera })
+      items.push({ label: 'Configurar Evolução', to: '/account/profile#evolution-settings', icon: Camera })
     }
 
     return items

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { CheckCircle2, CircleAlert, CreditCard, Crown, Gift, ReceiptText, ShieldCheck, TrendingDown, TrendingUp, Users } from 'lucide-react'
+import { Camera, CheckCircle2, CircleAlert, CreditCard, Crown, Gift, ReceiptText, ShieldCheck, TrendingDown, TrendingUp, Users } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
 import AsaasCardForm, { type AsaasCardFormSubmitData, type AsaasCardHolderInfoDefaults } from '../../components/AsaasCardForm'
 import ConfirmModal from '../../components/ConfirmModal'
 import MercadoPagoCardForm from '../../components/MercadoPagoCardForm'
@@ -75,6 +76,14 @@ type CardChargeResponse = {
   statusDetail: string | null
 }
 
+type EvolutionMode = 'anamnesis' | 'standalone'
+
+type EvolutionFieldConfig = {
+  id: string
+  label: string
+  exampleUrl?: string | null
+}
+
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free',
   starter: 'Starter',
@@ -98,6 +107,8 @@ const BILLING_CYCLE_LABELS: Record<string, string> = {
   quarterly: 'Trimestral',
   yearly: 'Anual',
 }
+
+const EVOLUTION_SETTINGS_HASH = '#evolution-settings'
 
 type CommercialPlan = 'free' | 'starter' | 'premium'
 
@@ -172,7 +183,9 @@ const PLAN_FEATURES: Record<CommercialPlan, PlanFeature> = {
 
 export default function Profile() {
   const { refreshAuthState } = useAuth()
+  const location = useLocation()
   const mercadoPagoPublicKey = import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY || ''
+  const evolutionSettingsRef = useRef<HTMLDivElement | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
@@ -206,6 +219,11 @@ export default function Profile() {
   const [cardFormAmount, setCardFormAmount] = useState<number | null>(null)
   const [removeSavedCardModalOpen, setRemoveSavedCardModalOpen] = useState(false)
   const [removeSavedCardLoading, setRemoveSavedCardLoading] = useState(false)
+  const [evolutionMode, setEvolutionMode] = useState<EvolutionMode>('anamnesis')
+  const [evolutionFields, setEvolutionFields] = useState<EvolutionFieldConfig[]>([])
+  const [newEvolutionFieldLabel, setNewEvolutionFieldLabel] = useState('')
+  const [fieldReferenceFiles, setFieldReferenceFiles] = useState<Record<string, File | null>>({})
+  const [highlightEvolutionSection, setHighlightEvolutionSection] = useState(false)
 
   // Dados de Senha
   const [newPassword, setNewPassword] = useState('')
@@ -356,6 +374,25 @@ export default function Profile() {
     }
   }, [currentBillingCycle, showPlanChangeOptions])
 
+  useEffect(() => {
+    if (loading || location.hash !== EVOLUTION_SETTINGS_HASH) return
+
+    setHighlightEvolutionSection(true)
+
+    const scrollTimeout = window.setTimeout(() => {
+      evolutionSettingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 120)
+
+    const highlightTimeout = window.setTimeout(() => {
+      setHighlightEvolutionSection(false)
+    }, 2600)
+
+    return () => {
+      window.clearTimeout(scrollTimeout)
+      window.clearTimeout(highlightTimeout)
+    }
+  }, [loading, location.hash])
+
   async function loadProfile() {
     try {
       setLoading(true)
@@ -378,6 +415,11 @@ export default function Profile() {
       if (profile) {
         setName(profile.full_name || '')
         setPhone(profile.data?.phone || '')
+        const parsedEvolutionMode = normalizeEvolutionMode(profile.data?.config?.evolutionMode)
+        const parsedEvolutionFields = parseEvolutionFields(profile.data?.config?.evolutionFields)
+        setEvolutionMode(parsedEvolutionMode)
+        setEvolutionFields(parsedEvolutionFields)
+        setFieldReferenceFiles({})
       }
 
       const resolvedPersonalAccountId = typeof profile?.personal_id === 'string' && profile.personal_id
@@ -468,15 +510,57 @@ export default function Profile() {
     setError('')
 
     try {
+      const uploadedReferenceMap: Record<string, string | null> = {}
+
+      for (const field of evolutionFields) {
+        const referenceFile = fieldReferenceFiles[field.id]
+        if (!referenceFile) continue
+
+        const fileExt = referenceFile.name.split('.').pop()
+        const filePath = `evolution-reference/${id}/${field.id}_${Date.now()}.${fileExt}`
+        const { error: uploadError } = await supabase.storage
+          .from('anamnesis-files')
+          .upload(filePath, referenceFile, { upsert: true })
+
+        if (uploadError) throw uploadError
+
+        const { data: publicFile } = supabase.storage.from('anamnesis-files').getPublicUrl(filePath)
+        uploadedReferenceMap[field.id] = publicFile.publicUrl
+      }
+
+      const sanitizedEvolutionFields = evolutionFields
+        .map((field) => ({
+          ...field,
+          label: field.label.trim(),
+          exampleUrl: uploadedReferenceMap[field.id] ?? field.exampleUrl ?? null,
+        }))
+        .filter((field) => field.label.length > 0)
+
+      if (evolutionMode === 'standalone' && sanitizedEvolutionFields.length === 0) {
+        throw new Error('Adicione pelo menos um campo para organizar a evolução fotográfica, como Frente, Costas ou Lado.')
+      }
+
       const { data: currentProfile } = await supabase
         .from('profiles')
         .select('data')
         .eq('id', id)
         .single()
 
+      const currentData = currentProfile?.data && typeof currentProfile.data === 'object'
+        ? currentProfile.data as Record<string, unknown>
+        : {}
+      const currentConfig = currentData.config && typeof currentData.config === 'object'
+        ? currentData.config as Record<string, unknown>
+        : {}
+
       const newData = {
-        ...(currentProfile?.data || {}),
+        ...currentData,
         phone: phone,
+        config: {
+          ...currentConfig,
+          evolutionMode,
+          evolutionFields: sanitizedEvolutionFields,
+        },
       }
 
       const { error: updateError } = await supabase
@@ -508,6 +592,8 @@ export default function Profile() {
       }
 
       setMsg('Perfil atualizado com sucesso!')
+      setEvolutionFields(sanitizedEvolutionFields)
+      setFieldReferenceFiles({})
     } catch (err: any) {
       console.error(err)
       setError(err.message || 'Erro ao atualizar perfil.')
@@ -801,6 +887,172 @@ export default function Profile() {
               <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Confirmar nova senha</span>
               <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repita a nova senha" style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }} />
             </div>
+          </div>
+        </div>
+
+        <div
+          id="evolution-settings"
+          ref={evolutionSettingsRef}
+          style={highlightEvolutionSection ? highlightedEvolutionSettingsCardStyle : evolutionSettingsCardStyle}
+        >
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={evolutionSettingsIconStyle}>
+                  <Camera size={18} color="#6D28D9" />
+                </div>
+                <div style={{ display: 'grid', gap: 4 }}>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Configurar Evolução</h3>
+                  <div style={{ fontSize: '0.92rem', color: '#64748b' }}>
+                    Defina se a evolução usa fotos da anamnese ou fotos avulsas com campos personalizados.
+                  </div>
+                </div>
+              </div>
+              {location.hash === EVOLUTION_SETTINGS_HASH && (
+                <span style={evolutionSettingsBadgeStyle}>Aberto a partir da central</span>
+              )}
+            </div>
+          </div>
+          <div style={{ padding: 24, display: 'grid', gap: 20 }}>
+            <div style={evolutionInfoBoxStyle}>
+              {evolutionMode === 'standalone'
+                ? 'Cadastre os campos e uma imagem de referência para orientar o aluno no envio.'
+                : 'A evolução segue o fluxo padrão já configurado para este personal.'}
+            </div>
+
+            {evolutionMode === 'standalone' && (
+              <div style={{ display: 'grid', gap: 16 }}>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Campos das fotos</span>
+                  <div style={{ fontSize: '0.88rem', color: '#64748b' }}>
+                    Escolha os nomes que vão orientar o envio e a organização das fotos de evolução.
+                  </div>
+                </div>
+
+                {evolutionFields.length ? (
+                  <div style={evolutionFieldListStyle}>
+                    {evolutionFields.map((field) => (
+                      <div key={field.id} style={evolutionFieldCardStyle}>
+                        <div style={evolutionFieldItemStyle}>
+                          <input
+                            value={field.label}
+                            onChange={(event) => {
+                              const nextLabel = event.target.value
+                              setEvolutionFields((current) => current.map((item) => (
+                                item.id === field.id
+                                  ? { ...item, label: nextLabel }
+                                  : item
+                              )))
+                            }}
+                            placeholder="Ex.: Frente"
+                            style={evolutionFieldInputStyle}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEvolutionFields((current) => current.filter((item) => item.id !== field.id))
+                              setFieldReferenceFiles((current) => {
+                                const next = { ...current }
+                                delete next[field.id]
+                                return next
+                              })
+                            }}
+                            style={removeEvolutionFieldButtonStyle}
+                          >
+                            Remover
+                          </button>
+                        </div>
+
+                        <div style={evolutionReferenceUploaderStyle}>
+                          <div style={{ display: 'grid', gap: 6 }}>
+                            <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#334155' }}>Imagem de referência</div>
+                            <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                              O aluno verá essa imagem como exemplo da pose ou ângulo correto.
+                            </div>
+                          </div>
+
+                          <label style={evolutionReferenceBoxStyle}>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(event) => {
+                                const nextFile = event.target.files?.[0] || null
+                                setFieldReferenceFiles((current) => ({ ...current, [field.id]: nextFile }))
+                              }}
+                              style={{ display: 'none' }}
+                            />
+
+                            {fieldReferenceFiles[field.id] ? (
+                              <div style={{ display: 'grid', gap: 8, justifyItems: 'center' }}>
+                                <img
+                                  src={URL.createObjectURL(fieldReferenceFiles[field.id] as File)}
+                                  alt={`Prévia de ${field.label}`}
+                                  style={evolutionReferencePreviewImageStyle}
+                                />
+                                <span style={evolutionReferenceHintStyle}>Nova referência pronta para salvar</span>
+                              </div>
+                            ) : field.exampleUrl ? (
+                              <div style={{ display: 'grid', gap: 8, justifyItems: 'center' }}>
+                                <img
+                                  src={field.exampleUrl}
+                                  alt={`Referência de ${field.label}`}
+                                  style={evolutionReferencePreviewImageStyle}
+                                />
+                                <span style={evolutionReferenceHintStyle}>Clique para trocar a referência</span>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'grid', gap: 8, justifyItems: 'center' }}>
+                                <Camera size={22} color="#6D28D9" />
+                                <span style={evolutionReferenceHintStyle}>Adicionar imagem de referência</span>
+                              </div>
+                            )}
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={emptyEvolutionFieldsStyle}>
+                    Nenhum campo configurado ainda. Adicione pelo menos um para liberar a organização das fotos avulsas.
+                  </div>
+                )}
+
+                <div style={addEvolutionFieldWrapStyle}>
+                  <input
+                    value={newEvolutionFieldLabel}
+                    onChange={(event) => setNewEvolutionFieldLabel(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter') return
+                      event.preventDefault()
+                      const trimmedLabel = newEvolutionFieldLabel.trim()
+                      if (!trimmedLabel) return
+
+                      setEvolutionFields((current) => [...current, createEvolutionField(trimmedLabel)])
+                      setNewEvolutionFieldLabel('')
+                    }}
+                    placeholder="Adicionar campo, ex.: Frente"
+                    style={addEvolutionFieldInputStyle}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmedLabel = newEvolutionFieldLabel.trim()
+                      if (!trimmedLabel) return
+
+                      setEvolutionFields((current) => [...current, createEvolutionField(trimmedLabel)])
+                      setNewEvolutionFieldLabel('')
+                    }}
+                    style={addEvolutionFieldButtonStyle}
+                  >
+                    Adicionar campo
+                  </button>
+                </div>
+
+                <div style={evolutionExamplesTextStyle}>
+                  Sugestões: Frente, Costas, Lado direito, Lado esquerdo, Posterior.
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1582,6 +1834,155 @@ const regularizationCardStyle: CSSProperties = {
   border: '1px solid #e2e8f0',
   display: 'grid',
   gap: 16,
+}
+
+const evolutionSettingsCardStyle: CSSProperties = {
+  background: '#fff',
+  borderRadius: 16,
+  border: '1px solid #e2e8f0',
+  overflow: 'hidden',
+  scrollMarginTop: 24,
+}
+
+const highlightedEvolutionSettingsCardStyle: CSSProperties = {
+  ...evolutionSettingsCardStyle,
+  border: '2px solid #7C3AED',
+  boxShadow: '0 0 0 4px rgba(124, 58, 237, 0.12)',
+}
+
+const evolutionSettingsIconStyle: CSSProperties = {
+  width: 40,
+  height: 40,
+  borderRadius: 12,
+  background: '#F5F3FF',
+  display: 'grid',
+  placeItems: 'center',
+}
+
+const evolutionSettingsBadgeStyle: CSSProperties = {
+  padding: '6px 12px',
+  borderRadius: 999,
+  background: '#F5F3FF',
+  color: '#6D28D9',
+  fontSize: '0.8rem',
+  fontWeight: 700,
+}
+
+const evolutionInfoBoxStyle: CSSProperties = {
+  padding: 14,
+  borderRadius: 12,
+  background: '#F8FAFC',
+  border: '1px solid #E2E8F0',
+  color: '#475569',
+  lineHeight: 1.5,
+}
+
+const evolutionFieldListStyle: CSSProperties = {
+  display: 'grid',
+  gap: 12,
+}
+
+const evolutionFieldCardStyle: CSSProperties = {
+  display: 'grid',
+  gap: 14,
+  padding: 16,
+  borderRadius: 16,
+  border: '1px solid #E2E8F0',
+  background: '#fff',
+}
+
+const evolutionFieldItemStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  gap: 12,
+  alignItems: 'center',
+}
+
+const evolutionFieldInputStyle: CSSProperties = {
+  padding: 12,
+  borderRadius: 10,
+  border: '1px solid #CBD5E1',
+  fontSize: '0.95rem',
+}
+
+const removeEvolutionFieldButtonStyle: CSSProperties = {
+  padding: '10px 14px',
+  borderRadius: 10,
+  border: '1px solid #FECACA',
+  background: '#FFF5F5',
+  color: '#B91C1C',
+  fontWeight: 600,
+  cursor: 'pointer',
+}
+
+const evolutionReferenceUploaderStyle: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+}
+
+const evolutionReferenceBoxStyle: CSSProperties = {
+  display: 'grid',
+  placeItems: 'center',
+  minHeight: 180,
+  padding: 16,
+  borderRadius: 16,
+  border: '2px dashed #D8B4FE',
+  background: '#FAF5FF',
+  cursor: 'pointer',
+}
+
+const evolutionReferencePreviewImageStyle: CSSProperties = {
+  width: 140,
+  height: 140,
+  borderRadius: 14,
+  objectFit: 'cover',
+  border: '1px solid #E5E7EB',
+}
+
+const evolutionReferenceHintStyle: CSSProperties = {
+  fontSize: '0.82rem',
+  fontWeight: 600,
+  color: '#6D28D9',
+  textAlign: 'center',
+}
+
+const emptyEvolutionFieldsStyle: CSSProperties = {
+  padding: 14,
+  borderRadius: 12,
+  background: '#EFF6FF',
+  border: '1px solid #BFDBFE',
+  color: '#1D4ED8',
+  fontWeight: 600,
+  lineHeight: 1.5,
+}
+
+const addEvolutionFieldWrapStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  gap: 12,
+  alignItems: 'center',
+}
+
+const addEvolutionFieldInputStyle: CSSProperties = {
+  padding: 12,
+  borderRadius: 10,
+  border: '1px solid #CBD5E1',
+  fontSize: '0.95rem',
+}
+
+const addEvolutionFieldButtonStyle: CSSProperties = {
+  padding: '12px 16px',
+  borderRadius: 10,
+  border: 'none',
+  background: '#6D28D9',
+  color: '#fff',
+  fontWeight: 700,
+  cursor: 'pointer',
+}
+
+const evolutionExamplesTextStyle: CSSProperties = {
+  fontSize: '0.85rem',
+  color: '#64748B',
 }
 
 const inlineSuccessStyle: CSSProperties = {
@@ -2444,6 +2845,44 @@ function normalizeMoneyValue(value: unknown) {
     if (Number.isFinite(normalized)) return normalized
   }
   return 0
+}
+
+function normalizeEvolutionMode(value: unknown): EvolutionMode {
+  return value === 'standalone' ? 'standalone' : 'anamnesis'
+}
+
+function parseEvolutionFields(value: unknown): EvolutionFieldConfig[] {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .map((item) => {
+      if (typeof item === 'string') {
+        const trimmed = item.trim()
+        return trimmed ? createEvolutionField(trimmed) : null
+      }
+
+      if (item && typeof item === 'object') {
+        const rawLabel = 'label' in item ? String(item.label ?? '').trim() : 'name' in item ? String(item.name ?? '').trim() : ''
+        if (!rawLabel) return null
+        const rawId = 'id' in item ? String(item.id ?? '').trim() : ''
+        const rawExampleUrl = 'exampleUrl' in item ? String(item.exampleUrl ?? '').trim() : ''
+        return {
+          id: rawId || createEvolutionField(rawLabel).id,
+          label: rawLabel,
+          exampleUrl: rawExampleUrl || null,
+        }
+      }
+
+      return null
+    })
+    .filter((item): item is EvolutionFieldConfig => Boolean(item))
+}
+
+function createEvolutionField(label: string): EvolutionFieldConfig {
+  return {
+    id: `field_${Math.random().toString(36).slice(2, 10)}`,
+    label,
+  }
 }
 
 function extractPaymentActionData(rawPayload: Record<string, unknown> | null | undefined) {
