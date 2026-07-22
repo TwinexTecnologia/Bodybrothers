@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { CheckCircle2, CircleAlert, Crown, Gift, ShieldCheck, TrendingDown, TrendingUp, Users } from 'lucide-react'
 import AsaasCardForm, { type AsaasCardFormSubmitData, type AsaasCardHolderInfoDefaults } from '../../components/AsaasCardForm'
 import ConfirmModal from '../../components/ConfirmModal'
 import MercadoPagoCardForm from '../../components/MercadoPagoCardForm'
@@ -106,6 +107,26 @@ type PlanFeature = {
 
 type BillingCycle = NonNullable<SubscriptionRow['billing_cycle']>
 
+type PlanSelectionCycle = {
+  cycle: BillingCycle
+  label: string
+  description: string
+  amount: number
+  perMonth: number
+  savingsLabel: string | null
+  highlightLabel: string | null
+  isCurrent: boolean
+  isSelectable: boolean
+}
+
+type PlanSelectionGroup = {
+  plan: CommercialPlan
+  title: string
+  subtitle: string
+  badge: string | null
+  cycles: PlanSelectionCycle[]
+}
+
 const PLAN_PRICES: Record<CommercialPlan, Record<BillingCycle, number>> = {
   free: { monthly: 0, quarterly: 0, yearly: 0 },
   starter: { monthly: 9.9, quarterly: 24.9, yearly: 89.9 },
@@ -192,90 +213,76 @@ export default function Profile() {
   const scheduledTargetBillingCycle = subscription?.scheduled_billing_cycle || null
   const hasScheduledChange = Boolean(subscription?.scheduled_change_at && (subscription?.scheduled_plan_slug || subscription?.scheduled_billing_cycle))
   const canManagePlanChange = true
-  const planChangeOptions = useMemo(() => {
-    if (!canManagePlanChange || !planChangeMode) return [] as Array<[string, string]>
-
-    if (currentPlan === 'free') {
-      return planChangeMode === 'upgrade'
-        ? [['starter', PLAN_LABELS.starter], ['premium', PLAN_LABELS.premium]]
-        : []
-    }
-
-    if (currentPlan === 'starter') {
-      return planChangeMode === 'upgrade'
-        ? [['premium', PLAN_LABELS.premium]]
-        : [['free', PLAN_LABELS.free]]
-    }
-
-    if (currentPlan === 'premium') {
-      return planChangeMode === 'downgrade'
-        ? [['starter', PLAN_LABELS.starter], ['free', PLAN_LABELS.free]]
-        : []
-    }
-
-    return []
-  }, [canManagePlanChange, currentPlan, planChangeMode])
   const canSchedulePlanChange = canManagePlanChange && !hasScheduledChange
   const currentPlanLabel = PLAN_LABELS[currentPlan] || currentPlan
   const currentBillingCycleLabel = BILLING_CYCLE_LABELS[currentBillingCycle] || 'Mensal'
+  const currentPlanAmount = getPlanAmount(currentPlan, currentBillingCycle)
+  const currentPlanMonthlyLabel = currentPlan === 'free'
+    ? 'Gratis'
+    : formatCurrency(getMonthlyEquivalentAmount(currentPlanAmount, currentBillingCycle), 'BRL')
   const scheduledTargetPlanLabel = PLAN_LABELS[scheduledTargetPlan] || scheduledTargetPlan
   const scheduledTargetBillingCycleLabel = scheduledTargetBillingCycle
     ? BILLING_CYCLE_LABELS[scheduledTargetBillingCycle] || scheduledTargetBillingCycle
     : null
   const selectedTargetPlanLabel = PLAN_LABELS[selectedTargetPlan] || selectedTargetPlan
-  const selectedTargetPlanFeatures = selectedTargetPlan ? PLAN_FEATURES[selectedTargetPlan as CommercialPlan] : null
   const planChangeBillingCycle = selectedPlanChangeBillingCycle || currentBillingCycle
   const planChangeBillingCycleLabel = BILLING_CYCLE_LABELS[planChangeBillingCycle] || 'Mensal'
   const selectedTargetPlanAmount = selectedTargetPlan
     ? getPlanAmount(selectedTargetPlan as CommercialPlan, planChangeBillingCycle)
     : 0
   const selectedTargetPlanPriceLabel = formatPlanPrice(selectedTargetPlan as CommercialPlan | '', planChangeBillingCycle)
-  const selectedTargetPlanMonthlyLabel = selectedTargetPlan && selectedTargetPlan !== 'free'
-    ? formatCurrency(getMonthlyEquivalentAmount(selectedTargetPlanAmount, planChangeBillingCycle), 'BRL')
-    : 'Gratis'
-  const selectedTargetPlanSavingsLabel = selectedTargetPlan ? getCycleSavingsLabel(selectedTargetPlan as CommercialPlan, planChangeBillingCycle) : null
-  const availablePlanCards = useMemo(() => {
-    return planChangeOptions
-      .map(([plan]) => {
-        const commercialPlan = plan as CommercialPlan
-        const details = PLAN_FEATURES[commercialPlan]
-        const recommendedCycle = getRecommendedBillingCycle(commercialPlan)
+  const planSelectionGroups = useMemo<PlanSelectionGroup[]>(() => {
+    if (!planChangeMode) return []
+
+    return getPlanGroupsForMode(currentPlan, planChangeMode)
+      .map((plan) => {
+        if (plan === 'free') {
+          return {
+            plan,
+            title: PLAN_FEATURES.free.title,
+            subtitle: 'Migrar para o plano gratuito no proximo vencimento',
+            badge: null,
+            cycles: [],
+          }
+        }
+
+        const cycles = getVisibleCyclesForPlan({
+          currentPlan,
+          currentBillingCycle,
+          targetPlan: plan,
+        }).map((cycle) => ({
+          cycle,
+          label: BILLING_CYCLE_LABELS[cycle],
+          description: getCycleDescription(cycle),
+          amount: getPlanAmount(plan, cycle),
+          perMonth: getMonthlyEquivalentAmount(getPlanAmount(plan, cycle), cycle),
+          savingsLabel: getCycleSavingsLabel(plan, cycle),
+          highlightLabel: getCycleHighlightLabel(plan, cycle),
+          isCurrent: plan === currentPlan && cycle === currentBillingCycle,
+          isSelectable: !(plan === currentPlan && cycle === currentBillingCycle),
+        }))
+
         return {
-          plan: commercialPlan,
-          details,
-          recommendedCycle,
-          amount: getPlanAmount(commercialPlan, recommendedCycle),
-          priceLabel: formatPlanPrice(commercialPlan, recommendedCycle),
-          monthlyLabel: formatCurrency(getMonthlyEquivalentAmount(getPlanAmount(commercialPlan, recommendedCycle), recommendedCycle), 'BRL'),
-          highlightLabel: getCycleHighlightLabel(commercialPlan, recommendedCycle),
-          savingsLabel: getCycleSavingsLabel(commercialPlan, recommendedCycle),
+          plan,
+          title: PLAN_FEATURES[plan].title,
+          subtitle: getPlanGroupSubtitle(plan, currentPlan),
+          badge: getPlanGroupBadge(plan),
+          cycles,
         }
       })
-      .filter((entry): entry is { plan: CommercialPlan; details: PlanFeature; recommendedCycle: BillingCycle; amount: number; priceLabel: string; monthlyLabel: string; highlightLabel: string | null; savingsLabel: string | null } => Boolean(entry.details))
-  }, [planChangeOptions])
-  const planChangeCycleCards = useMemo(() => {
-    if (!selectedTargetPlan || selectedTargetPlan === 'free') return [] as Array<{
-      cycle: NonNullable<SubscriptionRow['billing_cycle']>
-      label: string
-      amount: number
-      perMonth: number
-      savingsLabel: string | null
-      description: string
-    }>
-
-    return (Object.entries(BILLING_CYCLE_LABELS) as Array<[NonNullable<SubscriptionRow['billing_cycle']>, string]>).map(([cycle, label]) => {
-      const amount = getPlanAmount(selectedTargetPlan as CommercialPlan, cycle)
-      return {
-        cycle,
-        label,
-        amount,
-        perMonth: getMonthlyEquivalentAmount(amount, cycle),
-        savingsLabel: getCycleSavingsLabel(selectedTargetPlan as CommercialPlan, cycle),
-        highlightLabel: getCycleHighlightLabel(selectedTargetPlan as CommercialPlan, cycle),
-        description: getCycleDescription(cycle),
+      .filter((group) => group.plan === 'free' || group.cycles.some((cycle) => cycle.isSelectable))
+  }, [currentBillingCycle, currentPlan, planChangeMode])
+  const selectablePlanChoices = useMemo(() => {
+    return planSelectionGroups.flatMap((group) => {
+      if (group.plan === 'free') {
+        return [{ plan: 'free' as CommercialPlan, cycle: currentBillingCycle }]
       }
+
+      return group.cycles
+        .filter((cycle) => cycle.isSelectable)
+        .map((cycle) => ({ plan: group.plan, cycle: cycle.cycle }))
     })
-  }, [selectedTargetPlan])
+  }, [currentBillingCycle, planSelectionGroups])
   const isFreeCancellationScheduled = hasScheduledChange && scheduledTargetPlan === 'free'
   const isFreePlanSelection = planChangeMode === 'downgrade' && selectedTargetPlan === 'free'
   const paymentActionData = useMemo(() => extractPaymentActionData(latestPayment?.raw_payload), [latestPayment])
@@ -314,26 +321,32 @@ export default function Profile() {
   }, [])
 
   useEffect(() => {
-    if (!selectedTargetPlan) {
+    if (!selectablePlanChoices.length) {
+      setSelectedTargetPlan('')
       setSelectedPlanChangeBillingCycle(currentBillingCycle)
       return
     }
 
-    const recommendedCycle = getRecommendedBillingCycle(selectedTargetPlan as CommercialPlan)
-    setSelectedPlanChangeBillingCycle(recommendedCycle)
-  }, [currentBillingCycle, selectedTargetPlan])
+    const currentChoiceIsValid = selectablePlanChoices.some((choice) => (
+      choice.plan === selectedTargetPlan && choice.cycle === selectedPlanChangeBillingCycle
+    ))
+
+    if (currentChoiceIsValid) return
+
+    const defaultChoice = selectablePlanChoices.find((choice) => (
+      choice.cycle === getRecommendedBillingCycle(choice.plan)
+    )) || selectablePlanChoices[0]
+    setSelectedTargetPlan(defaultChoice.plan)
+    setSelectedPlanChangeBillingCycle(defaultChoice.cycle)
+  }, [currentBillingCycle, selectablePlanChoices, selectedPlanChangeBillingCycle, selectedTargetPlan])
 
   useEffect(() => {
-    if (!planChangeOptions.length) {
+    if (!showPlanChangeOptions) {
+      setPlanChangeMode(null)
       setSelectedTargetPlan('')
-      return
+      setSelectedPlanChangeBillingCycle(currentBillingCycle)
     }
-
-    const hasCurrentOption = planChangeOptions.some(([plan]) => plan === selectedTargetPlan)
-    if (!hasCurrentOption) {
-      setSelectedTargetPlan(planChangeOptions[0][0])
-    }
-  }, [planChangeOptions, selectedTargetPlan])
+  }, [currentBillingCycle, showPlanChangeOptions])
 
   async function loadProfile() {
     try {
@@ -1071,14 +1084,25 @@ export default function Profile() {
               </div>
             )}
 
-            <div style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', display: 'grid', gap: 10 }}>
-              <div style={{ fontWeight: 600, color: '#0f172a' }}>Trocar plano</div>
-              <div style={{ fontSize: '0.9rem' }}>
-                Seu plano atual é {currentPlanLabel}. Abra as opções abaixo para escolher se deseja fazer upgrade ou downgrade no próximo vencimento.
+            <div style={planChangeSectionStyle}>
+              <div style={{ display: 'grid', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={sectionIconWrapStyle}>
+                    {planChangeMode === 'downgrade'
+                      ? <TrendingDown size={18} color="#6D28D9" />
+                      : <TrendingUp size={18} color="#6D28D9" />}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#111827', fontSize: '1.5rem' }}>Trocar plano</div>
+                    <div style={{ fontSize: '0.95rem', color: '#6B7280' }}>
+                      Altere seu plano ou ciclo. A mudança será aplicada após o fim do ciclo atual.
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {hasScheduledChange && (
-                <div style={{ fontSize: '0.9rem', color: '#1d4ed8' }}>
+                <div style={{ fontSize: '0.95rem', color: '#2563EB' }}>
                   Existe uma mudança agendada. Se quiser escolher outro plano, primeiro cancele o agendamento atual.
                 </div>
               )}
@@ -1087,10 +1111,13 @@ export default function Profile() {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowPlanChangeOptions(current => !current)
-                    if (showPlanChangeOptions) {
-                      setPlanChangeMode(null)
-                    }
+                    setShowPlanChangeOptions(current => {
+                      const next = !current
+                      if (next && !planChangeMode) {
+                        setPlanChangeMode('upgrade')
+                      }
+                      return next
+                    })
                   }}
                   style={ghostButtonStyle}
                 >
@@ -1099,190 +1126,196 @@ export default function Profile() {
               )}
 
               {canSchedulePlanChange && showPlanChangeOptions && (
-                <div style={{ display: 'grid', gap: 12, padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff' }}>
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      onClick={() => setPlanChangeMode('downgrade')}
-                      style={planChangeMode === 'downgrade' ? activeActionButtonStyle : actionButtonStyle}
-                    >
-                      Downgrade
-                    </button>
+                <div style={planBuilderWrapStyle}>
+                  <div style={planModeTabsStyle}>
                     <button
                       type="button"
                       onClick={() => setPlanChangeMode('upgrade')}
-                      style={planChangeMode === 'upgrade' ? activeActionButtonStyle : actionButtonStyle}
+                      style={planChangeMode === 'upgrade' ? activePlanTabStyle : planTabStyle}
                     >
+                      <TrendingUp size={16} />
                       Upgrade
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPlanChangeMode('downgrade')}
+                      style={planChangeMode === 'downgrade' ? activePlanTabStyle : planTabStyle}
+                    >
+                      <TrendingDown size={16} />
+                      Downgrade
                     </button>
                   </div>
 
-                  {planChangeMode && !planChangeOptions.length && (
-                    <div style={{ fontSize: '0.9rem', color: '#475569' }}>
+                  <div style={currentPlanHeroStyle}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                      <div style={currentPlanIconStyle}>
+                        {renderPlanIcon(currentPlan)}
+                      </div>
+                      <div style={{ display: 'grid', gap: 4 }}>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#6D28D9' }}>Seu plano atual</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                          <div style={{ fontSize: '2rem', fontWeight: 700, color: '#111827', lineHeight: 1 }}>{PLAN_FEATURES[currentPlan].title}</div>
+                          <div style={currentCycleBadgeStyle}>{currentBillingCycleLabel}</div>
+                        </div>
+                        <div style={{ fontSize: '1rem', color: '#6B7280' }}>{getCurrentPlanDescriptor(currentPlan)}</div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', display: 'grid', gap: 6 }}>
+                      <div style={{ fontSize: '2.5rem', fontWeight: 700, color: '#111827', lineHeight: 1 }}>
+                        {currentPlan === 'free' ? 'Gratis' : currentPlanMonthlyLabel}
+                        {currentPlan !== 'free' && <span style={{ fontSize: '1.1rem', fontWeight: 500, color: '#6B7280' }}> /mês</span>}
+                      </div>
+                      <div style={{ fontSize: '0.95rem', color: '#6B7280' }}>
+                        Próximo vencimento: {subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : '-'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {planChangeMode && !planSelectionGroups.length && (
+                    <div style={{ fontSize: '0.95rem', color: '#6B7280' }}>
                       Não existem opções de {planChangeMode} disponíveis para o seu plano atual.
                     </div>
                   )}
 
-                  {planChangeMode && planChangeOptions.length > 0 && (
+                  {planChangeMode && planSelectionGroups.length > 0 && (
                     <>
-                      <div style={planCardsGridStyle}>
-                        {availablePlanCards.map(({ plan, details, amount, priceLabel, monthlyLabel, highlightLabel, savingsLabel }) => (
-                          <div
-                            key={plan}
-                            onClick={() => setSelectedTargetPlan(plan)}
-                            style={{
-                              ...planPreviewCardStyle,
-                              borderTop: `4px solid ${details.accentColor}`,
-                              ...(selectedTargetPlan === plan ? selectedPlanPreviewCardStyle : null),
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-                              <div style={{ display: 'grid', gap: 4 }}>
-                                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>{details.title}</div>
-                                <div style={{ fontSize: '0.85rem', color: '#475569' }}>{details.subtitle}</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827' }}>Escolha uma nova opção</div>
+
+                      <div style={{ display: 'grid', gap: 18 }}>
+                        {planSelectionGroups.map((group) => (
+                          <div key={group.plan} style={planGroupCardStyle}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                                <div style={planGroupIconStyle}>
+                                  {renderPlanIcon(group.plan)}
+                                </div>
+                                <div style={{ display: 'grid', gap: 4 }}>
+                                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#111827' }}>{group.title}</div>
+                                  <div style={{ fontSize: '0.95rem', color: '#6B7280' }}>{group.subtitle}</div>
+                                </div>
                               </div>
-                              <div style={{ display: 'grid', gap: 8, justifyItems: 'end' }}>
-                                {plan === 'premium' && (
-                                  <div style={recommendedBadgeStyle}>
-                                    ☆ Recomendado
-                                  </div>
-                                )}
-                                {selectedTargetPlan === plan && (
-                                <div style={selectedPlanBadgeStyle}>
-                                  Selecionado
+                              {group.badge && <div style={group.plan === 'premium' ? recommendedBadgeStyle : cycleHighlightBadgeStyle}>{group.badge}</div>}
+                            </div>
+
+                            {group.plan === 'free' ? (
+                              <div style={freePlanSelectionStyle}>
+                                <div style={{ display: 'grid', gap: 8 }}>
+                                  {PLAN_FEATURES.free.bullets.map((bullet) => (
+                                    <div key={bullet} style={featureBulletStyle}>
+                                      <Gift size={16} color="#6D28D9" />
+                                      <span>{bullet}</span>
+                                    </div>
+                                  ))}
                                 </div>
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedTargetPlan('free')
+                                    setSelectedPlanChangeBillingCycle(currentBillingCycle)
+                                  }}
+                                  style={selectedTargetPlan === 'free' ? selectedFreePlanButtonStyle : freePlanButtonStyle}
+                                >
+                                  {selectedTargetPlan === 'free' ? 'Downgrade selecionado' : 'Selecionar plano Free'}
+                                </button>
                               </div>
-                            </div>
-                            <div style={{ display: 'grid', gap: 2 }}>
-                              {amount > 0 ? (
-                                <>
-                                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>A partir de</div>
-                                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>
-                                    {monthlyLabel}/mes
-                                  </div>
-                                  <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                                    {`Cobranca ${highlightLabel?.toLowerCase() || 'no ciclo recomendado'} de ${priceLabel}`}
-                                  </div>
-                                </>
-                              ) : (
-                                <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
-                                  Sem cobranca recorrente
-                                </div>
-                              )}
-                              {savingsLabel && <div style={savingsBadgeStyle}>{savingsLabel}</div>}
-                            </div>
-                            <div style={{ display: 'grid', gap: 6 }}>
-                              {details.bullets.map((bullet) => (
-                                <div key={bullet} style={{ fontSize: '0.88rem', color: '#334155' }}>
-                                  {`- ${bullet}`}
-                                </div>
-                              ))}
-                            </div>
+                            ) : (
+                              <div style={planCyclesGridStyle}>
+                                {group.cycles.map((cycle) => {
+                                  const isSelected = selectedTargetPlan === group.plan && planChangeBillingCycle === cycle.cycle
+                                  return (
+                                    <button
+                                      key={`${group.plan}-${cycle.cycle}`}
+                                      type="button"
+                                      disabled={!cycle.isSelectable}
+                                      onClick={() => {
+                                        if (!cycle.isSelectable) return
+                                        setSelectedTargetPlan(group.plan)
+                                        setSelectedPlanChangeBillingCycle(cycle.cycle)
+                                      }}
+                                      style={{
+                                        ...planCycleOptionStyle,
+                                        ...(isSelected ? selectedPlanCycleOptionStyle : null),
+                                        ...(cycle.isCurrent ? currentPlanCycleOptionStyle : null),
+                                        opacity: cycle.isSelectable ? 1 : 0.82,
+                                        cursor: cycle.isSelectable ? 'pointer' : 'default',
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                                        {cycle.highlightLabel ? <div style={cycleHighlightBadgeStyle}>{cycle.highlightLabel}</div> : <span />}
+                                        <div style={{ width: 20, height: 20, borderRadius: 999, border: `2px solid ${isSelected ? '#6D28D9' : '#D1D5DB'}`, display: 'grid', placeItems: 'center', background: isSelected ? '#6D28D9' : '#fff' }}>
+                                          {isSelected && <div style={{ width: 8, height: 8, borderRadius: 999, background: '#fff' }} />}
+                                        </div>
+                                      </div>
+                                      <div style={{ display: 'grid', gap: 6, textAlign: 'left' }}>
+                                        <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#111827' }}>{cycle.label}</div>
+                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+                                          <div style={priceValueStyle}>{formatCurrency(cycle.perMonth, 'BRL')}</div>
+                                          <div style={priceSuffixStyle}>/mês</div>
+                                        </div>
+                                        <div style={{ fontSize: '0.95rem', color: '#6B7280' }}>
+                                          {cycle.cycle === 'monthly'
+                                            ? 'Cobrança mensal'
+                                            : cycle.cycle === 'quarterly'
+                                            ? `Cobrança de ${formatCurrency(cycle.amount, 'BRL')} a cada 3 meses`
+                                            : `Cobrança anual de ${formatCurrency(cycle.amount, 'BRL')}`}
+                                        </div>
+                                        {cycle.savingsLabel && <div style={savingsBadgeStyle}>{cycle.savingsLabel}</div>}
+                                        {cycle.isCurrent && <div style={currentPlanMiniBadgeStyle}>Plano atual</div>}
+                                      </div>
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
 
-                      {selectedTargetPlan && !isFreePlanSelection && (
-                        <>
-                          <div style={{ fontSize: '0.9rem', color: '#475569' }}>
-                            Seu plano será alterado de {currentPlanLabel} para {selectedTargetPlanLabel} somente após o fim do ciclo atual.
+                      {isFreePlanSelection ? (
+                        <div style={freeInfoBannerStyle}>
+                          <CircleAlert size={18} />
+                          <div>
+                            Ao confirmar o downgrade para Free, seu acesso pago continua normalmente até {subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'o fim do ciclo atual'}.
                           </div>
-                          {selectedTargetPlanFeatures && (
-                            <div style={selectedPlanSummaryStyle}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                                <div style={{ display: 'grid', gap: 4 }}>
-                                  <div style={{ fontWeight: 700, color: '#0f172a' }}>{selectedTargetPlanFeatures.title}</div>
-                                  <div style={{ fontSize: '0.88rem', color: '#475569' }}>{selectedTargetPlanFeatures.subtitle}</div>
-                                </div>
-                                <div style={{ display: 'grid', gap: 8, justifyItems: 'end' }}>
-                                  {selectedTargetPlan === 'premium' && (
-                                    <div style={recommendedBadgeStyle}>
-                                      ☆ Recomendado
-                                    </div>
-                                  )}
-                                  <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>A partir de</div>
-                                    <div style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{selectedTargetPlanMonthlyLabel}/mes</div>
-                                    <div style={{ fontSize: '0.92rem', color: '#64748b' }}>Cobranca {planChangeBillingCycleLabel.toLowerCase()} de {selectedTargetPlanPriceLabel}</div>
-                                  </div>
-                                  {selectedTargetPlanSavingsLabel && <div style={savingsBadgeStyle}>{selectedTargetPlanSavingsLabel}</div>}
-                                </div>
+                        </div>
+                      ) : (
+                        <div style={planInfoBannerStyle}>
+                          <CircleAlert size={18} />
+                          <div>
+                            A mudança será aplicada somente após o fim do ciclo atual.
+                            {selectedTargetPlan && (
+                              <div style={{ fontWeight: 600, color: '#6B7280' }}>
+                                Seu novo plano entrará em vigor em {subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'sua próxima cobrança'}.
                               </div>
-                              <div style={{ display: 'grid', gap: 10 }}>
-                                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Escolha o ciclo de pagamento</div>
-                                <div style={billingCycleCardsGridStyle}>
-                                  {planChangeCycleCards.map(({ cycle, label, amount, perMonth, savingsLabel, highlightLabel, description }) => (
-                                    <div
-                                      key={cycle}
-                                      onClick={() => setSelectedPlanChangeBillingCycle(cycle)}
-                                      style={{
-                                        ...billingCycleCardStyle,
-                                        ...(planChangeBillingCycle === cycle ? selectedBillingCycleCardStyle : null),
-                                      }}
-                                    >
-                                      <div style={{ display: 'grid', gap: 4 }}>
-                                        <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>{label}</div>
-                                        <div style={{ fontSize: '0.82rem', color: '#64748b' }}>{description}</div>
-                                      </div>
-                                      <div style={{ textAlign: 'right', display: 'grid', gap: 4 }}>
-                                        <div style={{ fontSize: '1.02rem', fontWeight: 800, color: '#0f172a' }}>
-                                          {formatCurrency(perMonth, 'BRL')}/mes
-                                        </div>
-                                        <div style={{ fontSize: '0.82rem', color: '#475569' }}>
-                                          {formatCurrency(amount, 'BRL')} no {label.toLowerCase()}
-                                        </div>
-                                        {highlightLabel && <div style={cycleHighlightBadgeStyle}>{highlightLabel}</div>}
-                                        {savingsLabel && <div style={savingsBadgeStyle}>{savingsLabel}</div>}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                              <div style={{ fontSize: '0.88rem', color: '#334155' }}>
-                                {selectedTargetPlanAmount > 0
-                                  ? `A nova cobranca sera de ${selectedTargetPlanPriceLabel} no ciclo ${planChangeBillingCycleLabel.toLowerCase()}, iniciando apenas na proxima renovacao.`
-                                  : 'Depois da virada, sua conta continua no plano gratuito sem nova cobranca automatica.'}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {isFreePlanSelection && (
-                        <div style={downgradeWarningStyle}>
-                          Ao escolher o downgrade para Free, seu acesso pago continua normalmente ate {subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'o fim do ciclo atual'}. Depois dessa data, a recorrencia e encerrada e nenhuma nova cobranca automatica deve ser gerada.
+                            )}
+                          </div>
                         </div>
                       )}
-
-                      <div style={downgradeWarningStyle}>
-                        A mudança só será aplicada após o fim do ciclo atual, em {subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'sua próxima cobrança'}.
-                      </div>
                     </>
                   )}
-                </div>
-              )}
 
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                {canSchedulePlanChange && showPlanChangeOptions && planChangeMode && selectedTargetPlan && (
                   <button
                     type="button"
                     onClick={() => setPlanChangeModalOpen(true)}
-                    disabled={planChangeLoading}
-                    style={{
-                      ...(isFreePlanSelection ? subtleDangerButtonStyle : actionButtonStyle),
-                      opacity: planChangeLoading ? 0.7 : 1,
-                      cursor: planChangeLoading ? 'not-allowed' : 'pointer',
-                    }}
+                    disabled={!selectedTargetPlan || planChangeLoading}
+                    style={(!selectedTargetPlan || planChangeLoading)
+                      ? disabledPrimaryPlanButtonStyle
+                      : primaryPlanButtonStyle}
                   >
+                    <CheckCircle2 size={18} />
                     {planChangeLoading
                       ? 'Agendando...'
                       : isFreePlanSelection
-                      ? 'Confirmar downgrade para Free'
-                      : `Confirmar ${planChangeMode}`}
+                      ? 'Confirmar alteração'
+                      : 'Confirmar alteração'}
                   </button>
-                )}
-              </div>
+
+                  <div style={securePaymentStyle}>
+                    <ShieldCheck size={16} />
+                    <span>Pagamento 100% seguro. Você pode cancelar quando quiser.</span>
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>
@@ -1484,100 +1517,270 @@ const pixGuidanceStyle: CSSProperties = {
   lineHeight: 1.5,
 }
 
-const planCardsGridStyle: CSSProperties = {
+const planChangeSectionStyle: CSSProperties = {
+  padding: 24,
+  borderRadius: 16,
+  border: '1px solid #E5E7EB',
+  background: '#FFFFFF',
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-  gap: 12,
+  gap: 20,
 }
 
-const planPreviewCardStyle: CSSProperties = {
-  padding: 14,
-  borderRadius: 12,
-  border: '1px solid #e2e8f0',
-  background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-  display: 'grid',
-  gap: 12,
-  cursor: 'pointer',
-  boxShadow: '0 10px 24px rgba(15, 23, 42, 0.06)',
-  transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
-}
-
-const selectedPlanPreviewCardStyle: CSSProperties = {
-  border: '1px solid #bfdbfe',
-  background: '#eff6ff',
-  boxShadow: '0 14px 30px rgba(59, 130, 246, 0.14)',
-  transform: 'translateY(-2px)',
-}
-
-const selectedPlanBadgeStyle: CSSProperties = {
-  padding: '4px 10px',
+const sectionIconWrapStyle: CSSProperties = {
+  width: 44,
+  height: 44,
   borderRadius: 999,
-  background: '#dbeafe',
-  color: '#1d4ed8',
-  fontSize: '0.75rem',
+  background: '#F5F3FF',
+  display: 'grid',
+  placeItems: 'center',
+}
+
+const planBuilderWrapStyle: CSSProperties = {
+  display: 'grid',
+  gap: 20,
+}
+
+const planModeTabsStyle: CSSProperties = {
+  display: 'flex',
+  gap: 12,
+  flexWrap: 'wrap',
+}
+
+const planTabStyle: CSSProperties = {
+  height: 44,
+  padding: '0 18px',
+  borderRadius: 12,
+  border: '1px solid #E5E7EB',
+  background: '#FFFFFF',
+  color: '#374151',
+  fontWeight: 600,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  cursor: 'pointer',
+}
+
+const activePlanTabStyle: CSSProperties = {
+  ...planTabStyle,
+  border: '1px solid #111827',
+  background: '#111827',
+  color: '#FFFFFF',
+}
+
+const currentPlanHeroStyle: CSSProperties = {
+  padding: 24,
+  borderRadius: 16,
+  border: '1px solid #E5E7EB',
+  background: '#FFFFFF',
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 20,
+  alignItems: 'center',
+  flexWrap: 'wrap',
+}
+
+const currentPlanIconStyle: CSSProperties = {
+  width: 60,
+  height: 60,
+  borderRadius: 16,
+  background: '#F5F3FF',
+  display: 'grid',
+  placeItems: 'center',
+  color: '#6D28D9',
+}
+
+const currentCycleBadgeStyle: CSSProperties = {
+  padding: '6px 12px',
+  borderRadius: 999,
+  background: '#F5F3FF',
+  color: '#6D28D9',
+  fontSize: '0.82rem',
   fontWeight: 700,
 }
 
-const selectedPlanSummaryStyle: CSSProperties = {
-  padding: 12,
-  borderRadius: 10,
-  border: '1px solid #cbd5e1',
-  background: 'linear-gradient(135deg, #ffffff 0%, #f8f5ff 100%)',
+const planGroupCardStyle: CSSProperties = {
+  padding: 24,
+  borderRadius: 16,
+  border: '1px solid #E5E7EB',
+  background: '#FFFFFF',
+  display: 'grid',
+  gap: 18,
+}
+
+const planGroupIconStyle: CSSProperties = {
+  width: 42,
+  height: 42,
+  borderRadius: 12,
+  background: '#F5F3FF',
+  display: 'grid',
+  placeItems: 'center',
+  color: '#6D28D9',
+}
+
+const planCyclesGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gap: 14,
+}
+
+const planCycleOptionStyle: CSSProperties = {
+  minHeight: 180,
+  padding: 18,
+  borderRadius: 16,
+  border: '1px solid #E5E7EB',
+  background: '#FFFFFF',
   display: 'grid',
   gap: 12,
+  textAlign: 'left',
+  transition: '0.2s ease',
 }
 
-const billingCycleCardsGridStyle: CSSProperties = {
+const selectedPlanCycleOptionStyle: CSSProperties = {
+  border: '2px solid #6D28D9',
+  background: '#FAF5FF',
+  transform: 'translateY(-2px)',
+}
+
+const currentPlanCycleOptionStyle: CSSProperties = {
+  background: '#F9FAFB',
+}
+
+const currentPlanMiniBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  justifySelf: 'start',
+  padding: '6px 12px',
+  borderRadius: 999,
+  background: '#F3F4F6',
+  color: '#9CA3AF',
+  fontSize: '0.78rem',
+  fontWeight: 700,
+}
+
+const freePlanSelectionStyle: CSSProperties = {
   display: 'grid',
-  gap: 10,
+  gap: 16,
 }
 
-const billingCycleCardStyle: CSSProperties = {
-  padding: 14,
-  borderRadius: 12,
-  border: '1px solid #e2e8f0',
-  background: '#fff',
+const featureBulletStyle: CSSProperties = {
   display: 'flex',
-  justifyContent: 'space-between',
-  gap: 16,
   alignItems: 'center',
+  gap: 8,
+  color: '#374151',
+  fontSize: '0.95rem',
+}
+
+const freePlanButtonStyle: CSSProperties = {
+  height: 52,
+  padding: '0 18px',
+  borderRadius: 12,
+  border: '1px solid #E5E7EB',
+  background: '#FFFFFF',
+  color: '#374151',
+  fontWeight: 600,
   cursor: 'pointer',
 }
 
-const selectedBillingCycleCardStyle: CSSProperties = {
-  border: '1px solid #a78bfa',
-  background: '#f5f3ff',
-  boxShadow: '0 12px 24px rgba(124, 58, 237, 0.1)',
+const selectedFreePlanButtonStyle: CSSProperties = {
+  ...freePlanButtonStyle,
+  border: '2px solid #6D28D9',
+  background: '#FAF5FF',
+  color: '#6D28D9',
+}
+
+const priceValueStyle: CSSProperties = {
+  fontSize: '2.1rem',
+  fontWeight: 700,
+  color: '#111827',
+  lineHeight: 1,
+}
+
+const priceSuffixStyle: CSSProperties = {
+  fontSize: '1.05rem',
+  color: '#6B7280',
+  fontWeight: 500,
 }
 
 const recommendedBadgeStyle: CSSProperties = {
   justifySelf: 'end',
   padding: '6px 12px',
   borderRadius: 999,
-  background: '#dcfce7',
-  color: '#166534',
+  background: '#F5F3FF',
+  color: '#6D28D9',
   fontSize: '0.78rem',
   fontWeight: 700,
 }
 
 const cycleHighlightBadgeStyle: CSSProperties = {
-  justifySelf: 'end',
+  justifySelf: 'start',
   padding: '4px 10px',
   borderRadius: 999,
-  background: '#ede9fe',
-  color: '#6d28d9',
+  background: '#F5F3FF',
+  color: '#6D28D9',
   fontSize: '0.75rem',
   fontWeight: 700,
 }
 
 const savingsBadgeStyle: CSSProperties = {
-  justifySelf: 'end',
+  justifySelf: 'start',
   padding: '4px 10px',
   borderRadius: 999,
-  background: '#dcfce7',
-  color: '#166534',
+  background: '#DCFCE7',
+  color: '#15803D',
   fontSize: '0.75rem',
   fontWeight: 700,
+}
+
+const planInfoBannerStyle: CSSProperties = {
+  padding: 16,
+  borderRadius: 16,
+  border: '1px solid #E5E7EB',
+  background: '#F5F3FF',
+  color: '#374151',
+  display: 'flex',
+  gap: 12,
+  alignItems: 'flex-start',
+}
+
+const freeInfoBannerStyle: CSSProperties = {
+  padding: 16,
+  borderRadius: 16,
+  border: '1px solid #FCA5A5',
+  background: '#FEF2F2',
+  color: '#991B1B',
+  display: 'flex',
+  gap: 12,
+  alignItems: 'flex-start',
+}
+
+const primaryPlanButtonStyle: CSSProperties = {
+  height: 52,
+  border: 'none',
+  borderRadius: 12,
+  background: '#6D28D9',
+  color: '#FFFFFF',
+  fontWeight: 600,
+  fontSize: '1rem',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  cursor: 'pointer',
+  boxShadow: '0 10px 24px rgba(109, 40, 217, 0.2)',
+}
+
+const disabledPrimaryPlanButtonStyle: CSSProperties = {
+  ...primaryPlanButtonStyle,
+  opacity: 0.7,
+  cursor: 'not-allowed',
+}
+
+const securePaymentStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  gap: 8,
+  color: '#6B7280',
+  fontSize: '0.92rem',
 }
 
 function formatDate(value: string) {
@@ -1635,10 +1838,60 @@ function getCycleHighlightLabel(planSlug: CommercialPlan, billingCycle: string) 
   return planSlug === 'premium' ? 'Mais popular' : 'Mais economico'
 }
 
-function getRecommendedBillingCycle(planSlug: CommercialPlan): BillingCycle {
-  if (planSlug === 'premium') return 'yearly'
-  if (planSlug === 'starter') return 'yearly'
-  return 'monthly'
+function getPlanGroupsForMode(currentPlan: CommercialPlan, mode: 'downgrade' | 'upgrade') {
+  if (mode === 'upgrade') {
+    if (currentPlan === 'free') return ['starter', 'premium'] as CommercialPlan[]
+    if (currentPlan === 'starter') return ['starter', 'premium'] as CommercialPlan[]
+    if (currentPlan === 'premium') return ['premium'] as CommercialPlan[]
+  }
+
+  if (mode === 'downgrade') {
+    if (currentPlan === 'starter') return ['free'] as CommercialPlan[]
+    if (currentPlan === 'premium') return ['starter', 'free'] as CommercialPlan[]
+  }
+
+  return [] as CommercialPlan[]
+}
+
+function getVisibleCyclesForPlan({
+  currentPlan,
+  currentBillingCycle,
+  targetPlan,
+}: {
+  currentPlan: CommercialPlan
+  currentBillingCycle: BillingCycle
+  targetPlan: CommercialPlan
+}) {
+  const cycles: BillingCycle[] = ['monthly', 'quarterly', 'yearly']
+
+  if (targetPlan !== currentPlan) return cycles
+
+  return cycles.filter((cycle) => getBillingCycleMultiplier(cycle) >= getBillingCycleMultiplier(currentBillingCycle))
+}
+
+function getPlanGroupSubtitle(plan: CommercialPlan, currentPlan: CommercialPlan) {
+  if (plan === currentPlan && plan === 'starter') return 'Continue no Starter e economize'
+  if (plan === currentPlan && plan === 'premium') return 'Continue no Premium e economize mais'
+  if (plan === 'premium') return 'Mais recursos, alunos ilimitados e relatorios avancados'
+  if (plan === 'starter') return 'Todos os acessos ate 5 alunos'
+  return 'Plano gratuito sem cobranca automatica'
+}
+
+function getPlanGroupBadge(plan: CommercialPlan) {
+  if (plan === 'premium') return 'Recomendado'
+  return null
+}
+
+function getCurrentPlanDescriptor(plan: CommercialPlan) {
+  if (plan === 'starter') return 'Ate 5 alunos'
+  if (plan === 'premium') return 'Alunos ilimitados'
+  return 'Ate 1 aluno'
+}
+
+function renderPlanIcon(plan: CommercialPlan) {
+  if (plan === 'premium') return <Crown size={24} />
+  if (plan === 'starter') return <Users size={24} />
+  return <Gift size={24} />
 }
 
 function formatPlanPrice(planSlug: CommercialPlan | '', billingCycle: string) {
