@@ -285,6 +285,15 @@ serve(async (req) => {
       });
     }
 
+    if (action === "remove_permuta") {
+      return await handleRemovePermuta({
+        supabase,
+        requesterId: requesterUser.id,
+        requesterRole: requesterProfile.role ?? "",
+        body,
+      });
+    }
+
     throw new Error("Ação inválida.");
   } catch (error) {
     return new Response(
@@ -461,6 +470,122 @@ async function handleCancelDowngrade({
       personalId,
       currentPlan: normalizePlan(subscription.plan_slug || "free"),
       canceledPlan: scheduledPlanSlug,
+    }),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+}
+
+async function handleRemovePermuta({
+  supabase,
+  requesterId,
+  requesterRole,
+  body,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  requesterId: string;
+  requesterRole: string;
+  body: Record<string, unknown>;
+}) {
+  if (requesterRole !== "owner") {
+    throw new Error("Somente o owner pode remover a permuta.");
+  }
+
+  const personalId = getString(body, ["personalId"]) || requesterId;
+  const nowIso = new Date().toISOString();
+
+  const [{ data: subscription, error: subscriptionError }, { data: personalProfile, error: profileError }] = await Promise.all([
+    supabase
+      .from("personal_subscriptions")
+      .select("id, personal_id, plan_slug, billing_cycle, status, student_limit, amount, currency, next_billing_at, blocked_at, grace_until, last_payment_id, last_payment_status, payment_provider, provider_subscription_id, current_period_start, current_period_end")
+      .eq("personal_id", personalId)
+      .single<SubscriptionRow>(),
+    supabase
+      .from("profiles")
+      .select("id, data")
+      .eq("id", personalId)
+      .single<ProfileRow>(),
+  ]);
+
+  if (subscriptionError || !subscription) {
+    throw subscriptionError ?? new Error("Assinatura do personal não encontrada.");
+  }
+
+  if (profileError || !personalProfile) {
+    throw profileError ?? new Error("Perfil do personal não encontrado.");
+  }
+
+  const planSlug = normalizePlan(subscription.plan_slug || "");
+  if (!PLAN_CONFIGS[planSlug]?.paid) {
+    throw new Error("A permuta só pode ser removida de planos pagos.");
+  }
+
+  const currentSaas = isRecord(personalProfile.data?.saas) ? personalProfile.data.saas : {};
+  const currentBillingModel = getString(currentSaas, ["billingModel"]).toLowerCase();
+  const isPermuta = currentBillingModel === "permuta" || Boolean(currentSaas.isPermuta);
+
+  if (!isPermuta) {
+    throw new Error("Este personal não está marcado como permuta.");
+  }
+
+  const nextBillingAt = subscription.next_billing_at || nowIso;
+  const amount = resolveTargetSubscriptionAmount({
+    planSlug,
+    billingCycle: subscription.billing_cycle || "monthly",
+  });
+
+  const { error: subscriptionUpdateError } = await supabase
+    .from("personal_subscriptions")
+    .update({
+      status: "blocked",
+      amount,
+      currency: subscription.currency || "BRL",
+      next_billing_at: nextBillingAt,
+      grace_until: null,
+      blocked_at: nowIso,
+      last_payment_status: "pending",
+      updated_at: nowIso,
+    })
+    .eq("id", subscription.id);
+
+  if (subscriptionUpdateError) throw subscriptionUpdateError;
+
+  const nextData = isRecord(personalProfile.data) ? { ...personalProfile.data } : {};
+  nextData.saas = {
+    ...currentSaas,
+    plan: planSlug,
+    billingCycle: normalizeBillingCycle(subscription.billing_cycle || "monthly") || "monthly",
+    studentLimit: typeof subscription.student_limit === "number" ? subscription.student_limit : currentSaas.studentLimit,
+    billingModel: "normal",
+    isPermuta: false,
+    subscriptionStatus: "blocked",
+    paymentStatus: "pending",
+    startedAt: subscription.started_at || subscription.current_period_start || null,
+    nextBillingAt,
+    paymentProvider: subscription.payment_provider || null,
+    createdVia: getString(currentSaas, ["createdVia"]) || "owner",
+  };
+
+  const { error: profileUpdateError } = await supabase
+    .from("profiles")
+    .update({
+      data: nextData,
+      updated_at: nowIso,
+    })
+    .eq("id", personalId);
+
+  if (profileUpdateError) throw profileUpdateError;
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      action: "remove_permuta",
+      personalId,
+      subscriptionStatus: "blocked",
+      billingModel: "normal",
+      nextBillingAt,
+      amount,
     }),
     {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -103,6 +103,8 @@ type SubscriptionRow = {
   status: string | null;
 };
 
+type BillingModel = "normal" | "permuta";
+
 type LandingRequestMode = {
   mode: "landing";
 };
@@ -278,6 +280,11 @@ async function handleCreatePersonal({
     body,
     isPaidPlan: planConfig.paid,
   });
+  const billingModel = resolveBillingModel({
+    requestMode,
+    body,
+    isPaidPlan: planConfig.paid,
+  });
   const anamnesisReviewRequired = resolveAnamnesisReviewRequired({
     requestMode,
     body,
@@ -293,23 +300,31 @@ async function handleCreatePersonal({
   const subscriptionStatus = resolveSubscriptionStatus({
     requestMode,
     isPaidPlan: planConfig.paid,
+    billingModel,
   });
-  const nextBillingAt = planConfig.paid && subscriptionStatus === "active"
+  const nextBillingAt = planConfig.paid && subscriptionStatus === "active" && billingModel !== "permuta"
     ? calculateNextBillingAt(nowIso, billingCycle)
+    : null;
+  const startedAt = planConfig.paid && subscriptionStatus === "active"
+    ? nowIso
     : null;
 
   const saasData = {
     plan: requestedPlan,
     billingCycle,
+    billingModel,
+    isPermuta: billingModel === "permuta",
     studentLimit: planConfig.studentLimit,
     paymentStatus: planConfig.paid
-      ? normalizedPaymentStatus || (requestMode.mode === "owner" ? "manual" : "approved")
+      ? billingModel === "permuta"
+        ? "permuta"
+        : normalizedPaymentStatus || (requestMode.mode === "owner" ? "manual" : "approved")
       : "free",
     paymentProvider: planConfig.paid ? paymentProvider || null : null,
     paymentId: planConfig.paid ? paymentId || null : null,
     recurringReady: paymentContext.recurringReady,
     subscriptionStatus,
-    startedAt: planConfig.paid ? nowIso : null,
+    startedAt,
     nextBillingAt,
     createdVia: requestMode.mode,
   };
@@ -411,9 +426,11 @@ async function handleCreatePersonal({
         paymentProvider: planConfig.paid ? paymentContext.paymentProvider || null : null,
         paymentId: planConfig.paid ? paymentContext.paymentId || null : null,
         paymentStatus: planConfig.paid
-          ? paymentContext.paymentStatus || (requestMode.mode === "owner" ? "manual" : "approved")
+          ? billingModel === "permuta"
+            ? "permuta"
+            : paymentContext.paymentStatus || (requestMode.mode === "owner" ? "manual" : "approved")
           : "free",
-        startedAt: planConfig.paid ? nowIso : null,
+        startedAt,
         nextBillingAt,
         amount: paymentContext.paymentAmount,
         currency: paymentContext.paymentCurrency,
@@ -559,15 +576,45 @@ function resolveBillingCycle({
   return requestedCycle || DEFAULT_BILLING_CYCLE;
 }
 
-function resolveSubscriptionStatus({
+function resolveBillingModel({
   requestMode,
+  body,
   isPaidPlan,
 }: {
   requestMode: RequestMode;
+  body: Record<string, unknown>;
   isPaidPlan: boolean;
+}): BillingModel {
+  if (!isPaidPlan) {
+    return "normal";
+  }
+
+  if (requestMode.mode === "landing") {
+    return "normal";
+  }
+
+  const explicitModel = getString(body, ["billingModel", "commercialCondition"]).toLowerCase();
+  if (explicitModel === "permuta") return "permuta";
+
+  const isComped = getBoolean(body, ["isPermuta", "permuta", "isComped", "comped"]);
+  return isComped ? "permuta" : "normal";
+}
+
+function resolveSubscriptionStatus({
+  requestMode,
+  isPaidPlan,
+  billingModel,
+}: {
+  requestMode: RequestMode;
+  isPaidPlan: boolean;
+  billingModel: BillingModel;
 }) {
   if (!isPaidPlan) {
     return "free";
+  }
+
+  if (billingModel === "permuta") {
+    return "active";
   }
 
   return requestMode.mode === "landing" ? "active" : "pending_payment";

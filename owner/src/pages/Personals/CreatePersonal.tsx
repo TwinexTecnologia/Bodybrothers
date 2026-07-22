@@ -15,6 +15,9 @@ export default function CreatePersonal() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [phone, setPhone] = useState('')
+  const [planSlug, setPlanSlug] = useState('free')
+  const [billingCycle, setBillingCycle] = useState('monthly')
+  const [isPermuta, setIsPermuta] = useState(false)
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
@@ -91,6 +94,10 @@ export default function CreatePersonal() {
                 email,
                 password,
                 phone,
+                plan: planSlug,
+                billingCycle,
+                isPermuta,
+                billingModel: isPermuta ? 'permuta' : 'normal',
                 brandName,
                 logoUrl,
                 source: 'owner',
@@ -111,6 +118,9 @@ export default function CreatePersonal() {
         setEmail('')
         setPassword('')
         setPhone('')
+        setPlanSlug('free')
+        setBillingCycle('monthly')
+        setIsPermuta(false)
         setBrandName('')
         setLogoUrl('')
         setEvolutionMode('anamnesis')
@@ -183,6 +193,61 @@ export default function CreatePersonal() {
                 />
             </label>
           </div>
+
+          <div style={{ borderTop: '1px solid #f1f5f9', margin: '10px 0' }}></div>
+          <h3 style={{ margin: 0, color: '#0f172a' }}>Plano e Cobrança</h3>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={{ fontWeight: 500, color: '#475569' }}>Plano inicial</span>
+                <select
+                    value={planSlug}
+                    onChange={e => {
+                        const nextPlan = e.target.value
+                        setPlanSlug(nextPlan)
+                        if (nextPlan === 'free') {
+                            setBillingCycle('monthly')
+                            setIsPermuta(false)
+                        }
+                    }}
+                    style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff' }}
+                >
+                    <option value="free">Free</option>
+                    <option value="starter">Starter</option>
+                    <option value="premium">Premium</option>
+                </select>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={{ fontWeight: 500, color: '#475569' }}>Ciclo inicial</span>
+                <select
+                    value={billingCycle}
+                    onChange={e => setBillingCycle(e.target.value)}
+                    disabled={planSlug === 'free'}
+                    style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', background: planSlug === 'free' ? '#f8fafc' : '#fff' }}
+                >
+                    <option value="monthly">Mensal</option>
+                    <option value="quarterly">Trimestral</option>
+                    <option value="yearly">Anual</option>
+                </select>
+            </label>
+          </div>
+
+          {planSlug !== 'free' && (
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: '#f8fafc', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                <input
+                    type="checkbox"
+                    checked={isPermuta}
+                    onChange={e => setIsPermuta(e.target.checked)}
+                    style={{ width: 20, height: 20, marginTop: 2, cursor: 'pointer' }}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>Cadastrar como permuta</span>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                        O personal entra ativo no plano escolhido sem cobrança automática. Depois você pode remover a permuta e ele cairá em regularização para cadastrar pagamento.
+                    </span>
+                </div>
+            </label>
+          )}
 
           <div style={{ borderTop: '1px solid #f1f5f9', margin: '10px 0' }}></div>
           <h3 style={{ margin: 0, color: '#0f172a' }}>Configurações</h3>

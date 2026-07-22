@@ -9,6 +9,12 @@ type PhotoRecord = {
     photos: string[]
 }
 
+type EvolutionField = {
+    id: string
+    label: string
+    exampleUrl?: string | null
+}
+
 export default function PhotoEvolution() {
     const { user } = useAuth()
     const [history, setHistory] = useState<PhotoRecord[]>([])
@@ -20,7 +26,7 @@ export default function PhotoEvolution() {
 
     // Controle de modo e upload
     const [evolutionMode, setEvolutionMode] = useState('anamnesis')
-    const [evolutionFields, setEvolutionFields] = useState<any[]>([]) // Campos customizados
+    const [evolutionFields, setEvolutionFields] = useState<EvolutionField[]>([]) // Campos customizados
     const [isUploading, setIsUploading] = useState(false)
     const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0])
     const [uploadFiles, setUploadFiles] = useState<FileList | null>(null)
@@ -444,6 +450,19 @@ export default function PhotoEvolution() {
                                         {evolutionFields.map(field => (
                                             <div key={field.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                                 <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>{field.label}</label>
+                                                {field.exampleUrl && (
+                                                    <div style={{ display: 'grid', gap: 6, padding: 10, borderRadius: 12, border: '1px solid #ddd6fe', background: '#f5f3ff' }}>
+                                                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#6d28d9' }}>Foto de referência</div>
+                                                        <img
+                                                            src={field.exampleUrl}
+                                                            alt={`Referência de ${field.label}`}
+                                                            style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 10, border: '1px solid #e5e7eb' }}
+                                                        />
+                                                        <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
+                                                            Use essa imagem como exemplo para enviar a foto correta.
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <div 
                                                     style={{ 
                                                         border: '2px dashed #cbd5e1', borderRadius: 12, padding: 16, 
