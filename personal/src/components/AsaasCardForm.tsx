@@ -527,6 +527,18 @@ function normalizeDigits(value: string) {
   return value.replace(/\D+/g, '')
 }
 
+function detectCardBrand(value: string) {
+  const normalized = normalizeDigits(value)
+
+  if (/^4\d{12}(\d{3})?(\d{3})?$/.test(normalized)) return 'visa'
+  if (/^(5[1-5]\d{14}|2(2[2-9]|[3-6]\d|7[01])\d{12})$/.test(normalized)) return 'mastercard'
+  if (/^3[47]\d{13}$/.test(normalized)) return 'amex'
+  if (/^(4011(78|79)|431274|438935|451416|457393|457631|457632|504175|5067|509\d|627780|636297|636368)\d*$/.test(normalized)) return 'elo'
+  if (/^6(?:011|5\d{2})\d{12}$/.test(normalized)) return 'discover'
+
+  return ''
+}
+
 function formatCardNumber(value: string) {
   return normalizeDigits(value)
     .slice(0, 19)
