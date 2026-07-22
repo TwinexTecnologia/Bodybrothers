@@ -1616,6 +1616,10 @@ function resolveTargetSubscriptionAmount({
   planSlug: string;
   billingCycle: string;
 }) {
+  if (planSlug === "free") {
+    return 0;
+  }
+
   const baseAmount = PLAN_PRICES[planSlug];
 
   if (typeof baseAmount !== "number" || Number.isNaN(baseAmount)) {

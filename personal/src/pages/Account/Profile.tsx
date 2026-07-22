@@ -117,6 +117,8 @@ export default function Profile() {
   const [billingCycleModalOpen, setBillingCycleModalOpen] = useState(false)
   const [showBillingCycleOptions, setShowBillingCycleOptions] = useState(false)
   const [billingCycleChangeLoading, setBillingCycleChangeLoading] = useState(false)
+  const [freeCancellationModalOpen, setFreeCancellationModalOpen] = useState(false)
+  const [freeCancellationLoading, setFreeCancellationLoading] = useState(false)
   const [cancelScheduledChangeLoading, setCancelScheduledChangeLoading] = useState(false)
   const [copyPixMsg, setCopyPixMsg] = useState('')
   const [paymentActionLoading, setPaymentActionLoading] = useState<'pix' | 'card' | 'check' | null>(null)
@@ -152,6 +154,7 @@ export default function Profile() {
   const scheduledTargetBillingCycleLabel = scheduledTargetBillingCycle
     ? BILLING_CYCLE_LABELS[scheduledTargetBillingCycle] || scheduledTargetBillingCycle
     : null
+  const isFreeCancellationScheduled = hasScheduledChange && scheduledTargetPlan === 'free'
   const paymentActionData = useMemo(() => extractPaymentActionData(latestPayment?.raw_payload), [latestPayment])
   const canCopyPix = Boolean(paymentActionData.pixCode)
   const needsRegularization = subscription?.status === 'blocked' || subscription?.status === 'past_due'
@@ -370,6 +373,7 @@ export default function Profile() {
   async function handleCancelScheduledChange() {
     const canceledCycleLabel = scheduledTargetBillingCycleLabel
     const canceledPlanLabel = scheduledTargetPlanLabel
+    const cancelingFreeSchedule = scheduledTargetPlan === 'free'
 
     try {
       setCancelScheduledChangeLoading(true)
@@ -379,7 +383,9 @@ export default function Profile() {
       const response = await cancelSubscriptionDowngrade()
       setShowBillingCycleOptions(false)
       setMsg(
-        canceledCycleLabel
+        cancelingFreeSchedule
+          ? 'Cancelamento agendado removido com sucesso. Sua assinatura paga continuará renovando normalmente.'
+          : canceledCycleLabel
           ? `Mudança agendada do plano ${canceledPlanLabel} para o ciclo ${canceledCycleLabel} cancelada com sucesso.`
           : `Mudança agendada do plano ${PLAN_LABELS[response.canceledPlan] || response.canceledPlan} cancelada com sucesso.`,
       )
@@ -389,6 +395,31 @@ export default function Profile() {
       setError(err.message || 'Não foi possível cancelar a mudança agendada.')
     } finally {
       setCancelScheduledChangeLoading(false)
+    }
+  }
+
+  async function handleConfirmFreeCancellation() {
+    try {
+      setFreeCancellationLoading(true)
+      setMsg('')
+      setError('')
+
+      const response = await requestSubscriptionDowngrade({
+        targetPlan: 'free',
+        targetBillingCycle: 'monthly',
+      })
+
+      setFreeCancellationModalOpen(false)
+      setShowBillingCycleOptions(false)
+      setMsg(
+        `Cancelamento agendado com sucesso. Seu plano ${currentPlanLabel} continua ativo ate ${formatDate(response.effectiveAt)}. Depois disso, a assinatura vira Free e nenhuma nova cobranca sera gerada.`,
+      )
+      await loadProfile()
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || 'Não foi possível agendar o cancelamento da assinatura.')
+    } finally {
+      setFreeCancellationLoading(false)
     }
   }
 
@@ -909,10 +940,42 @@ export default function Profile() {
                   </button>
                 </div>
                 <div style={{ fontSize: '0.92rem', color: '#475569' }}>
-                  {scheduledTargetBillingCycleLabel
+                  {isFreeCancellationScheduled
+                    ? `Seu plano ${currentPlanLabel} continua ativo ate ${subscription?.scheduled_change_at ? formatDate(subscription.scheduled_change_at) : 'a próxima cobrança'}. Depois disso, sua assinatura será encerrada, o plano passará para Free e não haverá nova cobrança automática.`
+                    : scheduledTargetBillingCycleLabel
                     ? `Seu plano ${currentPlanLabel} continuará no ciclo ${currentBillingCycleLabel} até ${subscription?.scheduled_change_at ? formatDate(subscription.scheduled_change_at) : 'a próxima cobrança'}. Depois disso, ele passará para o ciclo ${scheduledTargetBillingCycleLabel} e a nova cobrança será feita a partir dessa data.`
                     : `Seu plano será alterado para ${scheduledTargetPlanLabel} em ${subscription?.scheduled_change_at ? formatDate(subscription.scheduled_change_at) : 'data a confirmar'}.`}
                 </div>
+              </div>
+            )}
+
+            {canManageBillingCycle && (
+              <div style={regularizationCardStyle}>
+                <div style={{ fontWeight: 700, color: '#0f172a' }}>Cancelar renovacao automatica</div>
+                <div style={{ fontSize: '0.92rem', color: '#475569', lineHeight: 1.5 }}>
+                  Ao agendar o plano Free, seu acesso pago continua normalmente ate o fim do ciclo atual. No vencimento, a recorrencia e encerrada e nenhuma nova cobranca automatica deve ser gerada.
+                </div>
+
+                {hasScheduledChange ? (
+                  <div style={downgradeWarningStyle}>
+                    {isFreeCancellationScheduled
+                      ? 'O cancelamento para Free ja esta agendado. Se quiser mudar essa decisao antes da virada, basta cancelar o agendamento acima.'
+                      : 'Ja existe outra mudanca agendada para esta assinatura. Para cancelar a renovacao automatica, primeiro cancele o agendamento atual.'}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setFreeCancellationModalOpen(true)}
+                    disabled={freeCancellationLoading}
+                    style={freeCancellationLoading ? {
+                      ...subtleDangerButtonStyle,
+                      opacity: 0.7,
+                      cursor: 'not-allowed',
+                    } : subtleDangerButtonStyle}
+                  >
+                    {freeCancellationLoading ? 'Agendando cancelamento...' : 'Agendar cancelamento para Free'}
+                  </button>
+                )}
               </div>
             )}
 
@@ -1044,6 +1107,22 @@ export default function Profile() {
         stackActions
         cancelDisabled={removeSavedCardLoading}
         confirmDisabled={removeSavedCardLoading}
+      />
+
+      <ConfirmModal
+        isOpen={freeCancellationModalOpen}
+        title="Agendar cancelamento para Free"
+        description={`Você confirma o cancelamento da renovação automática do plano ${currentPlanLabel}? Seu acesso pago continua normalmente até ${subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : 'o fim do ciclo atual'}. Depois dessa data, o plano vira Free e não deve haver nova cobrança automática.`}
+        cancelText="Manter assinatura"
+        confirmText={freeCancellationLoading ? 'Agendando...' : 'Sim, agendar cancelamento'}
+        onCancel={() => {
+          if (!freeCancellationLoading) setFreeCancellationModalOpen(false)
+        }}
+        onConfirm={handleConfirmFreeCancellation}
+        isDanger
+        stackActions
+        cancelDisabled={freeCancellationLoading}
+        confirmDisabled={freeCancellationLoading}
       />
     </div>
   )

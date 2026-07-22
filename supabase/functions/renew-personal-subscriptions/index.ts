@@ -1508,6 +1508,18 @@ async function deleteAsaasSubscriptionById({
   });
 }
 
+async function deleteAsaasPaymentById({
+  paymentId,
+  config,
+}: {
+  paymentId: string;
+  config: { accessToken: string; baseUrl: string; userAgent: string };
+}) {
+  return await asaasRequest(`/payments/${paymentId}`, config, {
+    method: "DELETE",
+  });
+}
+
 async function listAsaasPayments({
   config,
   query,
@@ -1702,6 +1714,18 @@ async function applyScheduledAsaasSubscriptionChange({
     };
   }
 
+  if (targetPlan === "free") {
+    return await applyScheduledAsaasFreeCancellation({
+      supabase,
+      subscription,
+      providerSubscriptionId,
+      config,
+      paymentMethodRow,
+      savedPaymentMethod,
+      profileData,
+    });
+  }
+
   const targetAmount = resolveScheduledSubscriptionAmount({
     planSlug: targetPlan,
     billingCycle: targetBillingCycle,
@@ -1835,6 +1859,129 @@ async function applyScheduledAsaasSubscriptionChange({
     throw error ?? new Error("Nao foi possivel persistir a troca agendada da assinatura Asaas.");
   }
 
+  await saveSubscriptionSaasToProfile({
+    supabase,
+    personalId: subscription.personal_id,
+    currentData: profileData,
+    subscription: data,
+  });
+
+  return {
+    subscription: data,
+    savedPaymentMethod: updatedSavedPaymentMethod,
+  };
+}
+
+async function applyScheduledAsaasFreeCancellation({
+  supabase,
+  subscription,
+  providerSubscriptionId,
+  config,
+  paymentMethodRow,
+  savedPaymentMethod,
+  profileData,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  subscription: SubscriptionRow;
+  providerSubscriptionId: string;
+  config: { accessToken: string; baseUrl: string; userAgent: string };
+  paymentMethodRow: PersonalPaymentMethodRow | null;
+  savedPaymentMethod: SavedPaymentMethod | null;
+  profileData: Record<string, unknown> | null;
+}) {
+  const nowIso = new Date().toISOString();
+  const effectiveDate = formatBillingDate(subscription.next_billing_at || nowIso);
+  const scheduledPendingPayments = await listAsaasPayments({
+    config,
+    query: {
+      subscription: providerSubscriptionId,
+      limit: "100",
+      offset: "0",
+      "dueDate[ge]": effectiveDate,
+    },
+  });
+  const cancellablePaymentIds = scheduledPendingPayments
+    .filter((payment) => {
+      const paymentId = getString(payment, ["id"]);
+      if (!paymentId) return false;
+
+      const normalizedStatus = normalizeAsaasPaymentStatus(
+        getString(payment, ["status"]) || "PENDING",
+      );
+      const paymentDueDate = formatBillingDate(
+        getString(payment, ["dueDate", "originalDueDate"]) || effectiveDate,
+      );
+
+      return normalizedStatus === "pending" && paymentDueDate >= effectiveDate;
+    })
+    .map((payment) => getString(payment, ["id"]))
+    .filter(Boolean);
+
+  await deleteAsaasSubscriptionById({
+    subscriptionId: providerSubscriptionId,
+    config,
+  });
+
+  for (const paymentId of cancellablePaymentIds) {
+    await deleteAsaasPaymentById({
+      paymentId,
+      config,
+    });
+  }
+
+  const updatedSavedPaymentMethod = buildSavedPaymentMethodWithoutSubscription({
+    savedPaymentMethod,
+    paymentMethodRow,
+    updatedAt: nowIso,
+  });
+
+  await syncAsaasPaymentMethodAfterFreeCancellation({
+    supabase,
+    subscription,
+    paymentMethodRow,
+    canceledSubscriptionId: providerSubscriptionId,
+    canceledPaymentIds: cancellablePaymentIds,
+    savedPaymentMethod: updatedSavedPaymentMethod,
+    profileData,
+  });
+
+  const { data, error } = await supabase
+    .from("personal_subscriptions")
+    .update({
+      plan_slug: "free",
+      billing_cycle: "monthly",
+      student_limit: 1,
+      amount: 0,
+      status: "free",
+      payment_provider: null,
+      provider_subscription_id: null,
+      next_billing_at: null,
+      grace_until: null,
+      blocked_at: null,
+      current_period_start: null,
+      current_period_end: null,
+      started_at: null,
+      scheduled_plan_slug: null,
+      scheduled_student_limit: null,
+      scheduled_billing_cycle: null,
+      scheduled_change_at: null,
+      updated_at: nowIso,
+    })
+    .eq("id", subscription.id)
+    .select("id, personal_id, plan_slug, billing_cycle, status, amount, currency, next_billing_at, grace_until, blocked_at, last_payment_id, last_payment_status, payment_provider, provider_subscription_id, current_period_start, current_period_end, started_at, student_limit, scheduled_plan_slug, scheduled_student_limit, scheduled_billing_cycle, scheduled_change_at")
+    .single<SubscriptionRow>();
+
+  if (error || !data) {
+    throw error ?? new Error("Nao foi possivel persistir o cancelamento agendado da assinatura Asaas.");
+  }
+
+  await saveSubscriptionSaasToProfile({
+    supabase,
+    personalId: subscription.personal_id,
+    currentData: profileData,
+    subscription: data,
+  });
+
   return {
     subscription: data,
     savedPaymentMethod: updatedSavedPaymentMethod,
@@ -1944,6 +2091,152 @@ async function syncAsaasPaymentMethodAfterScheduledChange({
     currentData: profileData,
     paymentMethod: savedPaymentMethod,
   });
+}
+
+async function syncAsaasPaymentMethodAfterFreeCancellation({
+  supabase,
+  subscription,
+  paymentMethodRow,
+  canceledSubscriptionId,
+  canceledPaymentIds,
+  savedPaymentMethod,
+  profileData,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  subscription: SubscriptionRow;
+  paymentMethodRow: PersonalPaymentMethodRow | null;
+  canceledSubscriptionId: string;
+  canceledPaymentIds: string[];
+  savedPaymentMethod: SavedPaymentMethod | null;
+  profileData: Record<string, unknown> | null;
+}) {
+  const nowIso = new Date().toISOString();
+  const previousRawPayload = isRecord(paymentMethodRow?.raw_payload) ? paymentMethodRow.raw_payload : {};
+  const mergedRawPayload = {
+    ...previousRawPayload,
+    previousSubscriptionId: canceledSubscriptionId,
+    canceledPaymentIds,
+    subscription: null,
+  };
+
+  const { error } = await supabase
+    .from("personal_payment_methods")
+    .update({
+      provider_subscription_id: null,
+      raw_payload: mergedRawPayload,
+      updated_at: nowIso,
+    })
+    .eq("personal_id", subscription.personal_id);
+
+  if (error) throw error;
+
+  await savePaymentMethodToProfile({
+    supabase,
+    personalId: subscription.personal_id,
+    currentData: profileData,
+    paymentMethod: savedPaymentMethod,
+  });
+}
+
+function buildSavedPaymentMethodWithoutSubscription({
+  savedPaymentMethod,
+  paymentMethodRow,
+  updatedAt,
+}: {
+  savedPaymentMethod: SavedPaymentMethod | null;
+  paymentMethodRow: PersonalPaymentMethodRow | null;
+  updatedAt: string;
+}) {
+  if (savedPaymentMethod) {
+    return {
+      ...savedPaymentMethod,
+      providerSubscriptionId: null,
+      updatedAt,
+    };
+  }
+
+  if (!paymentMethodRow?.provider_customer_id?.trim()) {
+    return null;
+  }
+
+  return {
+    provider: "asaas" as const,
+    providerCustomerId: paymentMethodRow.provider_customer_id.trim(),
+    providerCardId: paymentMethodRow.provider_card_id?.trim() || null,
+    providerPaymentProfileId: paymentMethodRow.provider_payment_profile_id?.trim() || null,
+    providerPaymentMethodToken: paymentMethodRow.provider_payment_method_token?.trim() || null,
+    providerSubscriptionId: null,
+    paymentMethodId: paymentMethodRow.payment_method_id?.trim() || null,
+    issuerId: paymentMethodRow.issuer_id?.trim() || null,
+    brand: paymentMethodRow.brand?.trim() || null,
+    lastFour: paymentMethodRow.last_four?.trim() || null,
+    firstPaymentProviderPaymentId: paymentMethodRow.first_payment_provider_payment_id?.trim() || null,
+    updatedAt,
+  };
+}
+
+async function saveSubscriptionSaasToProfile({
+  supabase,
+  personalId,
+  currentData,
+  subscription,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  personalId: string;
+  currentData: Record<string, unknown> | null;
+  subscription: SubscriptionRow;
+}) {
+  const nextData = isRecord(currentData) ? { ...currentData } : {};
+  nextData.saas = buildProfileSaasSnapshot({
+    currentData,
+    subscription,
+  });
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      data: nextData,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", personalId);
+
+  if (error) throw error;
+}
+
+function buildProfileSaasSnapshot({
+  currentData,
+  subscription,
+}: {
+  currentData: Record<string, unknown> | null;
+  subscription: SubscriptionRow;
+}) {
+  const currentSaas = isRecord(currentData?.saas) ? currentData.saas : {};
+  const planSlug = normalizePlan(subscription.plan_slug || "free") || "free";
+  const billingCycle = normalizeBillingCycle(subscription.billing_cycle || "monthly") || "monthly";
+  const studentLimit = typeof subscription.student_limit === "number"
+    ? subscription.student_limit
+    : planSlug === "free"
+    ? 1
+    : Number(currentSaas.studentLimit) || null;
+
+  return {
+    ...currentSaas,
+    plan: planSlug,
+    billingCycle,
+    studentLimit,
+    subscriptionStatus: subscription.status || (planSlug === "free" ? "free" : "active"),
+    startedAt: subscription.started_at || null,
+    nextBillingAt: subscription.next_billing_at || null,
+    paymentProvider: subscription.payment_provider || null,
+    recurringReady: planSlug === "free"
+      ? false
+      : typeof currentSaas.recurringReady === "boolean"
+      ? currentSaas.recurringReady
+      : true,
+    paymentStatus: planSlug === "free"
+      ? "free"
+      : getString(currentSaas, ["paymentStatus"]) || "approved",
+  };
 }
 
 function getAsaasPaymentAmount(gatewayPayment: Record<string, unknown>) {
