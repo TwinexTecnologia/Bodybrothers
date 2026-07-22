@@ -15,7 +15,7 @@ const DEFAULT_ANAMNESIS_REVIEW_REQUIRED = true;
 
 const PLAN_CONFIGS: Record<string, { studentLimit: number; paid: boolean }> = {
   free: { studentLimit: 1, paid: false },
-  starter: { studentLimit: 10, paid: true },
+  starter: { studentLimit: 5, paid: true },
   pro: { studentLimit: 30, paid: true },
   premium: { studentLimit: 30, paid: true },
   elite: { studentLimit: 999999, paid: true },
