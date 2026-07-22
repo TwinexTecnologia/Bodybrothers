@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { CheckCircle2, CircleAlert, Crown, Gift, ReceiptText, ShieldCheck, TrendingDown, TrendingUp, Users } from 'lucide-react'
+import { CheckCircle2, CircleAlert, CreditCard, Crown, Gift, ReceiptText, ShieldCheck, TrendingDown, TrendingUp, Users } from 'lucide-react'
 import AsaasCardForm, { type AsaasCardFormSubmitData, type AsaasCardHolderInfoDefaults } from '../../components/AsaasCardForm'
 import ConfirmModal from '../../components/ConfirmModal'
 import MercadoPagoCardForm from '../../components/MercadoPagoCardForm'
@@ -236,6 +236,9 @@ export default function Profile() {
     ? getPlanAmount(selectedTargetPlan as CommercialPlan, planChangeBillingCycle)
     : 0
   const selectedTargetPlanPriceLabel = formatPlanPrice(selectedTargetPlan as CommercialPlan | '', planChangeBillingCycle)
+  const fallbackSavedPaymentMethod = useMemo(() => mapStoredPaymentMethod(storedPaymentMethod), [storedPaymentMethod])
+  const savedCardBrandLabel = formatSavedCardBrand(savedPaymentMethod?.brand || fallbackSavedPaymentMethod?.brand || null)
+  const savedCardLastFour = savedPaymentMethod?.lastFour || fallbackSavedPaymentMethod?.lastFour || null
   const planSelectionGroups = useMemo<PlanSelectionGroup[]>(() => {
     if (!planChangeMode) return []
 
@@ -802,15 +805,8 @@ export default function Profile() {
         </div>
 
         <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Plano e Assinatura</h3>
-            <button
-              type="button"
-              onClick={() => setShowFinancialHistory((current) => !current)}
-              style={ghostButtonStyle}
-            >
-              {showFinancialHistory ? 'Ocultar financeiro' : 'Ver financeiro'}
-            </button>
           </div>
           <div style={{ padding: 24, display: 'grid', gap: 20 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
@@ -822,6 +818,27 @@ export default function Profile() {
               <InfoCard label="Próxima cobrança" value={subscription?.next_billing_at ? formatDate(subscription.next_billing_at) : '-'} />
             </div>
 
+            <div style={financialHistoryToggleCardStyle}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={financialSectionIconStyle}>
+                  <ReceiptText size={18} color="#6D28D9" />
+                </div>
+                <div style={{ display: 'grid', gap: 4 }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Histórico de pagamento</div>
+                  <div style={{ fontSize: '0.9rem', color: '#6B7280' }}>
+                    Veja todas as cobranças da sua assinatura e o método usado em cada pagamento.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFinancialHistory((current) => !current)}
+                style={showFinancialHistory ? secondaryFinancialButtonStyle : primaryFinancialButtonStyle}
+              >
+                {showFinancialHistory ? 'Ocultar histórico de pagamento' : 'Ver histórico de pagamento'}
+              </button>
+            </div>
+
             {showFinancialHistory && (
               <div style={financialHistoryCardStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -830,7 +847,7 @@ export default function Profile() {
                       <ReceiptText size={18} color="#6D28D9" />
                     </div>
                     <div style={{ display: 'grid', gap: 4 }}>
-                      <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Financeiro</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Histórico de pagamento</div>
                       <div style={{ fontSize: '0.9rem', color: '#6B7280' }}>
                         Acompanhe seus pagamentos, mensalidades e o tipo de cobrança da assinatura.
                       </div>
@@ -867,7 +884,7 @@ export default function Profile() {
                             <td style={financialBodyCellStyle}>{getPaymentChargeTypeLabel(payment)}</td>
                             <td style={financialBodyCellStyle}>{BILLING_CYCLE_LABELS[payment.billing_cycle || 'monthly'] || 'Mensal'}</td>
                             <td style={financialBodyCellStyle}>{formatCurrency(payment.amount, payment.currency || 'BRL')}</td>
-                            <td style={financialBodyCellStyle}>{getPaymentMethodLabel(payment)}</td>
+                            <td style={financialBodyCellStyle}>{getPaymentMethodLabel(payment, savedPaymentMethod || fallbackSavedPaymentMethod)}</td>
                             <td style={financialBodyCellStyle}>
                               <span style={getPaymentStatusPillStyle(payment.status)}>{getPaymentStatusLabel(payment.status)}</span>
                             </td>
@@ -904,9 +921,9 @@ export default function Profile() {
                 <div style={{ display: 'grid', gap: 6 }}>
                   <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
                     {isAsaasSubscriptionFlow && hasSavedPaymentMethod
-                      ? `Cartao salvo${savedPaymentMethod?.lastFour ? ` final ${savedPaymentMethod.lastFour}` : ''}`
+                      ? `${savedCardBrandLabel}${savedCardLastFour ? ` final ${savedCardLastFour}` : ''}`
                       : hasSavedPaymentMethod
-                      ? `${formatSavedCardBrand(savedPaymentMethod?.brand)} final ${savedPaymentMethod?.lastFour || '****'}`
+                      ? `${savedCardBrandLabel} final ${savedCardLastFour || '****'}`
                       : 'Nenhum cartao cadastrado'}
                   </div>
                   <div style={{ fontSize: '0.9rem', color: '#475569' }}>
@@ -917,6 +934,23 @@ export default function Profile() {
                       : 'Cadastre um cartao para manter o metodo de pagamento salvo e liberar a renovacao automatica.'}
                   </div>
                 </div>
+
+                {hasSavedPaymentMethod && (
+                  <div style={savedCardPreviewStyle}>
+                    <div style={savedCardBrandChipStyle}>
+                      <CreditCard size={16} color="#6D28D9" />
+                      {savedCardBrandLabel}
+                    </div>
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      <div style={{ fontSize: '0.96rem', fontWeight: 700, color: '#111827' }}>
+                        {savedCardBrandLabel}{savedCardLastFour ? ` final ${savedCardLastFour}` : ''}
+                      </div>
+                      <div style={{ fontSize: '0.88rem', color: '#6B7280' }}>
+                        Cartao salvo para as proximas cobrancas recorrentes.
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   <button
@@ -1876,6 +1910,18 @@ const financialHistoryCardStyle: CSSProperties = {
   padding: 20,
 }
 
+const financialHistoryToggleCardStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 16,
+  flexWrap: 'wrap',
+  borderRadius: 16,
+  border: '1px solid #E5E7EB',
+  background: '#FFFFFF',
+  padding: 20,
+}
+
 const financialSectionIconStyle: CSSProperties = {
   width: 40,
   height: 40,
@@ -1884,6 +1930,31 @@ const financialSectionIconStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
+}
+
+const primaryFinancialButtonStyle: CSSProperties = {
+  minHeight: 46,
+  padding: '0 18px',
+  border: 'none',
+  borderRadius: 12,
+  background: '#6D28D9',
+  color: '#FFFFFF',
+  fontWeight: 700,
+  fontSize: '0.95rem',
+  cursor: 'pointer',
+  boxShadow: '0 10px 24px rgba(109, 40, 217, 0.18)',
+}
+
+const secondaryFinancialButtonStyle: CSSProperties = {
+  minHeight: 46,
+  padding: '0 18px',
+  border: '1px solid #DDD6FE',
+  borderRadius: 12,
+  background: '#F5F3FF',
+  color: '#6D28D9',
+  fontWeight: 700,
+  fontSize: '0.95rem',
+  cursor: 'pointer',
 }
 
 const financialTableWrapStyle: CSSProperties = {
@@ -1926,6 +1997,29 @@ const financialEmptyStateStyle: CSSProperties = {
   padding: 18,
   fontSize: '0.92rem',
   color: '#6B7280',
+}
+
+const savedCardPreviewStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 14,
+  flexWrap: 'wrap',
+  borderRadius: 14,
+  border: '1px solid #E5E7EB',
+  background: '#F9FAFB',
+  padding: 16,
+}
+
+const savedCardBrandChipStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '8px 12px',
+  borderRadius: 12,
+  background: '#F5F3FF',
+  color: '#6D28D9',
+  fontWeight: 700,
+  fontSize: '0.9rem',
 }
 
 const invoiceReferenceStyle: CSSProperties = {
@@ -2173,7 +2267,7 @@ function getPaymentChargeTypeLabel(payment: SubscriptionPaymentRow) {
   return 'Cobranca da assinatura'
 }
 
-function getPaymentMethodLabel(payment: SubscriptionPaymentRow) {
+function getPaymentMethodLabel(payment: SubscriptionPaymentRow, fallbackSavedMethod?: SavedPaymentMethod | null) {
   const paymentActionData = extractPaymentActionData(payment.raw_payload)
   if (paymentActionData.pixCode || paymentActionData.qrCodeBase64) return 'PIX'
 
@@ -2191,6 +2285,11 @@ function getPaymentMethodLabel(payment: SubscriptionPaymentRow) {
     'last_four',
     'lastDigits',
     'creditCardNumber',
+    'creditCardLastFour',
+    'creditCardLast4',
+    'creditCardLastDigits',
+    'lastDigitsCard',
+    'creditCardNumber',
   ])
 
   if (rawBrand && rawLastFour) {
@@ -2198,6 +2297,14 @@ function getPaymentMethodLabel(payment: SubscriptionPaymentRow) {
   }
 
   if (billingType === 'CREDIT_CARD' || payment.provider === 'mercadopago' || payment.provider === 'asaas') {
+    if (fallbackSavedMethod?.brand && fallbackSavedMethod?.lastFour) {
+      return `${formatSavedCardBrand(fallbackSavedMethod.brand)} final ${fallbackSavedMethod.lastFour}`
+    }
+
+    if (fallbackSavedMethod?.brand) {
+      return formatSavedCardBrand(fallbackSavedMethod.brand)
+    }
+
     return 'Cartao'
   }
 
