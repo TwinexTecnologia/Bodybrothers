@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import AsaasCardForm, { type AsaasCardFormSubmitData } from '../../components/AsaasCardForm'
+import AsaasCardForm, { type AsaasCardFormSubmitData, type AsaasCardHolderInfoDefaults } from '../../components/AsaasCardForm'
 import ConfirmModal from '../../components/ConfirmModal'
 import MercadoPagoCardForm from '../../components/MercadoPagoCardForm'
 import { cancelSubscriptionDowngrade, chargeSavedCard, checkSubscriptionPaymentStatus, createRegularizationPayment, payWithCardToken, removeSavedPaymentMethod, requestSubscriptionDowngrade, saveCardToken } from '../../lib/subscription'
@@ -62,6 +62,7 @@ type StoredPaymentMethodRow = {
   last_four: string | null
   first_payment_provider_payment_id: string | null
   updated_at: string | null
+  raw_payload?: Record<string, unknown> | null
 }
 
 type CardChargeResponse = {
@@ -120,6 +121,7 @@ export default function Profile() {
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null)
   const [subscriptionAmount, setSubscriptionAmount] = useState(0)
   const [savedPaymentMethod, setSavedPaymentMethod] = useState<SavedPaymentMethod | null>(null)
+  const [storedPaymentMethod, setStoredPaymentMethod] = useState<StoredPaymentMethodRow | null>(null)
   const [latestPayment, setLatestPayment] = useState<SubscriptionPaymentRow | null>(null)
   const [activeStudents, setActiveStudents] = useState(0)
   const [selectedBillingCycle, setSelectedBillingCycle] = useState<SubscriptionRow['billing_cycle']>('monthly')
@@ -190,6 +192,13 @@ export default function Profile() {
   const canCopyPix = Boolean(paymentActionData.pixCode)
   const needsRegularization = subscription?.status === 'blocked' || subscription?.status === 'past_due'
   const isAsaasSubscriptionFlow = savedPaymentMethod?.provider === 'asaas' || latestPayment?.provider === 'asaas'
+  const asaasCardHolderDefaults = useMemo<AsaasCardHolderInfoDefaults>(() => {
+    return extractAsaasCardHolderDefaults(storedPaymentMethod?.raw_payload, {
+      name,
+      email,
+      phone,
+    })
+  }, [email, name, phone, storedPaymentMethod])
   const hasSavedPaymentMethod = isAsaasSubscriptionFlow
     ? Boolean(savedPaymentMethod)
     : Boolean(savedPaymentMethod?.providerCardId || savedPaymentMethod?.providerPaymentProfileId)
@@ -270,7 +279,7 @@ export default function Profile() {
       const [paymentMethodResult, subscriptionResult, studentsResult] = await Promise.all([
         supabase
           .from('personal_payment_methods')
-          .select('provider, provider_customer_id, provider_card_id, provider_payment_profile_id, provider_payment_method_token, provider_subscription_id, payment_method_id, issuer_id, brand, last_four, first_payment_provider_payment_id, updated_at')
+          .select('provider, provider_customer_id, provider_card_id, provider_payment_profile_id, provider_payment_method_token, provider_subscription_id, payment_method_id, issuer_id, brand, last_four, first_payment_provider_payment_id, updated_at, raw_payload')
           .eq('personal_id', resolvedPersonalAccountId)
           .eq('status', 'active')
           .maybeSingle<StoredPaymentMethodRow>(),
@@ -299,6 +308,7 @@ export default function Profile() {
       }
 
       setSavedPaymentMethod(resolveSavedPaymentMethod(profile?.data, paymentMethodResult.data || null))
+      setStoredPaymentMethod(paymentMethodResult.data || null)
 
       const fallbackSubscription = buildLegacySubscription(profile?.data)
       const resolvedSubscription = subscriptionResult.data || fallbackSubscription
@@ -797,6 +807,7 @@ export default function Profile() {
                       payerName={name}
                       payerEmail={email}
                       payerPhone={phone}
+                      savedHolderInfo={asaasCardHolderDefaults}
                       loading={paymentActionLoading === 'card'}
                       title={hasSavedPaymentMethod ? 'Trocar cartao salvo' : 'Cadastrar cartao'}
                       submitLabel={hasSavedPaymentMethod ? 'Salvar novo cartao' : 'Salvar cartao'}
@@ -1631,6 +1642,22 @@ function extractPaymentActionData(rawPayload: Record<string, unknown> | null | u
 
 function buildQrCodeImageSource(value: string) {
   return value.startsWith('data:image') ? value : `data:image/png;base64,${value}`
+}
+
+function extractAsaasCardHolderDefaults(
+  rawPayload: Record<string, unknown> | null | undefined,
+  fallback: { name?: string | null; email?: string | null; phone?: string | null },
+): AsaasCardHolderInfoDefaults {
+  return {
+    name: findNestedString(rawPayload, ['name']) || fallback.name || '',
+    email: findNestedString(rawPayload, ['email']) || fallback.email || '',
+    cpfCnpj: findNestedString(rawPayload, ['cpfCnpj', 'cpf_cnpj', 'document']) || '',
+    postalCode: findNestedString(rawPayload, ['postalCode', 'postal_code', 'zipCode']) || '',
+    addressNumber: findNestedString(rawPayload, ['addressNumber', 'address_number']) || '',
+    addressComplement: findNestedString(rawPayload, ['addressComplement', 'address_complement', 'complement']) || '',
+    phone: findNestedString(rawPayload, ['phone']) || fallback.phone || '',
+    mobilePhone: findNestedString(rawPayload, ['mobilePhone', 'mobile_phone']) || fallback.phone || '',
+  }
 }
 
 function findNestedString(value: unknown, keys: string[]): string | null {
