@@ -1838,6 +1838,12 @@ function getCycleHighlightLabel(planSlug: CommercialPlan, billingCycle: string) 
   return planSlug === 'premium' ? 'Mais popular' : 'Mais economico'
 }
 
+function getRecommendedBillingCycle(planSlug: CommercialPlan): BillingCycle {
+  if (planSlug === 'premium') return 'yearly'
+  if (planSlug === 'starter') return 'yearly'
+  return 'monthly'
+}
+
 function getPlanGroupsForMode(currentPlan: CommercialPlan, mode: 'downgrade' | 'upgrade') {
   if (mode === 'upgrade') {
     if (currentPlan === 'free') return ['starter', 'premium'] as CommercialPlan[]
