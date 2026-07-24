@@ -520,6 +520,9 @@ export default function Profile() {
     setError('')
 
     try {
+      const trimmedNewPassword = newPassword.trim()
+      const trimmedConfirmPassword = confirmPassword.trim()
+      const shouldUpdatePassword = Boolean(trimmedNewPassword || trimmedConfirmPassword)
       const uploadedReferenceMap: Record<string, string | null> = {}
 
       for (const field of evolutionFields) {
@@ -584,16 +587,19 @@ export default function Profile() {
       if (updateError) throw updateError
 
       // 2. Atualizar Senha (se preenchida)
-      if (newPassword) {
-        if (newPassword.length < 6) {
+      if (shouldUpdatePassword) {
+        if (!trimmedNewPassword || !trimmedConfirmPassword) {
+            throw new Error('Preencha e confirme a nova senha para alterar esse campo.')
+        }
+        if (trimmedNewPassword.length < 6) {
             throw new Error('A senha deve ter no mínimo 6 caracteres.')
         }
-        if (newPassword !== confirmPassword) {
+        if (trimmedNewPassword !== trimmedConfirmPassword) {
             throw new Error('As senhas não conferem.')
         }
 
         const { error: passwordError } = await supabase.auth.updateUser({
-            password: newPassword
+            password: trimmedNewPassword
         })
 
         if (passwordError) throw passwordError
@@ -891,11 +897,11 @@ export default function Profile() {
             </label>
             <div style={{ display: 'grid', gap: 8 }}>
               <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Nova senha</span>
-              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Opcional" style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Opcional" autoComplete="new-password" data-lpignore="true" style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }} />
             </div>
             <div style={{ display: 'grid', gap: 8 }}>
               <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>Confirmar nova senha</span>
-              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repita a nova senha" style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repita a nova senha" autoComplete="new-password" data-lpignore="true" style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }} />
             </div>
           </div>
         </div>
