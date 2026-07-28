@@ -39,13 +39,11 @@ export default function NotificationBellV2() {
             
             // Fallback se o hook falhar
             if (!currentUser) {
-                console.error('Hook user vazio, tentando supabase.auth.getUser()...')
                 const { data } = await supabase.auth.getUser()
                 currentUser = data.user
             }
 
             if (!currentUser) {
-                console.error('ABORTANDO: Usuário não autenticado.')
                 return
             }
 
@@ -58,43 +56,42 @@ export default function NotificationBellV2() {
                 recentLimit.setDate(recentLimit.getDate() - 30) // 30 dias de histórico
                 const recentLimitStr = recentLimit.toISOString()
 
-                // 1. Financeiro (Pagos Recentes)
-                const { data: paidDebits } = await supabase
-                    .from('debits')
-                    .select('id, amount, paid_at, payer_id') 
-                    .eq('receiver_id', currentUser.id)
-                    .eq('status', 'paid')
-                    .gte('paid_at', recentLimitStr)
-
-                // 2. Financeiro (Pendentes)
-                const { data: pendingDebits } = await supabase
-                    .from('debits')
-                    .select('id, amount, due_date, payer_id')
-                    .eq('receiver_id', currentUser.id)
-                    .eq('status', 'pending')
-
-                // 3. Anamneses (Respondidas Recentes)
-                const { data: answers, error: err3 } = await supabase
-                    .from('protocols')
-                    .select('id, title, created_at, student_id')
-                    .eq('personal_id', currentUser.id)
-                    .eq('type', 'anamnesis')
-                    .gte('created_at', recentLimitStr)
-
-                // 4. Anamneses (Vencidas)
-                const { data: expiredAnamnesis } = await supabase
-                    .from('protocols')
-                    .select('id, title, ends_at, student_id')
-                    .eq('personal_id', currentUser.id)
-                    .eq('type', 'anamnesis_model')
-                    .lt('ends_at', todayStr)
-
-                // 5. Notificações do Sistema (Feedbacks, etc)
-                const { data: sysNotifications } = await supabase
-                    .from('notifications')
-                    .select('id, type, title, message, created_at, link')
-                    .eq('user_id', currentUser.id)
-                    .gte('created_at', recentLimitStr)
+                const [
+                    { data: paidDebits },
+                    { data: pendingDebits },
+                    { data: answers },
+                    { data: expiredAnamnesis },
+                    { data: sysNotifications },
+                ] = await Promise.all([
+                    supabase
+                        .from('debits')
+                        .select('id, amount, paid_at, payer_id') 
+                        .eq('receiver_id', currentUser.id)
+                        .eq('status', 'paid')
+                        .gte('paid_at', recentLimitStr),
+                    supabase
+                        .from('debits')
+                        .select('id, amount, due_date, payer_id')
+                        .eq('receiver_id', currentUser.id)
+                        .eq('status', 'pending'),
+                    supabase
+                        .from('protocols')
+                        .select('id, title, created_at, student_id')
+                        .eq('personal_id', currentUser.id)
+                        .eq('type', 'anamnesis')
+                        .gte('created_at', recentLimitStr),
+                    supabase
+                        .from('protocols')
+                        .select('id, title, ends_at, student_id')
+                        .eq('personal_id', currentUser.id)
+                        .eq('type', 'anamnesis_model')
+                        .lt('ends_at', todayStr),
+                    supabase
+                        .from('notifications')
+                        .select('id, type, title, message, created_at, link')
+                        .eq('user_id', currentUser.id)
+                        .gte('created_at', recentLimitStr),
+                ])
 
                 // COLETAR IDs PARA NOMES
                 const allStudentIds = new Set<string>()
@@ -216,10 +213,13 @@ export default function NotificationBellV2() {
             }
         }
 
-        fetchNotifications()
+        const timeout = window.setTimeout(fetchNotifications, 700)
         // Atualiza a cada 60s
         const interval = setInterval(fetchNotifications, 60000)
-        return () => clearInterval(interval)
+        return () => {
+            clearTimeout(timeout)
+            clearInterval(interval)
+        }
     }, [user])
 
     const handleClick = (n: PersonalNotification) => {
