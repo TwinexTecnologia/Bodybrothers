@@ -26,7 +26,6 @@ function getMonthsToDistribute(frequency?: string | null) {
 export default function Overview() {
   const navigate = useNavigate()
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
-  const [detailsLoading, setDetailsLoading] = useState(true)
   const [filters, setFilters] = useState({
     year: new Date().getFullYear(),
     month: 'all' // 'all' or '0', '1', ... '11'
@@ -116,22 +115,29 @@ export default function Overview() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
-        const [
-          studentsRes,
-          plansRes,
-          protocolsSummaryRes,
-          profileRes,
+            const [
+            studentsRes,
+            plansRes,
+            paymentsRes,
+            dietsActiveRes,
+            dietsInactiveRes,
+            workoutsActiveRes,
+            workoutsInactiveRes,
+            profileRes, // NOVO
+            anamnesisModelsRes,
+            anamnesisRes // NOVO
         ] = await Promise.all([
-          supabase.from('profiles').select('id, personal_id, plan_id, data').eq('personal_id', user.id).eq('role', 'aluno'),
-          supabase.from('plans').select('id, frequency').eq('personal_id', user.id),
-          supabase.from('protocols').select('type, status').eq('personal_id', user.id).in('type', ['diet', 'workout']),
-          supabase.from('profiles').select('data').eq('id', user.id).single(),
+            supabase.from('profiles').select('id, personal_id, created_at, plan_id, due_day, data').eq('personal_id', user.id).eq('role', 'aluno'),
+            supabase.from('plans').select('id, frequency').eq('personal_id', user.id),
+            supabase.from('debits').select('id, payer_id, amount, due_date, paid_at').eq('receiver_id', user.id).eq('status', 'paid'),
+            supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active'),
+            supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active'),
+            supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').eq('status', 'active'),
+            supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').neq('status', 'active'),
+            supabase.from('profiles').select('data').eq('id', user.id).single(),
+            supabase.from('protocols').select('id, status, student_id').eq('personal_id', user.id).eq('type', 'anamnesis_model'),
+            supabase.from('protocols').select('id, student_id, created_at, data, renew_in_days').eq('personal_id', user.id).eq('type', 'anamnesis')
         ])
-        const protocolsSummary = protocolsSummaryRes.data || []
-        const activeDietsCount = protocolsSummary.filter((protocol: any) => protocol.type === 'diet' && protocol.status === 'active').length
-        const inactiveDietsCount = protocolsSummary.filter((protocol: any) => protocol.type === 'diet' && protocol.status !== 'active').length
-        const activeWorkoutsCount = protocolsSummary.filter((protocol: any) => protocol.type === 'workout' && protocol.status === 'active').length
-        const inactiveWorkoutsCount = protocolsSummary.filter((protocol: any) => protocol.type === 'workout' && protocol.status !== 'active').length
 
         const studentsRaw = studentsRes.data || []
         const students: StudentRecord[] = studentsRaw.map((d: any) => ({
@@ -140,8 +146,11 @@ export default function Overview() {
             name: '',
             email: '',
             status: d.data?.status || 'ativo',
+            createdAt: d.created_at,
             planId: d.plan_id || d.data?.planId,
             planStartDate: d.data?.planStartDate,
+            dueDay: d.due_day || d.data?.dueDay,
+            whatsapp: d.data?.whatsapp,
         })) as any
 
         const totalStudents = students.length
@@ -151,167 +160,162 @@ export default function Overview() {
         const activeStudents = activeStudentsList.length
         const inactiveStudents = totalStudents - activeStudents
 
+        // LÓGICA DE ANAMNESES PENDENTES
+        let pendingAnamnesisCount = 0
         const showAnamnesisPending = profileRes.data?.data?.config?.anamnesisReviewRequired === true
+        
+        if (showAnamnesisPending) {
+            const allModels = anamnesisModelsRes.data || []
+            const allResponses = anamnesisRes.data || []
+            pendingAnamnesisCount = countPendingAnamnesisReviews(
+              allResponses,
+              activeStudentIds,
+              allModels.length > 0
+            )
+        }
 
         const plans = (plansRes.data || []) as PlanRecord[]
         const planFrequencyById = new Map(plans.map(plan => [plan.id, plan.frequency]))
+        
+        const paymentsRaw = paymentsRes.data || []
+        const allPayments: DebitRecord[] = paymentsRaw.map((d: any) => ({
+            id: d.id,
+            payerId: d.payer_id,
+            receiverId: user.id,
+            amount: Number(d.amount),
+            dueDate: d.due_date,
+            paidAt: d.paid_at,
+            status: 'paid',
+            monthRef: undefined
+        }))
+        const paymentsByStudentId = new Map<string, DebitRecord[]>()
 
+        allPayments.forEach(payment => {
+            const currentPayments = paymentsByStudentId.get(payment.payerId) || []
+            currentPayments.push(payment)
+            paymentsByStudentId.set(payment.payerId, currentPayments)
+        })
+
+        paymentsByStudentId.forEach(studentPayments => {
+            studentPayments.sort((a, b) => {
+                const dateA = new Date(a.paidAt || a.dueDate || 0).getTime()
+                const dateB = new Date(b.paidAt || b.dueDate || 0).getTime()
+                return dateB - dateA
+            })
+        })
+
+        // Salva dados brutos
         setRawData({
             students: activeStudentsList,
             plans,
-            payments: []
+            payments: allPayments
+        })
+
+        // CALCULO DO CARD "Faturamento Mensal (Mês Atual)"
+        // 1. Regime de Competência (monthlyRevenue)
+        let monthlyRevenue = 0
+        const now = new Date()
+        const currentMonth = now.getMonth()
+        const currentYear = now.getFullYear()
+
+        // 2. Regime de Caixa (monthlyCash) - O que realmente entrou na conta
+        let monthlyCash = 0
+
+        allPayments.forEach(payment => {
+            if (!payment.paidAt && !payment.dueDate) return
+            
+            // Calculo Caixa: Se pagou neste mês, soma
+            if (payment.paidAt) {
+                const paidDate = new Date(payment.paidAt)
+                // Ajuste de fuso horário simples para garantir dia correto se necessário
+                // Mas new Date(iso) costuma funcionar bem.
+                if (paidDate.getMonth() === currentMonth && paidDate.getFullYear() === currentYear) {
+                    monthlyCash += payment.amount
+                }
+            }
+
+            // Calculo Competência (mantendo lógica anterior)
+            const baseDate = new Date(payment.dueDate || payment.paidAt!)
+            const monthsToDistribute = getMonthsToDistribute(
+              planFrequencyById.get(activeStudentPlanById.get(payment.payerId) || '')
+            )
+            
+            const monthlyValue = payment.amount / monthsToDistribute
+            
+            for (let i = 0; i < monthsToDistribute; i++) {
+                const targetDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, 1)
+                if (targetDate.getMonth() === currentMonth && targetDate.getFullYear() === currentYear) {
+                    monthlyRevenue += monthlyValue
+                }
+            }
+        })
+        
+        // CALCULO FINANCEIRO (Quem deve REALMENTE)
+        let pendingFinanceCount = 0
+        activeStudentsList.forEach(student => {
+            if (!student.planId || !student.planStartDate) return
+            const planFrequency = planFrequencyById.get(student.planId)
+            if (!planFrequency) return
+            const studentPayments = paymentsByStudentId.get(student.id) || []
+            // NOVA LÓGICA DE VENCIMENTO REAL (HISTÓRICO)
+            // Não olha apenas o mês atual, mas sim se o último pagamento cobre o dia de hoje.
+            const lastPayment = studentPayments[0]
+            
+            // Se nunca pagou e já passou da data de início + tolerância, está devendo
+            if (!lastPayment) {
+                if (student.planStartDate) {
+                    const start = new Date(student.planStartDate)
+                    const gracePeriod = new Date(start)
+                    gracePeriod.setDate(gracePeriod.getDate() + 5) // 5 dias de tolerância inicial
+                    if (now > gracePeriod) {
+                        pendingFinanceCount++
+                    }
+                }
+                return
+            }
+
+            // 2. Calcula a validade do último pagamento
+            const refDate = new Date(lastPayment.paidAt || lastPayment.dueDate || 0)
+            let validityDays = 30 // Padrão mensal
+
+            switch (planFrequency) {
+                case 'weekly': validityDays = 7; break
+                case 'monthly': validityDays = 30; break
+                case 'bimonthly': validityDays = 60; break
+                case 'quarterly': validityDays = 90; break
+                case 'semiannual': validityDays = 180; break
+                case 'annual': validityDays = 365; break
+            }
+
+            const validUntil = new Date(refDate)
+            validUntil.setDate(validUntil.getDate() + validityDays)
+            // Adiciona uma margem de tolerância de 3 dias para não ficar vermelho no fds
+            validUntil.setDate(validUntil.getDate() + 3)
+
+            // Se a validade já passou, está pendente
+            if (now > validUntil) {
+                pendingFinanceCount++
+            }
         })
 
         setStats({
           totalStudents,
           activeStudents,
           inactiveStudents,
-          pendingFinance: 0,
-          activeDiets: activeDietsCount,
-          inactiveDiets: inactiveDietsCount,
-          activeWorkouts: activeWorkoutsCount,
-          inactiveWorkouts: inactiveWorkoutsCount,
-          monthlyRevenue: 0,
-          monthlyCash: 0,
-          loading: false,
-          pendingAnamnesis: 0,
-          showAnamnesisPending
-        })
-
-        setDetailsLoading(true)
-
-        const [paymentsRes, anamnesisModelsRes, anamnesisRes] = await Promise.all([
-          supabase.from('debits').select('id, payer_id, amount, due_date, paid_at').eq('receiver_id', user.id).eq('status', 'paid'),
-          showAnamnesisPending
-            ? supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'anamnesis_model')
-            : Promise.resolve({ data: null, count: 0, error: null }),
-          showAnamnesisPending
-            ? supabase.from('protocols').select('student_id, data, content, reviewed_at').eq('personal_id', user.id).eq('type', 'anamnesis')
-            : Promise.resolve({ data: [], error: null }),
-        ])
-
-        let pendingAnamnesisCount = 0
-        if (showAnamnesisPending) {
-          pendingAnamnesisCount = countPendingAnamnesisReviews(
-            anamnesisRes.data || [],
-            activeStudentIds,
-            Boolean(anamnesisModelsRes.count && anamnesisModelsRes.count > 0),
-          )
-        }
-
-        const paymentsRaw = paymentsRes.data || []
-        const allPayments: DebitRecord[] = paymentsRaw.map((d: any) => ({
-          id: d.id,
-          payerId: d.payer_id,
-          receiverId: user.id,
-          amount: Number(d.amount),
-          dueDate: d.due_date,
-          paidAt: d.paid_at,
-          status: 'paid',
-          monthRef: undefined
-        }))
-        const paymentsByStudentId = new Map<string, DebitRecord[]>()
-
-        allPayments.forEach(payment => {
-          const currentPayments = paymentsByStudentId.get(payment.payerId) || []
-          currentPayments.push(payment)
-          paymentsByStudentId.set(payment.payerId, currentPayments)
-        })
-
-        paymentsByStudentId.forEach(studentPayments => {
-          studentPayments.sort((a, b) => {
-            const dateA = new Date(a.paidAt || a.dueDate || 0).getTime()
-            const dateB = new Date(b.paidAt || b.dueDate || 0).getTime()
-            return dateB - dateA
-          })
-        })
-
-        setRawData({
-          students: activeStudentsList,
-          plans,
-          payments: allPayments
-        })
-
-        let monthlyRevenue = 0
-        const now = new Date()
-        const currentMonth = now.getMonth()
-        const currentYear = now.getFullYear()
-        let monthlyCash = 0
-
-        allPayments.forEach(payment => {
-          if (!payment.paidAt && !payment.dueDate) return
-
-          if (payment.paidAt) {
-            const paidDate = new Date(payment.paidAt)
-            if (paidDate.getMonth() === currentMonth && paidDate.getFullYear() === currentYear) {
-              monthlyCash += payment.amount
-            }
-          }
-
-          const baseDate = new Date(payment.dueDate || payment.paidAt!)
-          const monthsToDistribute = getMonthsToDistribute(
-            planFrequencyById.get(activeStudentPlanById.get(payment.payerId) || '')
-          )
-
-          const monthlyValue = payment.amount / monthsToDistribute
-
-          for (let i = 0; i < monthsToDistribute; i++) {
-            const targetDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, 1)
-            if (targetDate.getMonth() === currentMonth && targetDate.getFullYear() === currentYear) {
-              monthlyRevenue += monthlyValue
-            }
-          }
-        })
-
-        let pendingFinanceCount = 0
-        activeStudentsList.forEach(student => {
-          if (!student.planId || !student.planStartDate) return
-          const planFrequency = planFrequencyById.get(student.planId)
-          if (!planFrequency) return
-          const studentPayments = paymentsByStudentId.get(student.id) || []
-          const lastPayment = studentPayments[0]
-
-          if (!lastPayment) {
-            const start = new Date(student.planStartDate)
-            const gracePeriod = new Date(start)
-            gracePeriod.setDate(gracePeriod.getDate() + 5)
-            if (now > gracePeriod) {
-              pendingFinanceCount++
-            }
-            return
-          }
-
-          const refDate = new Date(lastPayment.paidAt || lastPayment.dueDate || 0)
-          let validityDays = 30
-
-          switch (planFrequency) {
-            case 'weekly': validityDays = 7; break
-            case 'monthly': validityDays = 30; break
-            case 'bimonthly': validityDays = 60; break
-            case 'quarterly': validityDays = 90; break
-            case 'semiannual': validityDays = 180; break
-            case 'annual': validityDays = 365; break
-          }
-
-          const validUntil = new Date(refDate)
-          validUntil.setDate(validUntil.getDate() + validityDays)
-          validUntil.setDate(validUntil.getDate() + 3)
-
-          if (now > validUntil) {
-            pendingFinanceCount++
-          }
-        })
-
-        setStats(prev => ({
-          ...prev,
           pendingFinance: pendingFinanceCount,
+          activeDiets: dietsActiveRes.count || 0,
+          inactiveDiets: dietsInactiveRes.count || 0,
+          activeWorkouts: workoutsActiveRes.count || 0,
+          inactiveWorkouts: workoutsInactiveRes.count || 0,
           monthlyRevenue,
           monthlyCash,
+          loading: false,
           pendingAnamnesis: pendingAnamnesisCount,
-        }))
+          showAnamnesisPending
+        })
+
       } catch (error) {
         console.error('Erro ao carregar dashboard:', error)
-      } finally {
         setStats(prev => ({ ...prev, loading: false }))
       }
     }
@@ -428,7 +432,7 @@ export default function Overview() {
                       <div>
                           <div style={{ fontWeight: 600, fontSize: 14, color: '#334155' }}>Financeiro</div>
                           <div style={{ fontSize: 12, color: '#64748b' }}>
-                              {detailsLoading ? 'Calculando...' : stats.pendingFinance === 0 ? 'Tudo pago' : `${stats.pendingFinance} pendentes`}
+                              {stats.pendingFinance === 0 ? 'Tudo pago' : `${stats.pendingFinance} pendentes`}
                           </div>
                       </div>
                   </div>
@@ -477,7 +481,7 @@ export default function Overview() {
                           <div>
                               <div style={{ fontWeight: 600, fontSize: 14, color: '#334155' }}>Anamneses</div>
                               <div style={{ fontSize: 12, color: '#64748b' }}>
-                                  {detailsLoading ? 'Calculando...' : stats.pendingAnamnesis === 0 ? 'Tudo analisado' : `${stats.pendingAnamnesis} aguardando análise`}
+                                  {stats.pendingAnamnesis === 0 ? 'Tudo analisado' : `${stats.pendingAnamnesis} aguardando análise`}
                               </div>
                           </div>
                       </div>
@@ -551,56 +555,51 @@ export default function Overview() {
           </div>
           
           <div style={{ width: '100%', height: isMobile ? 260 : 300 }}>
-              {detailsLoading ? (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 14 }}>
-                  Carregando projeção de faturamento...
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: isMobile ? 12 : 30, right: isMobile ? 8 : 30, left: isMobile ? 0 : 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis 
-                            dataKey="name" 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 12 }} 
-                            interval={0}
-                            minTickGap={isMobile ? 4 : 12}
-                            dy={10}
-                        />
-                        <YAxis 
-                            axisLine={false} 
-                            tickLine={false} 
-                            width={isMobile ? 50 : 70}
-                            tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 12 }}
-                            tickFormatter={(value) => isMobile ? `R$${Math.round(value / 1000)}k` : `R$ ${value}`}
-                        />
-                        <Tooltip 
-                            cursor={{ fill: '#f1f5f9' }}
-                            contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                            formatter={(value: number) => [
-                                new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value), 
-                                'Receita Est.'
-                            ]}
-                        />
-                        <Bar 
-                            dataKey="revenue" 
-                            fill="#0ea5e9" 
-                            radius={[4, 4, 0, 0]} 
-                            barSize={isMobile ? 26 : 40}
-                        >
-                            {!isMobile && (
-                              <LabelList 
-                                dataKey="revenue" 
-                                position="top" 
-                                formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
-                                style={{ fontSize: 12, fill: '#64748b' }}
-                              />
-                            )}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
-              )}
+              <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: isMobile ? 12 : 30, right: isMobile ? 8 : 30, left: isMobile ? 0 : 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis 
+                          dataKey="name" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 12 }} 
+                          interval={0}
+                          minTickGap={isMobile ? 4 : 12}
+                          dy={10}
+                      />
+                      <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          width={isMobile ? 50 : 70}
+                          tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 12 }}
+                          tickFormatter={(value) => isMobile ? `R$${Math.round(value / 1000)}k` : `R$ ${value}`}
+                          // domain removido para auto-scale padrão
+                      />
+                      <Tooltip 
+                          cursor={{ fill: '#f1f5f9' }}
+                          contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                          formatter={(value: number) => [
+                              new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value), 
+                              'Receita Est.'
+                          ]}
+                      />
+                      <Bar 
+                          dataKey="revenue" 
+                          fill="#0ea5e9" 
+                          radius={[4, 4, 0, 0]} 
+                          barSize={isMobile ? 26 : 40}
+                      >
+                          {!isMobile && (
+                            <LabelList 
+                              dataKey="revenue" 
+                              position="top" 
+                              formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
+                              style={{ fontSize: 12, fill: '#64748b' }}
+                            />
+                          )}
+                      </Bar>
+                  </BarChart>
+              </ResponsiveContainer>
           </div>
       </div>
 
