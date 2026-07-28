@@ -8,6 +8,91 @@ import type { DebitRecord } from '../../store/financial'
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts'
 
+type DashboardRawData = {
+  students: StudentRecord[]
+  plans: PlanRecord[]
+  payments: DebitRecord[]
+}
+
+type DashboardStats = {
+  totalStudents: number
+  activeStudents: number
+  inactiveStudents: number
+  pendingFinance: number
+  activeDiets: number
+  inactiveDiets: number
+  activeWorkouts: number
+  inactiveWorkouts: number
+  monthlyRevenue: number
+  monthlyCash: number
+  loading: boolean
+  pendingAnamnesis: number
+  showAnamnesisPending: boolean
+}
+
+type DashboardCachePayload = {
+  version: number
+  savedAt: number
+  rawData: DashboardRawData
+  stats: DashboardStats
+}
+
+const DASHBOARD_CACHE_VERSION = 1
+const DASHBOARD_CACHE_TTL_MS = 1000 * 60 * 15
+
+const emptyRawData: DashboardRawData = {
+  students: [],
+  plans: [],
+  payments: [],
+}
+
+const emptyStats: DashboardStats = {
+  totalStudents: 0,
+  activeStudents: 0,
+  inactiveStudents: 0,
+  pendingFinance: 0,
+  activeDiets: 0,
+  inactiveDiets: 0,
+  activeWorkouts: 0,
+  inactiveWorkouts: 0,
+  monthlyRevenue: 0,
+  monthlyCash: 0,
+  loading: true,
+  pendingAnamnesis: 0,
+  showAnamnesisPending: false,
+}
+
+function getDashboardCacheKey(userId: string) {
+  return `personal-dashboard-overview:${userId}`
+}
+
+function readDashboardCache(userId: string): DashboardCachePayload | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const rawCache = window.localStorage.getItem(getDashboardCacheKey(userId))
+    if (!rawCache) return null
+
+    const parsedCache = JSON.parse(rawCache) as DashboardCachePayload
+    if (parsedCache.version !== DASHBOARD_CACHE_VERSION) return null
+    if (Date.now() - parsedCache.savedAt > DASHBOARD_CACHE_TTL_MS) return null
+
+    return parsedCache
+  } catch {
+    return null
+  }
+}
+
+function writeDashboardCache(userId: string, payload: DashboardCachePayload) {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.localStorage.setItem(getDashboardCacheKey(userId), JSON.stringify(payload))
+  } catch {
+    // Ignora falhas de storage para não bloquear o dashboard.
+  }
+}
+
 function getMonthsToDistribute(frequency?: string | null) {
   switch (frequency) {
     case 'bimonthly':
@@ -32,27 +117,9 @@ export default function Overview() {
     month: 'all' // 'all' or '0', '1', ... '11'
   })
 
-  const [rawData, setRawData] = useState({
-    students: [] as StudentRecord[],
-    plans: [] as PlanRecord[],
-    payments: [] as DebitRecord[]
-  })
+  const [rawData, setRawData] = useState<DashboardRawData>(emptyRawData)
 
-  const [stats, setStats] = useState({
-    totalStudents: 0,
-    activeStudents: 0,
-    inactiveStudents: 0,
-    pendingFinance: 0,
-    activeDiets: 0,
-    inactiveDiets: 0,
-    activeWorkouts: 0,
-    inactiveWorkouts: 0,
-    monthlyRevenue: 0,
-    monthlyCash: 0, // Novo estado para Caixa
-    loading: true,
-    pendingAnamnesis: 0, // NOVO
-    showAnamnesisPending: false // NOVO
-  })
+  const [stats, setStats] = useState<DashboardStats>(emptyStats)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -116,6 +183,14 @@ export default function Overview() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
+        const cachedDashboard = readDashboardCache(user.id)
+
+        if (cachedDashboard) {
+          setRawData(cachedDashboard.rawData)
+          setStats({ ...cachedDashboard.stats, loading: false })
+          setDetailsLoading(false)
+        }
+
         const [
           studentsRes,
           plansRes,
@@ -156,29 +231,28 @@ export default function Overview() {
         const plans = (plansRes.data || []) as PlanRecord[]
         const planFrequencyById = new Map(plans.map(plan => [plan.id, plan.frequency]))
 
-        setRawData({
+        setRawData(prev => ({
             students: activeStudentsList,
             plans,
-            payments: []
-        })
+            payments: cachedDashboard ? prev.payments : []
+        }))
 
-        setStats({
+        setStats(prev => ({
+          ...prev,
           totalStudents,
           activeStudents,
           inactiveStudents,
-          pendingFinance: 0,
           activeDiets: activeDietsCount,
           inactiveDiets: inactiveDietsCount,
           activeWorkouts: activeWorkoutsCount,
           inactiveWorkouts: inactiveWorkoutsCount,
-          monthlyRevenue: 0,
-          monthlyCash: 0,
           loading: false,
-          pendingAnamnesis: 0,
           showAnamnesisPending
-        })
+        }))
 
-        setDetailsLoading(true)
+        if (!cachedDashboard) {
+          setDetailsLoading(true)
+        }
 
         const [paymentsRes, anamnesisModelsRes, anamnesisRes] = await Promise.all([
           supabase.from('debits').select('id, payer_id, amount, due_date, paid_at').eq('receiver_id', user.id).eq('status', 'paid'),
@@ -226,11 +300,13 @@ export default function Overview() {
           })
         })
 
-        setRawData({
+        const nextRawData: DashboardRawData = {
           students: activeStudentsList,
           plans,
           payments: allPayments
-        })
+        }
+
+        setRawData(nextRawData)
 
         let monthlyRevenue = 0
         const now = new Date()
@@ -302,16 +378,38 @@ export default function Overview() {
           }
         })
 
-        setStats(prev => ({
-          ...prev,
+        const nextStats: DashboardStats = {
+          ...emptyStats,
+          totalStudents,
+          activeStudents,
+          inactiveStudents,
+          activeDiets: activeDietsCount,
+          inactiveDiets: inactiveDietsCount,
+          activeWorkouts: activeWorkoutsCount,
+          inactiveWorkouts: inactiveWorkoutsCount,
           pendingFinance: pendingFinanceCount,
           monthlyRevenue,
           monthlyCash,
+          loading: false,
           pendingAnamnesis: pendingAnamnesisCount,
+          showAnamnesisPending,
+        }
+
+        setStats(prev => ({
+          ...prev,
+          ...nextStats,
         }))
+        setDetailsLoading(false)
+        writeDashboardCache(user.id, {
+          version: DASHBOARD_CACHE_VERSION,
+          savedAt: Date.now(),
+          rawData: nextRawData,
+          stats: nextStats,
+        })
       } catch (error) {
         console.error('Erro ao carregar dashboard:', error)
       } finally {
+        setDetailsLoading(false)
         setStats(prev => ({ ...prev, loading: false }))
       }
     }
