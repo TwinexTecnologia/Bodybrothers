@@ -119,20 +119,19 @@ export default function Overview() {
         const [
           studentsRes,
           plansRes,
-          dietsActiveRes,
-          dietsInactiveRes,
-          workoutsActiveRes,
-          workoutsInactiveRes,
+          protocolsSummaryRes,
           profileRes,
         ] = await Promise.all([
           supabase.from('profiles').select('id, personal_id, plan_id, data').eq('personal_id', user.id).eq('role', 'aluno'),
           supabase.from('plans').select('id, frequency').eq('personal_id', user.id),
-          supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active'),
-          supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active'),
-          supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').eq('status', 'active'),
-          supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').neq('status', 'active'),
+          supabase.from('protocols').select('type, status').eq('personal_id', user.id).in('type', ['diet', 'workout']),
           supabase.from('profiles').select('data').eq('id', user.id).single(),
         ])
+        const protocolsSummary = protocolsSummaryRes.data || []
+        const activeDietsCount = protocolsSummary.filter((protocol: any) => protocol.type === 'diet' && protocol.status === 'active').length
+        const inactiveDietsCount = protocolsSummary.filter((protocol: any) => protocol.type === 'diet' && protocol.status !== 'active').length
+        const activeWorkoutsCount = protocolsSummary.filter((protocol: any) => protocol.type === 'workout' && protocol.status === 'active').length
+        const inactiveWorkoutsCount = protocolsSummary.filter((protocol: any) => protocol.type === 'workout' && protocol.status !== 'active').length
 
         const studentsRaw = studentsRes.data || []
         const students: StudentRecord[] = studentsRaw.map((d: any) => ({
@@ -168,10 +167,10 @@ export default function Overview() {
           activeStudents,
           inactiveStudents,
           pendingFinance: 0,
-          activeDiets: dietsActiveRes.count || 0,
-          inactiveDiets: dietsInactiveRes.count || 0,
-          activeWorkouts: workoutsActiveRes.count || 0,
-          inactiveWorkouts: workoutsInactiveRes.count || 0,
+          activeDiets: activeDietsCount,
+          inactiveDiets: inactiveDietsCount,
+          activeWorkouts: activeWorkoutsCount,
+          inactiveWorkouts: inactiveWorkoutsCount,
           monthlyRevenue: 0,
           monthlyCash: 0,
           loading: false,
@@ -310,15 +309,14 @@ export default function Overview() {
           monthlyCash,
           pendingAnamnesis: pendingAnamnesisCount,
         }))
-
       } catch (error) {
         console.error('Erro ao carregar dashboard:', error)
       } finally {
-        setDetailsLoading(false)
         setStats(prev => ({ ...prev, loading: false }))
       }
     }
 
+    loadStats()
   }, [])
 
   if (stats.loading) {
