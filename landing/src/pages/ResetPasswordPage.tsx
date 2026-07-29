@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Eye, EyeOff, LockKeyhole } from 'lucide-react'
-import { BrandMark } from '../components/BrandMark'
+import { Eye, EyeOff, LockKeyhole } from 'lucide-react'
 import { hasSupabaseEnv, supabase } from '../lib/supabase'
 
 type ResetStatus = 'idle' | 'checking' | 'ready' | 'submitting' | 'success' | 'error'
-
-const personalLoginUrl = import.meta.env.VITE_PERSONAL_LOGIN_URL || 'https://gerencialalunos.vercel.app/login'
 
 function getRecoveryCode() {
   const url = new URL(window.location.href)
@@ -116,7 +113,7 @@ export function ResetPasswordPage() {
       <div className="reset-orb reset-orb-right" />
 
       <main className="reset-card">
-        <BrandMark />
+        <p className="reset-brand">FitBody Pro Reset</p>
 
         <div className="reset-lock">
           <LockKeyhole size={34} />
@@ -177,10 +174,6 @@ export function ResetPasswordPage() {
         </form>
 
         <div className="reset-footer">
-          <a href={personalLoginUrl} target="_blank" rel="noreferrer">
-            <ArrowLeft size={16} />
-            {status === 'success' ? 'Ir para o login do personal' : 'Voltar para o login'}
-          </a>
           {status === 'ready' && password && confirmPassword && !passwordsMatch && (
             <p className="reset-warning">As senhas precisam ser iguais para continuar.</p>
           )}

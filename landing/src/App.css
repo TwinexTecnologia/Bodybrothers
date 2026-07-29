@@ -377,6 +377,16 @@
   border-radius: 36px;
 }
 
+.reset-brand {
+  margin: 0;
+  text-align: center;
+  color: #f8fafc;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
 .reset-orb-left {
   inset: 12% auto auto 8%;
   width: 240px;
