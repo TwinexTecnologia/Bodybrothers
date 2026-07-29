@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { ArrowLeft, Eye, EyeOff, LockKeyhole } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark'
 import { hasSupabaseEnv, supabase } from '../lib/supabase'
 
 type ResetStatus = 'idle' | 'checking' | 'ready' | 'submitting' | 'success' | 'error'
+
+const personalLoginUrl = import.meta.env.VITE_PERSONAL_LOGIN_URL || 'https://gerencialalunos.vercel.app/login'
 
 function getRecoveryCode() {
   const url = new URL(window.location.href)
@@ -176,17 +177,10 @@ export function ResetPasswordPage() {
         </form>
 
         <div className="reset-footer">
-          {status === 'success' && (
-            <a href="https://gerencialalunos.vercel.app/login" target="_blank" rel="noreferrer">
-              Ir para o login do personal
-            </a>
-          )}
-          {status !== 'success' && (
-            <Link to="/">
-              <ArrowLeft size={16} />
-              Voltar para a landing
-            </Link>
-          )}
+          <a href={personalLoginUrl} target="_blank" rel="noreferrer">
+            <ArrowLeft size={16} />
+            {status === 'success' ? 'Ir para o login do personal' : 'Voltar para o login'}
+          </a>
           {status === 'ready' && password && confirmPassword && !passwordsMatch && (
             <p className="reset-warning">As senhas precisam ser iguais para continuar.</p>
           )}
