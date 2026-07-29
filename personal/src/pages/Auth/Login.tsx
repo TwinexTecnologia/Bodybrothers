@@ -4,6 +4,9 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { supabase } from '../../lib/supabase'
 
+const resetPasswordRedirectUrl =
+  import.meta.env.VITE_PASSWORD_RESET_URL || 'https://app.fitbodyproapp.com/reset-password'
+
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
@@ -26,7 +29,7 @@ export default function Login() {
         if (isRecovering) {
             // Lógica de Recuperação de Senha
             const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-                redirectTo: window.location.origin + '/reset-password' // Opcional: ajustar rota depois
+                redirectTo: resetPasswordRedirectUrl
             })
             
             if (error) {
