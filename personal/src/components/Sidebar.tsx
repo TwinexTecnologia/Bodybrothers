@@ -145,6 +145,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: 'Gerenciar Planos', to: '/protocols/plans', icon: FileText },
   ]), [])
 
+  const anamnesisItems = useMemo<MenuItem[]>(() => ([
+    { label: 'Criar Anamnese', to: '/protocols/anamnesis/model/create', icon: Plus },
+    { label: 'Aplicar Anamnese', to: '/protocols/anamnesis-apply', icon: ClipboardList },
+    { label: 'Modelos de Anamnese', to: '/protocols/anamnesis-models', icon: FileText },
+    { label: 'Pendências', to: '/protocols/anamnesis-pending', icon: ListChecks },
+  ]), [])
+
   const financeItems = useMemo<MenuItem[]>(() => ([
     { label: 'Financeiro', to: '/financial', icon: Wallet },
   ]), [])
@@ -288,6 +295,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <div className="sidebar-group-title">Planos</div>
               <div className="sidebar-group-links">
                 {planItems.map(item => renderMenuItem(item))}
+              </div>
+            </div>
+
+            <div className="sidebar-group">
+              <div className="sidebar-group-title">Anamneses</div>
+              <div className="sidebar-group-links">
+                {anamnesisItems.map(item => renderMenuItem(item))}
               </div>
             </div>
           </>

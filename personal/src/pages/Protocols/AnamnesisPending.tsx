@@ -291,6 +291,29 @@ export default function AnamnesisPending() {
             {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
             <h1>Gestão de Anamneses</h1>
             <button className="btn" onClick={() => navigate('/dashboard/overview')} style={{ marginBottom: 20, background: 'transparent', color: '#666', border: '1px solid #ccc' }}>← Voltar</button>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
+                <button
+                    className="btn"
+                    style={{ background: '#10b981' }}
+                    onClick={() => navigate('/protocols/anamnesis/model/create')}
+                >
+                    + Criar Anamnese
+                </button>
+                <button
+                    className="btn"
+                    style={{ background: '#3b82f6' }}
+                    onClick={() => navigate('/protocols/anamnesis-apply')}
+                >
+                    Aplicar Anamnese
+                </button>
+                <button
+                    className="btn"
+                    style={{ background: 'transparent', color: '#0f172a', border: '1px solid #cbd5e1' }}
+                    onClick={() => navigate('/protocols/anamnesis-models')}
+                >
+                    Ver Modelos
+                </button>
+            </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
                 
