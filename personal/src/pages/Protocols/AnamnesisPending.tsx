@@ -1,20 +1,58 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { listStudentsByPersonal } from '../../store/students'
+import { getAnamnesisResponseData } from '../../lib/anamnesisReview'
 import { useNavigate } from 'react-router-dom'
 import { Toast, type ToastType } from '../../components/Toast'
+import { reviewAndReapplyAnamnesis } from '../../store/anamnesis'
 
 type PendingItem = {
-    student: any;
-    status: 'expired' | 'warning' | 'ok';
+    student: AnamnesisStudent;
+    status: 'expired';
     dueDate: string;
 }
 
 type ReviewItem = {
     id: string;
-    student: any;
+    student: AnamnesisStudent;
     answeredAt: string;
     data: any;
+}
+
+type AnamnesisOption = {
+    id: string;
+    title: string;
+}
+
+type AnamnesisStudent = {
+    id: string;
+    name: string;
+    status: 'ativo' | 'inativo';
+}
+
+type LatestAnamnesisResponseRow = {
+    student_id: string;
+    created_at: string;
+    renew_in_days?: number | null;
+    reviewed_at?: string | null;
+}
+
+type AnamnesisReviewQueueRow = {
+    id: string;
+    student_id: string;
+    created_at: string;
+    renew_in_days?: number | null;
+    model_id?: string | null;
+    data?: unknown;
+}
+
+function chunkArray<T>(items: T[], chunkSize: number) {
+    const chunks: T[][] = []
+
+    for (let index = 0; index < items.length; index += chunkSize) {
+        chunks.push(items.slice(index, index + chunkSize))
+    }
+
+    return chunks
 }
 
 export default function AnamnesisPending() {
@@ -25,12 +63,15 @@ export default function AnamnesisPending() {
     const [markingId, setMarkingId] = useState<string | null>(null)
     const [isReviewRequired, setIsReviewRequired] = useState(false)
     const [toast, setToast] = useState<{ msg: string, type: ToastType } | null>(null)
+    const [libraryModels, setLibraryModels] = useState<AnamnesisOption[]>([])
+    const [modelsById, setModelsById] = useState<Record<string, AnamnesisOption>>({})
     
     // Estados do Modal de Confirmação
-    const [confirmModal, setConfirmModal] = useState<{ open: boolean, item: ReviewItem | null, days: number }>({ 
+    const [confirmModal, setConfirmModal] = useState<{ open: boolean, item: ReviewItem | null, days: number, nextModelId: string }>({ 
         open: false, 
         item: null, 
-        days: 90 
+        days: 90,
+        nextModelId: ''
     })
 
     useEffect(() => {
@@ -41,103 +82,172 @@ export default function AnamnesisPending() {
         try {
             const { data: { user } } = await supabase.auth.getUser()
             if (user) {
-                // 1. Busca perfil do personal para ver configuração
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('data')
-                    .eq('id', user.id)
-                    .single()
-
-                const reviewRequired = profile?.data?.config?.anamnesisReviewRequired === true
-                setIsReviewRequired(reviewRequired)
-
-                const [students, modelsRes, responsesRes] = await Promise.all([
-                    listStudentsByPersonal(user.id),
-                    supabase.from('protocols').select('*').eq('personal_id', user.id).eq('type', 'anamnesis_model'),
-                    supabase.from('protocols').select('*').eq('personal_id', user.id).eq('type', 'anamnesis')
+                const [profileRes, studentsRes, modelsRes] = await Promise.all([
+                    supabase
+                        .from('profiles')
+                        .select('data')
+                        .eq('id', user.id)
+                        .single(),
+                    supabase
+                        .from('personal_active_students')
+                        .select('id, full_name')
+                        .eq('personal_id', user.id),
+                    supabase
+                        .from('protocols')
+                        .select('id, title, status, student_id')
+                        .eq('personal_id', user.id)
+                        .eq('type', 'anamnesis_model'),
                 ])
 
+                const reviewRequired = profileRes.data?.data?.config?.anamnesisReviewRequired === true
+                setIsReviewRequired(reviewRequired)
+
+                const students = ((studentsRes.data || []) as any[]).map((student): AnamnesisStudent => ({
+                    id: student.id,
+                    name: student.full_name || '',
+                    status: 'ativo',
+                }))
                 const allModels = modelsRes.data || []
-                const allResponses = responsesRes.data || []
-                const activeStudents = students.filter(s => s.status === 'ativo')
-                
+                const activeStudents = students
+                const activeStudentsById = new Map(activeStudents.map(student => [student.id, student]))
+                const studentsWithLinkedModel = new Set(
+                    allModels
+                        .filter((model: any) => !!model.student_id)
+                        .map((model: any) => model.student_id)
+                )
+                const activeModelOptions = allModels
+                    .filter((model: any) => (model.status ?? 'active') === 'active')
+                    .map((model: any) => ({
+                        id: model.id,
+                        title: model.title || 'Sem título'
+                    }))
+                const libraryModelOptions = allModels
+                    .filter((model: any) => !model.student_id && (model.status ?? 'active') === 'active')
+                    .map((model: any) => ({
+                        id: model.id,
+                        title: model.title || 'Sem título'
+                    }))
+
+                setLibraryModels(libraryModelOptions)
+                setModelsById(
+                    activeModelOptions.reduce((acc: Record<string, AnamnesisOption>, model: AnamnesisOption) => {
+                        acc[model.id] = model
+                        return acc
+                    }, {})
+                )
+
+                if (allModels.length === 0 || activeStudents.length === 0) {
+                    setPendingItems([])
+                    setReviewItems([])
+                    return
+                }
+
+                const linkedActiveStudentIds = activeStudents
+                    .map(student => student.id)
+                    .filter(studentId => studentsWithLinkedModel.has(studentId))
+
+                const latestStudentIdBatches = chunkArray(linkedActiveStudentIds, 100)
+                const reviewStudentIdBatches = chunkArray(activeStudents.map(student => student.id), 100)
+                const latestResponsesPromise = latestStudentIdBatches.length === 0
+                    ? Promise.resolve([])
+                    : Promise.all(
+                        latestStudentIdBatches.map(studentIds =>
+                            supabase
+                                .from('anamnesis_latest_responses')
+                                .select('student_id, created_at, renew_in_days, reviewed_at')
+                                .eq('personal_id', user.id)
+                                .in('student_id', studentIds)
+                        )
+                    )
+                const reviewQueuePromise = !reviewRequired || reviewStudentIdBatches.length === 0
+                    ? Promise.resolve([])
+                    : Promise.all(
+                        reviewStudentIdBatches.map(studentIds =>
+                            supabase
+                                .from('anamnesis_review_queue')
+                                .select('id, student_id, created_at, renew_in_days, model_id, data')
+                                .eq('personal_id', user.id)
+                                .in('student_id', studentIds)
+                                .order('created_at', { ascending: false })
+                        )
+                    )
+
+                const [latestResponseResults, reviewQueueResults] = await Promise.all([
+                    latestResponsesPromise,
+                    reviewQueuePromise,
+                ])
+
+                const latestResponseError = latestResponseResults.find(result => result.error)?.error
+                if (latestResponseError) throw latestResponseError
+
+                const reviewQueueError = reviewQueueResults.find(result => result.error)?.error
+                if (reviewQueueError) throw reviewQueueError
+
+                const latestResponses = latestResponseResults.flatMap(result => (result.data || []) as LatestAnamnesisResponseRow[])
+                const latestResponseByStudentId = new Map(
+                    latestResponses.map(response => [response.student_id, response])
+                )
                 const resultPending: PendingItem[] = []
-                const resultReview: ReviewItem[] = []
+                let resultReview: ReviewItem[] = []
                 const now = new Date()
 
-                // Se não tiver modelos, não tem pendência
-                if (allModels.length > 0) {
-                    activeStudents.forEach(student => {
-                        // 1. Verifica se tem modelo VINCULADO
-                        const hasLinkedModel = allModels.some(m => m.student_id === student.id)
-                        if (!hasLinkedModel) return
+                if (reviewRequired) {
+                    const reviewQueueRows = reviewQueueResults.flatMap(result => (result.data || []) as AnamnesisReviewQueueRow[])
+                    resultReview = reviewQueueRows.reduce<ReviewItem[]>((items, response) => {
+                        const student = activeStudentsById.get(response.student_id)
+                        if (!student) return items
 
-                        // 2. Busca respostas
-                        const studentResponses = allResponses.filter(r => r.student_id === student.id)
+                        const respData = getAnamnesisResponseData({ data: response.data })
+                        items.push({
+                            id: response.id,
+                            student,
+                            answeredAt: response.created_at,
+                            data: {
+                                ...respData,
+                                modelId: response.model_id || respData.modelId,
+                                renew_in_days: response.renew_in_days ?? respData.renew_in_days
+                            }
+                        })
+                        return items
+                    }, [])
+                }
+
+                activeStudents.forEach(student => {
+                    if (!studentsWithLinkedModel.has(student.id)) return
+
+                    const last = latestResponseByStudentId.get(student.id)
+
+                    if (!last) {
+                        return
+                    } else {
+                        if (reviewRequired && !last.reviewed_at) return
+
+                        // Data base para cálculo de vencimento
+                        // Se reviewRequired = true, usa reviewed_at (se existir)
+                        // Se reviewRequired = false, usa created_at
+                        const baseDateStr = (reviewRequired && last.reviewed_at) 
+                            ? last.reviewed_at 
+                            : last.created_at
                         
-                        // Lógica de Revisão (Novas Respostas) - APENAS SE CONFIGURADO
-                        if (reviewRequired) {
-                            // Pega todas as respostas que NÃO foram revisadas ainda
-                            studentResponses.forEach(resp => {
-                                const respData = resp.data || resp.content || {}
-                                // Se não tem reviewed_at, precisa de revisão
-                                if (!respData.reviewed_at) {
-                                    resultReview.push({
-                                        id: resp.id,
-                                        student,
-                                        answeredAt: resp.created_at,
-                                        data: respData
-                                    })
-                                }
-                            })
-                        }
+                        const renewDays = last.renew_in_days || 90
+                        if (renewDays) {
+                            const baseDate = new Date(baseDateStr)
+                            const expireDate = new Date(baseDate.getTime() + (renewDays * 24 * 60 * 60 * 1000))
+                            expireDate.setHours(0, 0, 0, 0)
+                            
+                            const nowZero = new Date(now)
+                            nowZero.setHours(0,0,0,0)
 
-                        if (studentResponses.length === 0) {
-                            // Nunca respondeu -> Ignora (ou mostra como missing se quiser)
-                        } else {
-                            // Verifica validade da última
-                            studentResponses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                            const last = studentResponses[0]
-                            
-                            // Se reviewRequired, ignora data de criação e considera reviewed_at como base
-                            // MAS se ainda não foi revisada, ela cai na lista de cima (resultReview) e não aqui.
-                            // Se já foi revisada, usamos reviewed_at. Se não é required, usamos created_at.
-                            
-                            const lastData = last.data || last.content || {}
-                            
-                            // Se precisa de revisão mas ainda não foi revisada, ela "não conta" como válida ainda
-                            // Então o aluno tecnicamente está "Vencido" ou "Pendente de Análise"
-                            // Para simplificar: se está em resultReview, não mostramos como vencido aqui embaixo para não duplicar
-                            const isPendingReview = reviewRequired && !lastData.reviewed_at
-                            if (isPendingReview) return 
-
-                            // Data base para cálculo de vencimento
-                            // Se reviewRequired = true, usa reviewed_at (se existir)
-                            // Se reviewRequired = false, usa created_at
-                            const baseDateStr = (reviewRequired && lastData.reviewed_at) 
-                                ? lastData.reviewed_at 
-                                : last.created_at
-                            
-                            const renewDays = last.renew_in_days || 90
-                            if (renewDays) {
-                                const baseDate = new Date(baseDateStr)
-                                const expireDate = new Date(baseDate.getTime() + (renewDays * 24 * 60 * 60 * 1000))
-                                expireDate.setHours(0, 0, 0, 0)
-                                
-                                const nowZero = new Date(now)
-                                nowZero.setHours(0,0,0,0)
-
-                                if (expireDate <= nowZero) {
-                                    resultPending.push({
-                                        student,
-                                        status: 'expired',
-                                        dueDate: expireDate.toISOString()
-                                    })
-                                }
+                            if (expireDate <= nowZero) {
+                                resultPending.push({
+                                    student,
+                                    status: 'expired',
+                                    dueDate: expireDate.toISOString()
+                                })
                             }
                         }
-                    })
-                }
+                    }
+                })
 
                 setPendingItems(resultPending)
                 setReviewItems(resultReview.sort((a, b) => new Date(b.answeredAt).getTime() - new Date(a.answeredAt).getTime()))
@@ -151,15 +261,43 @@ export default function AnamnesisPending() {
 
     const handleOpenConfirm = (item: ReviewItem) => {
         const currentRenew = item.data.renew_in_days || 90
-        setConfirmModal({ open: true, item, days: currentRenew })
+        const currentModelId = item.data?.modelId
+        const hasCurrentOption = currentModelId && modelsById[currentModelId]
+        const nextModelId = hasCurrentOption
+            ? currentModelId
+            : (libraryModels[0]?.id || '')
+
+        if (!nextModelId) {
+            setToast({ msg: 'Nenhuma anamnese disponível para reaplicar.', type: 'error' })
+            return
+        }
+
+        setConfirmModal({ open: true, item, days: currentRenew, nextModelId })
+    }
+
+    const getSelectableModels = (item: ReviewItem | null) => {
+        if (!item) return libraryModels
+
+        const currentModelId = item.data?.modelId
+        const currentModel = currentModelId ? modelsById[currentModelId] : null
+
+        if (!currentModel) return libraryModels
+        if (libraryModels.some(model => model.id === currentModel.id)) return libraryModels
+
+        return [currentModel, ...libraryModels]
     }
 
     const handleConfirmReview = async () => {
-        const { item, days } = confirmModal
+        const { item, days, nextModelId } = confirmModal
         if (!item) return
 
         if (days <= 0) {
             setToast({ msg: 'Por favor, insira um número válido de dias.', type: 'error' })
+            return
+        }
+
+        if (!nextModelId) {
+            setToast({ msg: 'Selecione qual anamnese será reaplicada.', type: 'error' })
             return
         }
         
@@ -167,54 +305,59 @@ export default function AnamnesisPending() {
         setMarkingId(item.id)
         
         try {
-            // 1. Busca dados atuais do banco para garantir integridade
-            const { data: currentProtocol, error: fetchError } = await supabase
-                .from('protocols')
-                .select('data')
-                .eq('id', item.id)
-                .single()
-            
-            if (fetchError) throw fetchError
+            const result = await reviewAndReapplyAnamnesis({
+                responseId: item.id,
+                nextModelId,
+                daysValid: days
+            })
 
-            // 2. Prepara novo objeto data
-            const currentData = currentProtocol?.data || {}
-            const newData = { 
-                ...currentData, 
-                reviewed_at: new Date().toISOString(),
-                renew_in_days: days 
+            if (!result.success) {
+                throw new Error(result.message || 'Erro ao concluir a anamnese.')
             }
-            
-            // 3. Atualiza
-            console.log('Enviando update para o banco:', newData)
-            const { error } = await supabase
-                .from('protocols')
-                .update({ 
-                    data: newData
-                })
-                .eq('id', item.id)
 
-            if (error) throw error
-            
-            console.log('Update sucesso!')
-            // Remove da lista localmente
             setReviewItems(prev => prev.filter(i => i.id !== item.id))
-            setToast({ msg: `Anamnese concluída! Renovação em ${days} dias.`, type: 'success' })
+            setToast({ msg: `Anamnese concluída e nova aplicação agendada para ${days} dias.`, type: 'success' })
         } catch (err: any) {
             console.error('Erro ao confirmar:', err)
             setToast({ msg: 'Erro ao atualizar: ' + err.message, type: 'error' })
         } finally {
             setMarkingId(null)
-            setConfirmModal({ open: false, item: null, days: 90 })
+            setConfirmModal({ open: false, item: null, days: 90, nextModelId: '' })
         }
     }
 
     if (loading) return <div>Carregando...</div>
+
+    const selectableModels = getSelectableModels(confirmModal.item)
 
     return (
         <div>
             {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
             <h1>Gestão de Anamneses</h1>
             <button className="btn" onClick={() => navigate('/dashboard/overview')} style={{ marginBottom: 20, background: 'transparent', color: '#666', border: '1px solid #ccc' }}>← Voltar</button>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
+                <button
+                    className="btn"
+                    style={{ background: '#10b981' }}
+                    onClick={() => navigate('/protocols/anamnesis/model/create')}
+                >
+                    + Criar Anamnese
+                </button>
+                <button
+                    className="btn"
+                    style={{ background: '#3b82f6' }}
+                    onClick={() => navigate('/protocols/anamnesis-apply')}
+                >
+                    Aplicar Anamnese
+                </button>
+                <button
+                    className="btn"
+                    style={{ background: 'transparent', color: '#0f172a', border: '1px solid #cbd5e1' }}
+                    onClick={() => navigate('/protocols/anamnesis-models')}
+                >
+                    Ver Modelos
+                </button>
+            </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
                 
@@ -277,12 +420,32 @@ export default function AnamnesisPending() {
                         }}>
                             <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', color: '#0f172a' }}>Confirmar Conclusão</h3>
                             <p style={{ margin: '0 0 20px 0', color: '#64748b', fontSize: '0.95rem' }}>
-                                A anamnese de <strong>{confirmModal.item.student.name}</strong> será marcada como analisada.
+                                A anamnese de <strong>{confirmModal.item.student.name}</strong> será marcada como analisada e uma nova anamnese será aplicada automaticamente.
                             </p>
+
+                            <label style={{ display: 'block', marginBottom: 16 }}>
+                                <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+                                    Qual anamnese deseja aplicar agora?
+                                </span>
+                                <select
+                                    value={confirmModal.nextModelId}
+                                    onChange={e => setConfirmModal(prev => ({ ...prev, nextModelId: e.target.value }))}
+                                    style={{
+                                        width: '100%', padding: '10px 12px', borderRadius: 8,
+                                        border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none',
+                                        background: '#fff'
+                                    }}
+                                >
+                                    <option value="">Selecione uma anamnese</option>
+                                    {selectableModels.map(model => (
+                                        <option key={model.id} value={model.id}>{model.title}</option>
+                                    ))}
+                                </select>
+                            </label>
 
                             <label style={{ display: 'block', marginBottom: 20 }}>
                                 <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: 6 }}>
-                                    Renovar novamente em quantos dias?
+                                    Em quantos dias essa nova anamnese vence?
                                 </span>
                                 <input 
                                     type="number"
@@ -334,25 +497,19 @@ export default function AnamnesisPending() {
                         )}
                         
                         {pendingItems.map((item, idx) => (
-                            <div key={item.student.id + idx} className="form-card" style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderLeft: item.status === 'missing' ? '4px solid #f59e0b' : '4px solid #ef4444' }}>
+                            <div key={item.student.id + idx} className="form-card" style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderLeft: '4px solid #ef4444' }}>
                                 <div>
                                     <div style={{ fontWeight: 'bold', fontSize: '1.1em' }}>{item.student.name}</div>
-                                    {item.status === 'missing' ? (
-                                        <div style={{ fontSize: 13, color: '#d97706', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            <span>⚠️</span> Nunca respondeu
-                                        </div>
-                                    ) : (
-                                        <div style={{ fontSize: 13, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            <span>⏰</span> Venceu em {new Date(item.dueDate!).toLocaleDateString()}
-                                        </div>
-                                    )}
+                                    <div style={{ fontSize: 13, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <span>⏰</span> Venceu em {new Date(item.dueDate).toLocaleDateString()}
+                                    </div>
                                 </div>
                                 <button 
                                     className="btn" 
-                                    style={{ background: item.status === 'missing' ? '#0f172a' : '#ef4444' }}
+                                    style={{ background: '#ef4444' }}
                                     onClick={() => navigate(`/protocols/anamnesis-apply?studentId=${item.student.id}`)}
                                 >
-                                    {item.status === 'missing' ? 'Aplicar Nova' : 'Renovar'}
+                                    Renovar
                                 </button>
                             </div>
                         ))}
