@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator,
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Save, Lock, Camera, User as UserIcon, X } from 'lucide-react-native';
+import { ChevronLeft, Save, Lock, Camera, User as UserIcon, Eye, EyeOff } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -21,6 +21,10 @@ export default function Profile() {
   const [modalConfig, setModalConfig] = useState({ title: '', message: '', type: 'error' as 'success' | 'error' });
   const [emailConfirmModalVisible, setEmailConfirmModalVisible] = useState(false);
   const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const showAlert = (title: string, message: string, type: 'success' | 'error' = 'error') => {
       setModalConfig({ title, message, type });
@@ -275,6 +279,17 @@ export default function Profile() {
 
         if (profileError) throw profileError;
 
+        if (newPassword) {
+            if (newPassword.length < 6) throw new Error('A senha deve ter no mínimo 6 caracteres');
+            if (newPassword !== confirmPassword) throw new Error('As senhas não conferem');
+
+            const { error: passError } = await supabase.auth.updateUser({ password: newPassword });
+            if (passError) throw passError;
+
+            setNewPassword('');
+            setConfirmPassword('');
+        }
+
         // 3. Atualizar Email (Se mudou)
         // Se chegou aqui, ou o email não mudou, ou já foi tratado pelo modal
         if (user?.email && email !== user.email) {
@@ -289,16 +304,6 @@ export default function Profile() {
     } finally {
         setSaving(false);
     }
-  }
-
-  const handleChangePassword = async () => {
-      if (!email) return;
-      try {
-          await supabase.auth.resetPasswordForEmail(email);
-          showAlert('Email Enviado', 'Verifique seu email para redefinir a senha.', 'success');
-      } catch (error) {
-          showAlert('Erro', 'Não foi possível enviar o email de redefinição.', 'error');
-      }
   }
 
   return (
@@ -371,6 +376,59 @@ export default function Profile() {
                   />
               </View>
 
+              <View style={styles.divider} />
+
+              <View style={styles.sectionHeader}>
+                  <Lock size={20} color="#0f172a" />
+                  <Text style={styles.sectionTitle}>Alterar Senha</Text>
+              </View>
+
+              <View style={styles.formGroup}>
+                  <Text style={styles.label}>Nova Senha</Text>
+                  <View style={styles.passwordInputContainer}>
+                      <TextInput
+                          style={styles.passwordInput}
+                          value={newPassword}
+                          onChangeText={setNewPassword}
+                          placeholder="Deixe em branco para manter"
+                          placeholderTextColor="#94a3b8"
+                          secureTextEntry={!showNewPassword}
+                          autoCapitalize="none"
+                          autoComplete="new-password"
+                      />
+                      <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)}>
+                          {showNewPassword ? (
+                              <EyeOff size={20} color="#94a3b8" />
+                          ) : (
+                              <Eye size={20} color="#94a3b8" />
+                          )}
+                      </TouchableOpacity>
+                  </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                  <Text style={styles.label}>Confirmar Senha</Text>
+                  <View style={styles.passwordInputContainer}>
+                      <TextInput
+                          style={styles.passwordInput}
+                          value={confirmPassword}
+                          onChangeText={setConfirmPassword}
+                          placeholder="Repita a nova senha"
+                          placeholderTextColor="#94a3b8"
+                          secureTextEntry={!showConfirmPassword}
+                          autoCapitalize="none"
+                          autoComplete="new-password"
+                      />
+                      <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                          {showConfirmPassword ? (
+                              <EyeOff size={20} color="#94a3b8" />
+                          ) : (
+                              <Eye size={20} color="#94a3b8" />
+                          )}
+                      </TouchableOpacity>
+                  </View>
+              </View>
+
               <TouchableOpacity 
                   style={styles.saveButton} 
                   onPress={handleSave}
@@ -384,15 +442,6 @@ export default function Profile() {
                           <Text style={styles.saveButtonText}>Salvar Alterações</Text>
                       </>
                   )}
-              </TouchableOpacity>
-
-              <View style={styles.divider} />
-
-              <Text style={styles.sectionTitle}>Segurança</Text>
-              
-              <TouchableOpacity style={styles.passwordButton} onPress={handleChangePassword}>
-                  <Lock size={20} color="#64748b" />
-                  <Text style={styles.passwordButtonText}>Redefinir Senha</Text>
               </TouchableOpacity>
 
           </ScrollView>
@@ -512,13 +561,17 @@ const styles = StyleSheet.create({
   saveButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
   divider: { height: 1, backgroundColor: '#e2e8f0', marginVertical: 32 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 16 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
 
-  passwordButton: {
-      flexDirection: 'row', alignItems: 'center', gap: 12,
-      backgroundColor: '#fff', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0'
+  passwordInputContainer: {
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12,
+      paddingHorizontal: 14,
   },
-  passwordButtonText: { color: '#475569', fontWeight: '600', fontSize: 15 },
+  passwordInput: {
+      flex: 1, paddingVertical: 14, fontSize: 16, color: '#0f172a',
+  },
 
   // Modal Styles
   modalOverlay: {

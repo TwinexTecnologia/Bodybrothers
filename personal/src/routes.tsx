@@ -40,13 +40,18 @@ import StudentLogin from './pages/StudentApp/Login'
 import StudentHome from './pages/StudentApp/Home'
 
 function DefaultRedirect() {
-  const { isAuthenticated } = useAuth()
-  return <Navigate to={isAuthenticated ? '/dashboard/overview' : '/login'} replace />
+  const { isAuthenticated, isSubscriptionRestricted } = useAuth()
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return <Navigate to={isSubscriptionRestricted ? '/account/profile' : '/dashboard/overview'} replace />
 }
 
-function Protected({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth()
-  return isAuthenticated ? children : <Navigate to="/login" replace />
+function Protected({ children, allowRestricted = false }: { children: React.ReactNode; allowRestricted?: boolean }) {
+  const { isAuthenticated, isSubscriptionRestricted } = useAuth()
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (isSubscriptionRestricted && !allowRestricted) {
+    return <Navigate to="/account/profile" replace />
+  }
+  return children
 }
 
 export default function AppRoutes() {
@@ -94,7 +99,7 @@ export default function AppRoutes() {
       
       <Route path="/financial" element={<Protected><FinancialList /></Protected>} />
 
-      <Route path="/account/profile" element={<Protected><Profile /></Protected>} />
+      <Route path="/account/profile" element={<Protected allowRestricted><Profile /></Protected>} />
       <Route path="/account/branding" element={<Protected><Branding /></Protected>} />
       <Route path="/account/preferences" element={<Protected><Preferences /></Protected>} />
       

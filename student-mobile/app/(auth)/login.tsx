@@ -18,6 +18,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
 
 const { width } = Dimensions.get("window");
+const resetPasswordRedirectUrl =
+  process.env.EXPO_PUBLIC_PASSWORD_RESET_URL ||
+  "https://app.fitbodyproapp.com/reset-password";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -41,7 +44,7 @@ export default function Login() {
       if (error) throw error;
 
       if (data.user) {
-        router.replace("/(tabs)/dashboard");
+        router.replace("/");
       }
     } catch (error: any) {
       Alert.alert(
@@ -61,7 +64,9 @@ export default function Login() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: resetPasswordRedirectUrl,
+      });
       if (error) throw error;
       Alert.alert(
         "Sucesso",

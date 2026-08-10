@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/useAuth'
-import { Camera, Calendar, ArrowRight, Image as ImageIcon } from 'lucide-react'
+import { Camera, ArrowRight, Image as ImageIcon, Upload, X } from 'lucide-react'
 
 type PhotoRecord = {
     id: string
@@ -9,18 +9,23 @@ type PhotoRecord = {
     photos: string[]
 }
 
+type EvolutionField = {
+    id: string
+    label: string
+    exampleUrl?: string | null
+}
+
 export default function PhotoEvolution() {
     const { user } = useAuth()
     const [history, setHistory] = useState<PhotoRecord[]>([])
     const [loading, setLoading] = useState(true)
-    const [debugData, setDebugData] = useState<any>(null)
     
     const [idA, setIdA] = useState('')
     const [idB, setIdB] = useState('')
 
     // Controle de modo e upload
     const [evolutionMode, setEvolutionMode] = useState('anamnesis')
-    const [evolutionFields, setEvolutionFields] = useState<any[]>([]) // Campos customizados
+    const [evolutionFields, setEvolutionFields] = useState<EvolutionField[]>([]) // Campos customizados
     const [isUploading, setIsUploading] = useState(false)
     const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0])
     const [uploadFiles, setUploadFiles] = useState<FileList | null>(null)
@@ -128,9 +133,6 @@ export default function PhotoEvolution() {
             setLoading(false)
             return
         }
-
-        // Salva o primeiro item para debug visual
-        setDebugData(data[0])
 
         // Função recursiva para achar imagens em qualquer lugar do JSON
         const extractImages = (obj: any): string[] => {
@@ -276,6 +278,261 @@ export default function PhotoEvolution() {
 
     const getRecord = (id: string) => history.find(h => h.id === id)
 
+    const triggerFieldInput = (fieldId: string, capture?: 'environment') => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/*'
+
+        if (capture) {
+            input.setAttribute('capture', capture)
+        }
+
+        input.onchange = () => {
+            const file = input.files?.[0]
+            if (file) {
+                setFieldFiles(prev => ({ ...prev, [fieldId]: file }))
+            }
+        }
+
+        input.click()
+    }
+
+    const renderStandaloneUploadFields = () => (
+        <div
+            style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: 16,
+            }}
+        >
+            {evolutionFields.map(field => {
+                const selectedFile = fieldFiles[field.id]
+                const previewUrl = selectedFile ? URL.createObjectURL(selectedFile) : null
+
+                return (
+                    <div
+                        key={field.id}
+                        style={{
+                            background: '#fff',
+                            borderRadius: 18,
+                            border: '1px solid #e2e8f0',
+                            overflow: 'hidden',
+                            boxShadow: '0 8px 20px rgba(15, 23, 42, 0.05)',
+                        }}
+                    >
+                        <div style={{ padding: '18px 18px 12px' }}>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a', textAlign: 'center' }}>
+                                {field.label}
+                            </div>
+                        </div>
+
+                        {selectedFile ? (
+                            <div style={{ position: 'relative', margin: '0 18px 18px', borderRadius: 14, overflow: 'hidden', aspectRatio: '3 / 4', background: '#e2e8f0' }}>
+                                <img
+                                    src={previewUrl!}
+                                    alt={`Preview de ${field.label}`}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setFieldFiles(prev => {
+                                        const next = { ...prev }
+                                        delete next[field.id]
+                                        return next
+                                    })}
+                                    style={{
+                                        position: 'absolute',
+                                        top: 12,
+                                        right: 12,
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: '50%',
+                                        border: 'none',
+                                        background: 'rgba(239, 68, 68, 0.92)',
+                                        color: '#fff',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        ) : (
+                            <div style={{ margin: '0 18px 18px', borderRadius: 14, border: '1px dashed #cbd5e1', background: '#f8fafc', overflow: 'hidden' }}>
+                                {field.exampleUrl && (
+                                    <div style={{ position: 'relative', height: 220, background: '#e5e7eb', borderBottom: '1px solid #e2e8f0' }}>
+                                        <img
+                                            src={field.exampleUrl}
+                                            alt={`Exemplo de ${field.label}`}
+                                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                        />
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                top: 12,
+                                                right: 12,
+                                                background: 'rgba(15,23,42,0.82)',
+                                                color: '#fff',
+                                                padding: '6px 10px',
+                                                borderRadius: 8,
+                                                fontSize: '0.75rem',
+                                                fontWeight: 700,
+                                                letterSpacing: '0.04em',
+                                                textTransform: 'uppercase',
+                                            }}
+                                        >
+                                            Exemplo
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 92 }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => triggerFieldInput(field.id, 'environment')}
+                                        style={{
+                                            border: 'none',
+                                            background: '#fff',
+                                            cursor: 'pointer',
+                                            display: 'grid',
+                                            placeItems: 'center',
+                                            gap: 6,
+                                            padding: 16,
+                                            color: '#64748b',
+                                            fontWeight: 700,
+                                        }}
+                                    >
+                                        <Camera size={22} />
+                                        <span>Câmera</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => triggerFieldInput(field.id)}
+                                        style={{
+                                            border: 'none',
+                                            borderLeft: '1px solid #e2e8f0',
+                                            background: '#fff',
+                                            cursor: 'pointer',
+                                            display: 'grid',
+                                            placeItems: 'center',
+                                            gap: 6,
+                                            padding: 16,
+                                            color: '#64748b',
+                                            fontWeight: 700,
+                                        }}
+                                    >
+                                        <Upload size={22} />
+                                        <span>Galeria</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )
+            })}
+        </div>
+    )
+
+    const renderUploadModal = () => (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+            <div style={{ background: '#fff', padding: 28, borderRadius: 24, width: '100%', maxWidth: 980, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 12 }}>
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a', fontWeight: 700 }}>Nova Evolução</h3>
+                        <p style={{ margin: '6px 0 0', color: '#64748b' }}>
+                            Adicione fotos atuais para comparar com seus resultados anteriores.
+                        </p>
+                    </div>
+                    <button onClick={() => setIsUploading(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8' }}>✕</button>
+                </div>
+                
+                <form onSubmit={handleUpload}>
+                    <div style={{ marginBottom: 20 }}>
+                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 8 }}>Quando as fotos foram tiradas?</label>
+                        <input 
+                            type="date" 
+                            value={uploadDate} 
+                            onChange={e => setUploadDate(e.target.value)}
+                            style={{ 
+                                width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #e2e8f0', 
+                                fontSize: '1rem', background: '#f8fafc', color: '#0f172a', outline: 'none',
+                                transition: 'all 0.2s'
+                            }}
+                            required
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: 28 }}>
+                        {evolutionFields.length > 0 ? (
+                            renderStandaloneUploadFields()
+                        ) : (
+                            <div style={{ 
+                                border: '2px dashed #cbd5e1', borderRadius: 16, padding: 24, 
+                                textAlign: 'center', background: '#f8fafc', cursor: 'pointer',
+                                position: 'relative', transition: 'all 0.2s'
+                            }}>
+                                <input 
+                                    type="file" 
+                                    multiple 
+                                    accept="image/*"
+                                    onChange={e => setUploadFiles(e.target.files)}
+                                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                                    required
+                                />
+                                <div style={{ pointerEvents: 'none' }}>
+                                    <div style={{ color: '#64748b', marginBottom: 8 }}>
+                                        <ImageIcon size={32} />
+                                    </div>
+                                    {uploadFiles && uploadFiles.length > 0 ? (
+                                        <div style={{ color: '#0f172a', fontWeight: 600 }}>
+                                            {uploadFiles.length} foto(s) selecionada(s)
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div style={{ color: '#0f172a', fontWeight: 600, marginBottom: 4 }}>Clique para enviar</div>
+                                            <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Frente, Costas, Lado...</div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+                        <button 
+                            type="button" 
+                            onClick={() => setIsUploading(false)} 
+                            style={{ 
+                                padding: '14px', borderRadius: 12, border: 'none', background: '#f1f5f9', 
+                                color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: '1rem'
+                            }}
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="submit" 
+                            disabled={uploading} 
+                            style={{ 
+                                padding: '14px', borderRadius: 12, border: 'none', background: '#0f172a', 
+                                color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '1rem',
+                                opacity: uploading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+                            }}
+                        >
+                            {uploading ? 'Enviando...' : (
+                                <>
+                                    <Camera size={18} /> Salvar Evolução
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    )
+
     if (loading) return <div className="p-8 text-center text-gray-500">Carregando fotos...</div>
 
     if (history.length === 0) {
@@ -302,104 +559,7 @@ export default function PhotoEvolution() {
                     </div>
                 )}
                 
-                {/* Modal de Upload dentro do empty state também */}
-                {isUploading && (
-                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, textAlign: 'left' }}>
-                        <div style={{ background: '#fff', padding: 32, borderRadius: 24, width: '100%', maxWidth: 480, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                                <h3 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a', fontWeight: 700 }}>Nova Evolução</h3>
-                                <button onClick={() => setIsUploading(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8' }}>✕</button>
-                            </div>
-                            
-                            <form onSubmit={handleUpload}>
-                                <div style={{ marginBottom: 20 }}>
-                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 8 }}>Quando as fotos foram tiradas?</label>
-                                    <input 
-                                        type="date" 
-                                        value={uploadDate} 
-                                        onChange={e => setUploadDate(e.target.value)}
-                                        style={{ 
-                                            width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #e2e8f0', 
-                                            fontSize: '1rem', background: '#f8fafc', color: '#0f172a', outline: 'none',
-                                            transition: 'all 0.2s'
-                                        }}
-                                        required
-                                    />
-                                </div>
-
-                                <div style={{ marginBottom: 32 }}>
-                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 8 }}>Selecione as Fotos</label>
-                                    <div style={{ 
-                                        border: '2px dashed #cbd5e1', borderRadius: 16, padding: 24, 
-                                        textAlign: 'center', background: '#f8fafc', cursor: 'pointer',
-                                        position: 'relative', transition: 'all 0.2s'
-                                    }}>
-                                        <input 
-                                            type="file" 
-                                            multiple 
-                                            accept="image/*"
-                                            onChange={e => setUploadFiles(e.target.files)}
-                                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-                                            required
-                                        />
-                                        <div style={{ pointerEvents: 'none' }}>
-                                            <div style={{ color: '#64748b', marginBottom: 8 }}>
-                                                <ImageIcon size={32} />
-                                            </div>
-                                            {uploadFiles && uploadFiles.length > 0 ? (
-                                                <div style={{ color: '#0f172a', fontWeight: 600 }}>
-                                                    {uploadFiles.length} foto(s) selecionada(s)
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <div style={{ color: '#0f172a', fontWeight: 600, marginBottom: 4 }}>Clique para enviar</div>
-                                                    <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Frente, Costas, Lado...</div>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setIsUploading(false)} 
-                                        style={{ 
-                                            padding: '14px', borderRadius: 12, border: 'none', background: '#f1f5f9', 
-                                            color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: '1rem'
-                                        }}
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button 
-                                        type="submit" 
-                                        disabled={uploading} 
-                                        style={{ 
-                                            padding: '14px', borderRadius: 12, border: 'none', background: '#0f172a', 
-                                            color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '1rem',
-                                            opacity: uploading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-                                        }}
-                                    >
-                                        {uploading ? 'Enviando...' : (
-                                            <>
-                                                <Camera size={18} /> Salvar Fotos
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {debugData && (
-                    <div style={{ marginTop: 40, textAlign: 'left', background: '#f1f5f9', padding: 20, borderRadius: 8, overflowX: 'auto' }}>
-                        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#475569', marginBottom: 10 }}>DADOS BRUTOS (DEBUG):</h4>
-                        <pre style={{ fontSize: '0.8rem', color: '#334155' }}>
-                            {JSON.stringify(debugData, null, 2)}
-                        </pre>
-                    </div>
-                )}
+                {isUploading && renderUploadModal()}
             </div>
         )
     }
@@ -409,146 +569,7 @@ export default function PhotoEvolution() {
 
     return (
         <div style={{ maxWidth: 1200, margin: '0 auto', paddingBottom: 40 }}>
-            {/* Modal de Upload Moderno */}
-            {isUploading && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-                    <div style={{ background: '#fff', padding: 32, borderRadius: 24, width: '100%', maxWidth: 480, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                            <h3 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a', fontWeight: 700 }}>Nova Evolução</h3>
-                            <button onClick={() => setIsUploading(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8' }}>✕</button>
-                        </div>
-                        
-                        <form onSubmit={handleUpload}>
-                            <div style={{ marginBottom: 20 }}>
-                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 8 }}>Quando as fotos foram tiradas?</label>
-                                <input 
-                                    type="date" 
-                                    value={uploadDate} 
-                                    onChange={e => setUploadDate(e.target.value)}
-                                    style={{ 
-                                        width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #e2e8f0', 
-                                        fontSize: '1rem', background: '#f8fafc', color: '#0f172a', outline: 'none',
-                                        transition: 'all 0.2s'
-                                    }}
-                                    required
-                                />
-                            </div>
-
-                            <div style={{ marginBottom: 32 }}>
-                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 8 }}>
-                                    {evolutionFields.length > 0 ? 'Fotos' : 'Selecione as Fotos'}
-                                </label>
-                                
-                                {evolutionFields.length > 0 ? (
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                                        {evolutionFields.map(field => (
-                                            <div key={field.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>{field.label}</label>
-                                                <div 
-                                                    style={{ 
-                                                        border: '2px dashed #cbd5e1', borderRadius: 12, padding: 16, 
-                                                        textAlign: 'center', background: '#f8fafc', cursor: 'pointer',
-                                                        position: 'relative', height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                        overflow: 'hidden'
-                                                    }}
-                                                >
-                                                    <input 
-                                                        type="file" 
-                                                        accept="image/*"
-                                                        onChange={e => {
-                                                            if (e.target.files?.[0]) {
-                                                                setFieldFiles(prev => ({ ...prev, [field.id]: e.target.files![0] }))
-                                                            }
-                                                        }}
-                                                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }}
-                                                    />
-                                                    
-                                                    {fieldFiles[field.id] ? (
-                                                        <img 
-                                                            src={URL.createObjectURL(fieldFiles[field.id])} 
-                                                            alt="Preview" 
-                                                            style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', zIndex: 1 }} 
-                                                        />
-                                                    ) : field.exampleUrl ? (
-                                                        <div style={{ width: '100%', height: '100%', position: 'absolute', zIndex: 0 }}>
-                                                            <img src={field.exampleUrl} alt="Referência" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, filter: 'grayscale(100%)' }} />
-                                                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.3)' }}>
-                                                                <span style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem' }}>+ Adicionar</span>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div style={{ color: '#94a3b8' }}>
-                                                            <Camera size={24} />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div style={{ 
-                                        border: '2px dashed #cbd5e1', borderRadius: 16, padding: 24, 
-                                        textAlign: 'center', background: '#f8fafc', cursor: 'pointer',
-                                        position: 'relative', transition: 'all 0.2s'
-                                    }}>
-                                        <input 
-                                            type="file" 
-                                            multiple 
-                                            accept="image/*"
-                                            onChange={e => setUploadFiles(e.target.files)}
-                                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-                                            required
-                                        />
-                                        <div style={{ pointerEvents: 'none' }}>
-                                            <div style={{ color: '#64748b', marginBottom: 8 }}>
-                                                <ImageIcon size={32} />
-                                            </div>
-                                            {uploadFiles && uploadFiles.length > 0 ? (
-                                                <div style={{ color: '#0f172a', fontWeight: 600 }}>
-                                                    {uploadFiles.length} foto(s) selecionada(s)
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <div style={{ color: '#0f172a', fontWeight: 600, marginBottom: 4 }}>Clique para enviar</div>
-                                                    <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Frente, Costas, Lado...</div>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                                <button 
-                                    type="button" 
-                                    onClick={() => setIsUploading(false)} 
-                                    style={{ 
-                                        padding: '14px', borderRadius: 12, border: 'none', background: '#f1f5f9', 
-                                        color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: '1rem'
-                                    }}
-                                >
-                                    Cancelar
-                                </button>
-                                <button 
-                                    type="submit" 
-                                    disabled={uploading} 
-                                    style={{ 
-                                        padding: '14px', borderRadius: 12, border: 'none', background: '#0f172a', 
-                                        color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '1rem',
-                                        opacity: uploading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-                                    }}
-                                >
-                                    {uploading ? 'Enviando...' : (
-                                        <>
-                                            <Camera size={18} /> Salvar Fotos
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            {isUploading && renderUploadModal()}
 
             <header style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>

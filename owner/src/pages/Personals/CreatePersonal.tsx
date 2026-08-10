@@ -1,19 +1,5 @@
 import { useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
-
-// Cria um cliente secundário ISOLADO para não deslogar o owner
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-// Cliente descartável que não salva sessão no localStorage
-const supabaseCreator = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false
-  }
-})
 
 function validEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
@@ -29,6 +15,9 @@ export default function CreatePersonal() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [phone, setPhone] = useState('')
+  const [planSlug, setPlanSlug] = useState('free')
+  const [billingCycle, setBillingCycle] = useState('monthly')
+  const [isPermuta, setIsPermuta] = useState(false)
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
@@ -99,75 +88,55 @@ export default function CreatePersonal() {
 
     try {
         console.log('Tentando criar personal:', { email })
-
-        // 1. Criar Usuário no Auth (Cliente Isolado)
-        const { data: authData, error: authError } = await supabaseCreator.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: name,
-                    role: 'personal', // Importante: Metadado que o trigger usa
-                    phone: phone,
-                    branding: {
-                        brandName,
-                        logoUrl
-                    },
-                    config: {
-                        evolutionMode,
-                        anamnesisReviewRequired
-                    }
-                }
+        const { data, error: invokeError } = await supabase.functions.invoke('create-personal-account', {
+            body: {
+                fullName: name,
+                email,
+                password,
+                phone,
+                plan: planSlug,
+                billingCycle,
+                isPermuta,
+                billingModel: isPermuta ? 'permuta' : 'normal',
+                brandName,
+                logoUrl,
+                source: 'owner',
+                evolutionMode,
+                anamnesisReviewRequired
             }
         })
 
-        if (authError) throw authError
+        if (invokeError) throw invokeError
 
-        if (authData.user) {
-            console.log('Usuário Auth criado com ID:', authData.user.id)
-
-            // 2. Garantir Perfil (Tentativa direta via tabela profiles)
-            // O Owner DEVE ter permissão RLS para fazer isso.
-            const { error: profileError } = await supabase.from('profiles').upsert({
-                id: authData.user.id,
-                email: email,
-                role: 'personal',
-                full_name: name,
-                data: {
-                    phone: phone,
-                    branding: {
-                        brandName,
-                        logoUrl
-                    }
-                }
-            })
-
-            if (profileError) {
-                console.error('Erro ao criar perfil:', profileError)
-                // Se der erro de permissão (42501), significa que o Owner não tem permissão de INSERT no banco.
-                // Nesse caso, só resolvendo no banco. Mas vamos tentar.
-                setError('Erro ao salvar perfil: ' + profileError.message + ' (Código: ' + profileError.code + ')')
-                return
-            }
-
-            setMsg(`Personal criado com sucesso! ID: ${authData.user.id}`)
-            // Limpar form
-            setName('')
-            setEmail('')
-            setPassword('')
-            setPhone('')
-            setBrandName('')
-            setLogoUrl('')
-        } else {
-            setError('Usuário criado, mas sem confirmação. Verifique se o email requer confirmação.')
+        if (!data?.success || !data?.personalId) {
+            throw new Error(data?.error || 'Não foi possível criar o personal.')
         }
+
+        setMsg(`Personal criado com sucesso! ID: ${data.personalId}`)
+        // Limpar form
+        setName('')
+        setEmail('')
+        setPassword('')
+        setPhone('')
+        setPlanSlug('free')
+        setBillingCycle('monthly')
+        setIsPermuta(false)
+        setBrandName('')
+        setLogoUrl('')
+        setEvolutionMode('anamnesis')
+        setAnamnesisReviewRequired(false)
 
     } catch (err: any) {
         console.error(err)
-        if (err.message?.includes('User already registered') || err.message?.includes('already registered')) {
+        let message = err?.message || ''
+        if (err?.context && typeof err.context.json === 'function') {
+            const payload = await err.context.json().catch(() => null)
+            message = payload?.error || payload?.message || message
+        }
+        if (message.includes('User already registered') || message.includes('already registered')) {
             setError('Este email já está cadastrado no sistema.')
         } else {
-            setError(err.message || 'Erro ao criar personal.')
+            setError(message || 'Erro ao criar personal.')
         }
     } finally {
         setLoading(false)
@@ -224,6 +193,61 @@ export default function CreatePersonal() {
                 />
             </label>
           </div>
+
+          <div style={{ borderTop: '1px solid #f1f5f9', margin: '10px 0' }}></div>
+          <h3 style={{ margin: 0, color: '#0f172a' }}>Plano e Cobrança</h3>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={{ fontWeight: 500, color: '#475569' }}>Plano inicial</span>
+                <select
+                    value={planSlug}
+                    onChange={e => {
+                        const nextPlan = e.target.value
+                        setPlanSlug(nextPlan)
+                        if (nextPlan === 'free') {
+                            setBillingCycle('monthly')
+                            setIsPermuta(false)
+                        }
+                    }}
+                    style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff' }}
+                >
+                    <option value="free">Free</option>
+                    <option value="starter">Starter</option>
+                    <option value="premium">Premium</option>
+                </select>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={{ fontWeight: 500, color: '#475569' }}>Ciclo inicial</span>
+                <select
+                    value={billingCycle}
+                    onChange={e => setBillingCycle(e.target.value)}
+                    disabled={planSlug === 'free'}
+                    style={{ padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', background: planSlug === 'free' ? '#f8fafc' : '#fff' }}
+                >
+                    <option value="monthly">Mensal</option>
+                    <option value="quarterly">Trimestral</option>
+                    <option value="yearly">Anual</option>
+                </select>
+            </label>
+          </div>
+
+          {planSlug !== 'free' && (
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: '#f8fafc', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                <input
+                    type="checkbox"
+                    checked={isPermuta}
+                    onChange={e => setIsPermuta(e.target.checked)}
+                    style={{ width: 20, height: 20, marginTop: 2, cursor: 'pointer' }}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>Cadastrar como permuta</span>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                        O personal entra ativo no plano escolhido sem cobrança automática. Depois você pode remover a permuta e ele cairá em regularização para cadastrar pagamento.
+                    </span>
+                </div>
+            </label>
+          )}
 
           <div style={{ borderTop: '1px solid #f1f5f9', margin: '10px 0' }}></div>
           <h3 style={{ margin: 0, color: '#0f172a' }}>Configurações</h3>

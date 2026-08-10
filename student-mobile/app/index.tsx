@@ -3,7 +3,7 @@ import { Redirect } from 'expo-router';
 import { View, ActivityIndicator } from 'react-native';
 
 export default function Index() {
-  const { session, loading } = useAuth();
+  const { session, role, loading } = useAuth();
 
   if (loading) {
     return (
@@ -15,6 +15,10 @@ export default function Index() {
 
   if (!session) {
     return <Redirect href="/(auth)/login" />;
+  }
+
+  if (role === 'personal') {
+    return <Redirect href="/personal-access" />;
   }
 
   return <Redirect href="/(tabs)/dashboard" />;

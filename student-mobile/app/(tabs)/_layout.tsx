@@ -1,7 +1,22 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { Home, Dumbbell, Utensils, Menu } from 'lucide-react-native';
+import { useAuth } from '../../lib/auth';
 
 export default function TabsLayout() {
+  const { session, role, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
+
+  if (!session) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
+  if (role === 'personal') {
+    return <Redirect href="/personal-access" />;
+  }
+
   return (
     <Tabs screenOptions={{ headerShown: false }}>
       <Tabs.Screen

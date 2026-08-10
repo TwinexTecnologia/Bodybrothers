@@ -72,7 +72,7 @@ export default function EvolutionCentral() {
                     <p style={{ color: '#64748b', margin: 0 }}>Selecione um aluno para gerenciar ou adicionar novas fotos.</p>
                 </div>
                 <button 
-                    onClick={() => navigate('/account/profile')}
+                    onClick={() => navigate('/account/profile#evolution-settings')}
                     style={{ 
                         background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', 
                         padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontWeight: 600,
@@ -87,7 +87,7 @@ export default function EvolutionCentral() {
             {evolutionMode === 'standalone' && evolutionFields.length === 0 && (
                 <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: 16, marginBottom: 24, color: '#1e40af' }}>
                     <strong>Dica:</strong> Você ativou o modo de fotos avulsas, mas não definiu campos personalizados (ex: Frente, Costas). 
-                    <button onClick={() => navigate('/account/profile')} style={{ background: 'none', border: 'none', color: '#2563eb', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600, marginLeft: 4 }}>
+                    <button onClick={() => navigate('/account/profile#evolution-settings')} style={{ background: 'none', border: 'none', color: '#2563eb', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600, marginLeft: 4 }}>
                         Configurar agora
                     </button>
                 </div>
