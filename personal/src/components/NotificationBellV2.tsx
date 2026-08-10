@@ -3,6 +3,25 @@ import { Bell, AlertCircle, Clock, DollarSign, FileText, Dumbbell, X, MessageSqu
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { supabase } from '../lib/supabase'
+import { listStudentsByPersonal, type StudentRecord } from '../store/students'
+import { listPlans, type PlanRecord } from '../store/plans'
+import type { DebitRecord } from '../store/financial'
+
+function reportNotificationDebug(hypothesisId: string, msg: string, data: Record<string, unknown>) {
+    fetch('http://127.0.0.1:7777/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: 'personal-dashboard-slow-v2',
+            runId: 'pre-fix',
+            hypothesisId,
+            location: 'personal/src/components/NotificationBellV2.tsx',
+            msg: `[DEBUG] ${msg}`,
+            data,
+            ts: Date.now(),
+        }),
+    }).catch(() => {})
+}
 
 type PersonalNotification = {
     id: string
@@ -12,6 +31,119 @@ type PersonalNotification = {
     date: Date
     studentId?: string
     link?: string
+}
+
+const DAY_MS = 1000 * 60 * 60 * 24
+
+function getValidityDays(frequency: PlanRecord['frequency']) {
+    switch (frequency) {
+        case 'weekly':
+            return 7
+        case 'bimonthly':
+            return 60
+        case 'quarterly':
+            return 90
+        case 'semiannual':
+            return 180
+        case 'annual':
+            return 365
+        case 'monthly':
+        default:
+            return 30
+    }
+}
+
+function normalizeDate(dateValue: string | Date) {
+    const date = new Date(dateValue)
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function getFinancialReminder(
+    student: StudentRecord,
+    plan: PlanRecord | undefined,
+    payments: DebitRecord[],
+): PersonalNotification | null {
+    if (student.status !== 'ativo' || !plan || !student.planStartDate) return null
+
+    const planName = plan.name.toLowerCase()
+    const isFree = plan.price <= 0 || planName.includes('permuta') || planName.includes('gratuito')
+    if (isFree) return null
+
+    const today = normalizeDate(new Date())
+    const studentPayments = payments
+        .filter((payment) => payment.payerId === student.id)
+        .sort((a, b) => new Date(b.paidAt || b.dueDate).getTime() - new Date(a.paidAt || a.dueDate).getTime())
+
+    const lastPayment = studentPayments[0]
+    let dueDate: Date
+
+    if (!lastPayment) {
+        dueDate = normalizeDate(student.planStartDate)
+    } else {
+        dueDate = normalizeDate(lastPayment.paidAt || lastPayment.dueDate)
+        dueDate.setDate(dueDate.getDate() + getValidityDays(plan.frequency))
+    }
+
+    const daysRemaining = Math.ceil((dueDate.getTime() - today.getTime()) / DAY_MS)
+    const studentName = student.name || 'Aluno'
+
+    if (daysRemaining < 0) {
+        const daysOverdue = Math.abs(daysRemaining)
+        return {
+            id: `financial-overdue-${student.id}-${dueDate.toISOString()}`,
+            type: 'financial_overdue',
+            title: 'Pagamento em Atraso',
+            description: `${studentName} está em atraso há ${daysOverdue} ${daysOverdue === 1 ? 'dia' : 'dias'}.`,
+            date: dueDate,
+            studentId: student.id,
+            link: '/financial',
+        }
+    }
+
+    if (daysRemaining === 0) {
+        return {
+            id: `financial-due-today-${student.id}-${dueDate.toISOString()}`,
+            type: 'financial_due_soon',
+            title: 'Pagamento Vence Hoje',
+            description: `${studentName} vence hoje.`,
+            date: dueDate,
+            studentId: student.id,
+            link: '/financial',
+        }
+    }
+
+    if (daysRemaining >= 1 && daysRemaining <= 3) {
+        const reminderText =
+            daysRemaining === 1 ? 'vence amanhã' : `vence em ${daysRemaining} dias`
+
+        return {
+            id: `financial-due-soon-${student.id}-${dueDate.toISOString()}`,
+            type: 'financial_due_soon',
+            title: 'Lembrete de Pagamento',
+            description: `${studentName} ${reminderText}.`,
+            date: dueDate,
+            studentId: student.id,
+            link: '/financial',
+        }
+    }
+
+    return null
+}
+
+function getNotificationPriority(notification: PersonalNotification) {
+    if (notification.type === 'financial_overdue') return 0
+
+    if (notification.type === 'financial_due_soon') {
+        const today = normalizeDate(new Date())
+        const diffDays = Math.ceil((normalizeDate(notification.date).getTime() - today.getTime()) / DAY_MS)
+        if (diffDays === 0) return 1
+        if (diffDays === 1) return 2
+        if (diffDays === 2) return 3
+        if (diffDays === 3) return 4
+        return 5
+    }
+
+    return 10
 }
 
 export default function NotificationBellV2() {
@@ -35,6 +167,12 @@ export default function NotificationBellV2() {
 
     useEffect(() => {
         const fetchNotifications = async () => {
+            const fetchStartedAt = performance.now()
+            // #region debug-point D:notification-start
+            reportNotificationDebug('D', 'Notification fetch started', {
+                hasHookUser: Boolean(user),
+            })
+            // #endregion
             let currentUser = user
             
             // Fallback se o hook falhar
@@ -44,6 +182,11 @@ export default function NotificationBellV2() {
             }
 
             if (!currentUser) {
+                // #region debug-point D:notification-no-user
+                reportNotificationDebug('D', 'Notification fetch skipped without user', {
+                    durationMs: Math.round(performance.now() - fetchStartedAt),
+                })
+                // #endregion
                 return
             }
 
@@ -56,24 +199,25 @@ export default function NotificationBellV2() {
                 recentLimit.setDate(recentLimit.getDate() - 30) // 30 dias de histórico
                 const recentLimitStr = recentLimit.toISOString()
 
+                const paidStart = new Date()
+                paidStart.setDate(paidStart.getDate() - 400)
+
                 const [
+                    students,
+                    plans,
                     { data: paidDebits },
-                    { data: pendingDebits },
                     { data: answers },
                     { data: expiredAnamnesis },
                     { data: sysNotifications },
                 ] = await Promise.all([
+                    listStudentsByPersonal(currentUser.id),
+                    listPlans(currentUser.id),
                     supabase
                         .from('debits')
-                        .select('id, amount, paid_at, payer_id') 
+                        .select('id, amount, paid_at, due_date, payer_id, receiver_id, status, description, saas_ref_month')
                         .eq('receiver_id', currentUser.id)
                         .eq('status', 'paid')
-                        .gte('paid_at', recentLimitStr),
-                    supabase
-                        .from('debits')
-                        .select('id, amount, due_date, payer_id')
-                        .eq('receiver_id', currentUser.id)
-                        .eq('status', 'pending'),
+                        .gte('paid_at', paidStart.toISOString()),
                     supabase
                         .from('protocols')
                         .select('id, title, created_at, student_id')
@@ -92,11 +236,22 @@ export default function NotificationBellV2() {
                         .eq('user_id', currentUser.id)
                         .gte('created_at', recentLimitStr),
                 ])
+                // #region debug-point D:notification-queries-finished
+                reportNotificationDebug('D', 'Notification queries finished', {
+                    durationMs: Math.round(performance.now() - fetchStartedAt),
+                    studentsCount: students.length,
+                    plansCount: plans.length,
+                    paidDebitsCount: paidDebits?.length || 0,
+                    answersCount: answers?.length || 0,
+                    expiredAnamnesisCount: expiredAnamnesis?.length || 0,
+                    sysNotificationsCount: sysNotifications?.length || 0,
+                })
+                // #endregion
 
                 // COLETAR IDs PARA NOMES
                 const allStudentIds = new Set<string>()
+                students.forEach((student) => allStudentIds.add(student.id))
                 paidDebits?.forEach((d: any) => d.payer_id && allStudentIds.add(d.payer_id))
-                pendingDebits?.forEach((d: any) => d.payer_id && allStudentIds.add(d.payer_id))
                 answers?.forEach((a: any) => a.student_id && allStudentIds.add(a.student_id))
                 expiredAnamnesis?.forEach((a: any) => a.student_id && allStudentIds.add(a.student_id))
 
@@ -113,6 +268,26 @@ export default function NotificationBellV2() {
                 }
 
                 // PROCESSAR LISTAS
+
+                const planMap = new Map(plans.map((plan) => [plan.id, plan]))
+                const mappedPayments: DebitRecord[] = (paidDebits || []).map((d: any) => ({
+                    id: d.id,
+                    payerId: d.payer_id,
+                    receiverId: d.receiver_id,
+                    amount: Number(d.amount),
+                    description: d.description,
+                    dueDate: d.due_date,
+                    paidAt: d.paid_at,
+                    status: d.status,
+                    monthRef: d.saas_ref_month,
+                }))
+
+                students
+                    .filter((student) => student.status === 'ativo')
+                    .forEach((student) => {
+                        const financialReminder = getFinancialReminder(student, student.planId ? planMap.get(student.planId) : undefined, mappedPayments)
+                        if (financialReminder) list.push(financialReminder)
+                    })
                 
                 // Pagos
                 paidDebits?.forEach((d: any) => {
@@ -124,37 +299,6 @@ export default function NotificationBellV2() {
                         date: new Date(d.paid_at),
                         studentId: d.payer_id
                     })
-                })
-
-                // Pendentes
-                pendingDebits?.forEach((d: any) => {
-                    const name = profilesMap[d.payer_id] || 'Aluno'
-                    const dueParts = d.due_date.split('-').map(Number)
-                    const localDue = new Date(dueParts[0], dueParts[1]-1, dueParts[2])
-                    const diffTime = localDue.getTime() - new Date().setHours(0,0,0,0)
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-                    if (diffDays < 0) {
-                        list.push({
-                            id: `overdue-${d.id}`,
-                            type: 'financial_overdue',
-                            title: 'Pagamento Atrasado',
-                            description: `${name} - Venceu há ${Math.abs(diffDays)} dias`,
-                            date: localDue,
-                            studentId: d.payer_id,
-                            link: '/financial'
-                        })
-                    } else if (diffDays <= 3) {
-                        list.push({
-                            id: `due-${d.id}`,
-                            type: 'financial_due_soon',
-                            title: 'Vencimento Próximo',
-                            description: `${name} - Vence em ${diffDays === 0 ? 'hoje' : diffDays + ' dias'}`,
-                            date: localDue,
-                            studentId: d.payer_id,
-                            link: '/financial'
-                        })
-                    }
                 })
 
                 // Anamneses Respondidas
@@ -195,8 +339,21 @@ export default function NotificationBellV2() {
                     })
                 })
 
-                // ORDENAR: Mais recentes primeiro
-                list.sort((a, b) => b.date.getTime() - a.date.getTime())
+                // ORDENAR: financeiros prioritarios primeiro, restante por data mais recente
+                list.sort((a, b) => {
+                    const priorityDiff = getNotificationPriority(a) - getNotificationPriority(b)
+                    if (priorityDiff !== 0) return priorityDiff
+
+                    if (a.type === 'financial_overdue' && b.type === 'financial_overdue') {
+                        return a.date.getTime() - b.date.getTime()
+                    }
+
+                    if (a.type === 'financial_due_soon' && b.type === 'financial_due_soon') {
+                        return a.date.getTime() - b.date.getTime()
+                    }
+
+                    return b.date.getTime() - a.date.getTime()
+                })
 
                 setNotifications(list)
                 
@@ -205,8 +362,21 @@ export default function NotificationBellV2() {
                 const lastReadDate = lastReadStr ? new Date(lastReadStr) : new Date(0)
                 const unread = list.filter(n => n.date.getTime() > lastReadDate.getTime()).length
                 setUnreadCount(unread)
+                // #region debug-point D:notification-finished
+                reportNotificationDebug('D', 'Notification fetch finished', {
+                    durationMs: Math.round(performance.now() - fetchStartedAt),
+                    notificationsCount: list.length,
+                    unreadCount: unread,
+                })
+                // #endregion
 
             } catch (error) {
+                // #region debug-point D:notification-error
+                reportNotificationDebug('D', 'Notification fetch failed', {
+                    durationMs: Math.round(performance.now() - fetchStartedAt),
+                    error: error instanceof Error ? error.message : String(error),
+                })
+                // #endregion
                 console.error('Erro Fatal Notificações:', error)
             } finally {
                 setLoading(false)
