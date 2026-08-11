@@ -1,12 +1,60 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { countPendingAnamnesisReviews } from '../../lib/anamnesisReview'
 import { useNavigate } from 'react-router-dom'
 import type { StudentRecord } from '../../store/students'
 import type { PlanRecord } from '../../store/plans'
 import type { DebitRecord } from '../../store/financial'
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts'
+
+const OVERVIEW_DEBUG_ENABLED =
+  import.meta.env.DEV && import.meta.env.VITE_OVERVIEW_DEBUG === 'true'
+
+function reportOverviewDebug(hypothesisId: string, msg: string, data: Record<string, unknown>) {
+  if (!OVERVIEW_DEBUG_ENABLED) return
+
+  fetch('http://127.0.0.1:7777/event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: 'personal-dashboard-slow-v2',
+      runId: 'pre-fix',
+      hypothesisId,
+      location: 'personal/src/pages/Dashboard/Overview.tsx',
+      msg: `[DEBUG] ${msg}`,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {})
+}
+
+function trackOverviewQuery<T>(hypothesisId: string, queryName: string, promise: Promise<T>) {
+  const startedAt = performance.now()
+  return promise
+    .then((result) => {
+      let rowsCount: number | null = null
+      if (typeof result === 'object' && result !== null && 'data' in result) {
+        const data = (result as { data?: unknown }).data
+        if (Array.isArray(data)) rowsCount = data.length
+      }
+
+      reportOverviewDebug(hypothesisId, 'Overview query resolved', {
+        queryName,
+        durationMs: Math.round(performance.now() - startedAt),
+        rowsCount,
+      })
+
+      return result
+    })
+    .catch((error) => {
+      reportOverviewDebug(hypothesisId, 'Overview query failed', {
+        queryName,
+        durationMs: Math.round(performance.now() - startedAt),
+        error: error instanceof Error ? error.message : String(error),
+      })
+      throw error
+    })
+}
 
 function getMonthsToDistribute(frequency?: string | null) {
   switch (frequency) {
@@ -21,6 +69,14 @@ function getMonthsToDistribute(frequency?: string | null) {
     default:
       return 1
   }
+}
+
+type ActiveDashboardStudentRow = {
+  id: string
+  personal_id: string
+  created_at: string
+  plan_id: string | null
+  plan_start_date: string | null
 }
 
 export default function Overview() {
@@ -111,11 +167,19 @@ export default function Overview() {
 
   useEffect(() => {
     async function loadStats() {
+      const loadStartedAt = performance.now()
+      // #region debug-point A:overview-load-start
+      reportOverviewDebug('A', 'Overview load started', {
+        filters,
+      })
+      // #endregion
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
-            const [
+        const primaryQueriesStartedAt = performance.now()
+        const [
+            totalStudentsRes,
             studentsRes,
             plansRes,
             paymentsRes,
@@ -123,38 +187,53 @@ export default function Overview() {
             dietsInactiveRes,
             workoutsActiveRes,
             workoutsInactiveRes,
-            profileRes, // NOVO
+            profileRes,
             anamnesisModelsRes,
-            anamnesisRes // NOVO
+            anamnesisPendingQueueRes
         ] = await Promise.all([
-            supabase.from('profiles').select('id, personal_id, created_at, plan_id, due_day, data').eq('personal_id', user.id).eq('role', 'aluno'),
-            supabase.from('plans').select('id, frequency').eq('personal_id', user.id),
-            supabase.from('debits').select('id, payer_id, amount, due_date, paid_at').eq('receiver_id', user.id).eq('status', 'paid'),
-            supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active'),
-            supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active'),
-            supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').eq('status', 'active'),
-            supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').neq('status', 'active'),
-            supabase.from('profiles').select('data').eq('id', user.id).single(),
-            supabase.from('protocols').select('id, status, student_id').eq('personal_id', user.id).eq('type', 'anamnesis_model'),
-            supabase.from('protocols').select('id, student_id, created_at, data, renew_in_days').eq('personal_id', user.id).eq('type', 'anamnesis')
+            trackOverviewQuery('A', 'students-total', supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('role', 'aluno')),
+            trackOverviewQuery('A', 'students-active', supabase.from('personal_active_students_dashboard').select('id, personal_id, created_at, plan_id, plan_start_date').eq('personal_id', user.id)),
+            trackOverviewQuery('A', 'plans', supabase.from('plans').select('id, frequency').eq('personal_id', user.id)),
+            trackOverviewQuery('A', 'payments', supabase.from('debits').select('id, payer_id, amount, due_date, paid_at').eq('receiver_id', user.id).eq('status', 'paid')),
+            trackOverviewQuery('A', 'diets-active', supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active')),
+            trackOverviewQuery('A', 'diets-inactive', supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active')),
+            trackOverviewQuery('A', 'workouts-active', supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').eq('status', 'active')),
+            trackOverviewQuery('A', 'workouts-inactive', supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'workout').neq('status', 'active')),
+            trackOverviewQuery('A', 'profile', supabase.from('profiles').select('data').eq('id', user.id).single()),
+            trackOverviewQuery('B', 'anamnesis-models-count', supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'anamnesis_model')),
+            trackOverviewQuery('B', 'anamnesis-pending-queue', supabase.from('personal_active_anamnesis_review_queue').select('id', { count: 'exact', head: true }).eq('personal_id', user.id))
         ])
+        // #region debug-point A:overview-primary-finished
+        reportOverviewDebug('A', 'Overview queries finished', {
+          durationMs: Math.round(performance.now() - primaryQueriesStartedAt),
+          totalStudentsCount: totalStudentsRes.count || 0,
+          studentsCount: studentsRes.data?.length || 0,
+          plansCount: plansRes.data?.length || 0,
+          paymentsCount: paymentsRes.data?.length || 0,
+          dietsActiveCount: dietsActiveRes.count || 0,
+          dietsInactiveCount: dietsInactiveRes.count || 0,
+          workoutsActiveCount: workoutsActiveRes.count || 0,
+          workoutsInactiveCount: workoutsInactiveRes.count || 0,
+          anamnesisModelsCount: anamnesisModelsRes.count || 0,
+          anamnesisPendingQueueCount: anamnesisPendingQueueRes.count || 0,
+          showAnamnesisPending: profileRes.data?.data?.config?.anamnesisReviewRequired === true,
+        })
+        // #endregion
 
-        const studentsRaw = studentsRes.data || []
-        const students: StudentRecord[] = studentsRaw.map((d: any) => ({
+        const studentsRaw = (studentsRes.data || []) as ActiveDashboardStudentRow[]
+        const students: StudentRecord[] = studentsRaw.map((d) => ({
             id: d.id,
             personalId: d.personal_id,
             name: '',
             email: '',
-            status: d.data?.status || 'ativo',
+            status: 'ativo',
             createdAt: d.created_at,
-            planId: d.plan_id || d.data?.planId,
-            planStartDate: d.data?.planStartDate,
-            dueDay: d.due_day || d.data?.dueDay,
-            whatsapp: d.data?.whatsapp,
+            planId: d.plan_id || undefined,
+            planStartDate: d.plan_start_date || undefined,
         })) as any
 
-        const totalStudents = students.length
-        const activeStudentsList = students.filter(s => s.status !== 'inativo')
+        const totalStudents = totalStudentsRes.count || 0
+        const activeStudentsList = students
         const activeStudentIds = new Set(activeStudentsList.map(student => student.id))
         const activeStudentPlanById = new Map(activeStudentsList.map(student => [student.id, student.planId]))
         const activeStudents = activeStudentsList.length
@@ -165,14 +244,19 @@ export default function Overview() {
         const showAnamnesisPending = profileRes.data?.data?.config?.anamnesisReviewRequired === true
         
         if (showAnamnesisPending) {
-            const allModels = anamnesisModelsRes.data || []
-            const allResponses = anamnesisRes.data || []
-            pendingAnamnesisCount = countPendingAnamnesisReviews(
-              allResponses,
-              activeStudentIds,
-              allModels.length > 0
-            )
+            const hasModels = (anamnesisModelsRes.count || 0) > 0
+            pendingAnamnesisCount = hasModels ? (anamnesisPendingQueueRes.count || 0) : 0
         }
+        // #region debug-point B:anamnesis-count
+        reportOverviewDebug('B', 'Anamnesis pending computed', {
+          showAnamnesisPending,
+          activeStudentsCount: activeStudentsList.length,
+          activeStudentIdsCount: activeStudentIds.size,
+          anamnesisModelsCount: anamnesisModelsRes.count || 0,
+          anamnesisPendingQueueCount: anamnesisPendingQueueRes.count || 0,
+          pendingAnamnesisCount,
+        })
+        // #endregion
 
         const plans = (plansRes.data || []) as PlanRecord[]
         const planFrequencyById = new Map(plans.map(plan => [plan.id, plan.frequency]))
@@ -313,8 +397,27 @@ export default function Overview() {
           pendingAnamnesis: pendingAnamnesisCount,
           showAnamnesisPending
         })
+        // #region debug-point C:overview-finished
+        reportOverviewDebug('C', 'Overview load finished', {
+          durationMs: Math.round(performance.now() - loadStartedAt),
+          totalStudents,
+          activeStudents,
+          inactiveStudents,
+          pendingFinanceCount,
+          pendingAnamnesisCount,
+          monthlyRevenue: Math.round(monthlyRevenue),
+          monthlyCash: Math.round(monthlyCash),
+          chartPaymentsCount: allPayments.length,
+        })
+        // #endregion
 
       } catch (error) {
+        // #region debug-point D:overview-error
+        reportOverviewDebug('D', 'Overview load failed', {
+          durationMs: Math.round(performance.now() - loadStartedAt),
+          error: error instanceof Error ? error.message : String(error),
+        })
+        // #endregion
         console.error('Erro ao carregar dashboard:', error)
         setStats(prev => ({ ...prev, loading: false }))
       }
