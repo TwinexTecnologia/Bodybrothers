@@ -1,18 +1,96 @@
-import { useEffect, useState } from 'react'
-import { listStudentsByPersonal, toggleStudentActive, getStudentsWeeklyFrequency, type StudentRecord } from '../../store/students'
+import { useEffect, useMemo, useState } from 'react'
+import { toggleStudentActive, getStudentsWeeklyFrequency, type StudentRecord } from '../../store/students'
 import { listPlans, type PlanRecord } from '../../store/plans'
-import { listActiveWorkouts, type WorkoutRecord } from '../../store/workouts'
-import { listAllAnamnesis, listResponsesByPersonal, type AnamnesisModel, type AnamnesisResponse } from '../../store/anamnesis'
-import { listAllDietsByPersonal, type DietRecord } from '../../store/diets'
-import { listRecentPayments, type DebitRecord } from '../../store/financial'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
-import { MessageSquare, BarChart2, ClipboardList } from 'lucide-react'
+import { MessageSquare, ClipboardList } from 'lucide-react'
 import StudentFeedbackModal from '../../components/StudentFeedbackModal'
 import StudentAnamnesisModal from '../../components/StudentAnamnesisModal'
 
+type StudentListViewRow = {
+  id: string
+  personal_id: string
+  full_name: string | null
+  email: string | null
+  created_at: string
+  status: 'ativo' | 'inativo'
+  last_access: string | null
+  address: StudentRecord['address'] | null
+  plan_id: string | null
+  plan_start_date: string | null
+  diet_ids: string[] | null
+  avatar_url: string | null
+}
+
+type WorkoutListRow = {
+  id: string
+  student_id: string | null
+  title: string | null
+}
+
+type DietListRow = {
+  id: string
+  student_id: string | null
+  title: string | null
+}
+
+type AnamnesisModelRow = {
+  student_id: string | null
+  ends_at: string | null
+}
+
+type LatestAnamnesisResponseRow = {
+  student_id: string | null
+  created_at: string
+  reviewed_at: string | null
+  renew_in_days: number | null
+}
+
+type PaymentSummaryRow = {
+  payer_id: string
+  due_date: string
+  paid_at: string | null
+}
+
+type FinancialStatus = {
+  status: 'none' | 'paid' | 'pending' | 'warning' | 'overdue'
+  label: string
+  color: string
+  bg: string
+  daysDiff: number | null
+}
+
+type AnamnesisStatus = {
+  status: 'pending' | 'ok' | 'warning' | 'overdue' | 'none' | 'error'
+  label: string
+  color: string
+  fontWeight: number
+}
+
+function getValidityDays(frequency: PlanRecord['frequency']) {
+  switch (frequency) {
+    case 'weekly': return 7
+    case 'monthly': return 30
+    case 'bimonthly': return 60
+    case 'quarterly': return 90
+    case 'semiannual': return 180
+    case 'annual': return 365
+    default: return 30
+  }
+}
+
+function getPaymentsStartDate() {
+  const date = new Date()
+  date.setMonth(date.getMonth() - 12)
+  return date.toISOString().split('T')[0]
+}
+
 // Helper de Status Financeiro (Baseado em Validade Real)
-const getFinancialStatus = (student: StudentRecord, plan: PlanRecord | undefined, payments: DebitRecord[]) => {
+const getFinancialStatus = (
+  student: StudentRecord,
+  plan: PlanRecord | undefined,
+  lastPayment?: PaymentSummaryRow
+): FinancialStatus => {
     if (!plan || !student.planStartDate) return { status: 'none', label: '—', color: '#9ca3af', bg: 'transparent', daysDiff: null }
     
     // Verifica Gratuidade/Permuta
@@ -22,12 +100,6 @@ const getFinancialStatus = (student: StudentRecord, plan: PlanRecord | undefined
     }
 
     // 1. Pega último pagamento
-    const myPayments = payments.filter(p => p.payerId === student.id).sort((a, b) => {
-        const dateA = new Date(a.paidAt || a.dueDate || 0).getTime()
-        const dateB = new Date(b.paidAt || b.dueDate || 0).getTime()
-        return dateB - dateA
-    })
-    const lastPayment = myPayments[0]
     const now = new Date()
 
     // 2. Se nunca pagou
@@ -43,17 +115,8 @@ const getFinancialStatus = (student: StudentRecord, plan: PlanRecord | undefined
     }
 
     // 3. Calcula validade
-    let validityDays = 30
-    switch (plan.frequency) {
-        case 'weekly': validityDays = 7; break
-        case 'monthly': validityDays = 30; break
-        case 'bimonthly': validityDays = 60; break
-        case 'quarterly': validityDays = 90; break
-        case 'semiannual': validityDays = 180; break
-        case 'annual': validityDays = 365; break
-    }
-
-    const refDate = new Date(lastPayment.paidAt || lastPayment.dueDate || 0)
+    const validityDays = getValidityDays(plan.frequency)
+    const refDate = new Date(lastPayment.paid_at || lastPayment.due_date || 0)
     const validUntil = new Date(refDate)
     validUntil.setDate(validUntil.getDate() + validityDays)
 
@@ -74,38 +137,22 @@ const getFinancialStatus = (student: StudentRecord, plan: PlanRecord | undefined
     }
 }
 
-const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], allResponses: AnamnesisResponse[]) => {
-    const studentAnamneses = allAnamneses.filter(a => a.studentId === studentId)
-    
-    if (studentAnamneses.length === 0) return { status: 'pending', label: 'Pendente', color: '#9ca3af', fontWeight: 400 }
+const getAnamnesisStatus = (
+  nearestValidUntil: string | null | undefined,
+  latestResponse?: LatestAnamnesisResponseRow
+): AnamnesisStatus => {
+    if (!nearestValidUntil) return { status: 'pending', label: 'Pendente', color: '#9ca3af', fontWeight: 400 }
 
     try {
-        // Pega o modelo mais recente (para saber a validade padrão se precisar)
-        const sorted = studentAnamneses.sort((a, b) => {
-            const da = a.validUntil ? new Date(a.validUntil).getTime() : Infinity
-            const db = b.validUntil ? new Date(b.validUntil).getTime() : Infinity
-            return da - db
-        })
-        const nearest = sorted[0]
-        
-        // CORREÇÃO: Busca a última resposta do aluno INDEPENDENTE DO MODELO ATIVO
-        const studentResponses = allResponses
-            .filter(r => r.studentId === studentId)
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-            
-        const lastResponse = studentResponses[0]
-
         // LÓGICA HÍBRIDA: Manual (Check) vs Automática (Mensal)
-        if (lastResponse) {
-                const data = lastResponse.data || lastResponse.content || {}
-                
+        if (latestResponse) {
                 // CASO 1: Personal revisou e definiu dias manualmente (renew_in_days existe)
-                if (data.renew_in_days && data.reviewed_at) {
-                    const reviewDate = new Date(data.reviewed_at)
+                if (latestResponse.renew_in_days && latestResponse.reviewed_at) {
+                    const reviewDate = new Date(latestResponse.reviewed_at)
                     // Normaliza para dia UTC ou Local? Vamos usar Local para garantir consistência visual
                     const reviewLocal = new Date(reviewDate.getFullYear(), reviewDate.getMonth(), reviewDate.getDate())
                     
-                    const daysToAdd = parseInt(data.renew_in_days)
+                    const daysToAdd = latestResponse.renew_in_days
                     
                     const dueDate = new Date(reviewLocal)
                     dueDate.setDate(dueDate.getDate() + daysToAdd)
@@ -125,8 +172,8 @@ const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], a
                 }
 
                 // CASO 2: Lógica Automática (Projeção Mensal baseada na data original DO MODELO ATIVO)
-                if (nearest && nearest.validUntil) {
-                    const validDate = new Date(nearest.validUntil)
+                if (nearestValidUntil) {
+                    const validDate = new Date(nearestValidUntil)
                     if (!isNaN(validDate.getTime())) {
                         const now = new Date()
                         now.setHours(0, 0, 0, 0)
@@ -148,8 +195,8 @@ const getAnamnesisStatus = (studentId: string, allAnamneses: AnamnesisModel[], a
         }
         
         // Sem resposta ainda
-        if (nearest && nearest.validUntil) {
-            const validDate = new Date(nearest.validUntil)
+        if (nearestValidUntil) {
+            const validDate = new Date(nearestValidUntil)
             if (!isNaN(validDate.getTime())) {
                 const now = new Date()
                 now.setHours(0, 0, 0, 0)
@@ -175,11 +222,11 @@ export default function ListStudents() {
   const navigate = useNavigate()
   const [students, setStudents] = useState<StudentRecord[]>([])
   const [plans, setPlans] = useState<PlanRecord[]>([])
-  const [workouts, setWorkouts] = useState<WorkoutRecord[]>([])
-  const [diets, setDiets] = useState<DietRecord[]>([])
-  const [anamneses, setAnamneses] = useState<AnamnesisModel[]>([])
-  const [responses, setResponses] = useState<AnamnesisResponse[]>([])
-  const [payments, setPayments] = useState<DebitRecord[]>([])
+  const [workouts, setWorkouts] = useState<WorkoutListRow[]>([])
+  const [diets, setDiets] = useState<DietListRow[]>([])
+  const [anamneses, setAnamneses] = useState<AnamnesisModelRow[]>([])
+  const [responses, setResponses] = useState<LatestAnamnesisResponseRow[]>([])
+  const [payments, setPayments] = useState<PaymentSummaryRow[]>([])
   const [frequencies, setFrequencies] = useState<Record<string, number>>({})
   const [selectedStudentForFeedback, setSelectedStudentForFeedback] = useState<StudentRecord | null>(null)
   const [selectedStudentForAnamnesis, setSelectedStudentForAnamnesis] = useState<StudentRecord | null>(null)
@@ -205,7 +252,28 @@ export default function ListStudents() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         // 1. Carrega Alunos PRIMEIRO
-        const s = await listStudentsByPersonal(user.id)
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('personal_students_list_view')
+          .select('id, personal_id, full_name, email, created_at, status, last_access, address, plan_id, plan_start_date, diet_ids, avatar_url')
+          .eq('personal_id', user.id)
+          .order('full_name')
+
+        if (studentsError) throw studentsError
+
+        const s = ((studentsData || []) as StudentListViewRow[]).map((row) => ({
+          id: row.id,
+          personalId: row.personal_id,
+          name: row.full_name || '',
+          email: row.email || '',
+          status: row.status === 'inativo' ? 'inativo' : 'ativo',
+          createdAt: row.created_at,
+          lastAccess: row.last_access || undefined,
+          address: row.address || undefined,
+          planId: row.plan_id || undefined,
+          planStartDate: row.plan_start_date || undefined,
+          dietIds: row.diet_ids || undefined,
+          avatarUrl: row.avatar_url || undefined,
+        }))
         console.log('Alunos carregados:', s.length)
         setStudents(s)
         
@@ -220,19 +288,45 @@ export default function ListStudents() {
         // 2. Carrega detalhes em segundo plano
         Promise.all([
             listPlans(user.id),
-            listActiveWorkouts(user.id),
-            listAllAnamnesis(user.id),
-            listResponsesByPersonal(user.id),
-            listAllDietsByPersonal(user.id),
-            listRecentPayments(user.id)
-        ]).then(([p, w, a, r, d, pay]) => {
+            supabase
+              .from('protocols')
+              .select('id, student_id, title')
+              .eq('personal_id', user.id)
+              .eq('type', 'workout')
+              .eq('status', 'active')
+              .not('student_id', 'is', null),
+            supabase
+              .from('protocols')
+              .select('student_id, ends_at')
+              .eq('personal_id', user.id)
+              .eq('type', 'anamnesis_model')
+              .not('student_id', 'is', null),
+            supabase
+              .from('personal_latest_anamnesis_response_summary')
+              .select('student_id, created_at, reviewed_at, renew_in_days')
+              .eq('personal_id', user.id),
+            supabase
+              .from('protocols')
+              .select('id, student_id, title')
+              .eq('personal_id', user.id)
+              .eq('type', 'diet')
+              .eq('status', 'active')
+              .not('student_id', 'is', null),
+            supabase
+              .from('debits')
+              .select('payer_id, due_date, paid_at')
+              .eq('receiver_id', user.id)
+              .eq('status', 'paid')
+              .gte('paid_at', getPaymentsStartDate())
+              .order('paid_at', { ascending: false })
+        ]).then(([p, workoutsRes, anamnesesRes, responsesRes, dietsRes, paymentsRes]) => {
             console.log('Detalhes carregados em background')
             setPlans(p)
-            setWorkouts(w)
-            setAnamneses(a)
-            setResponses(r)
-            setDiets(d)
-            setPayments(pay)
+            setWorkouts(((workoutsRes.data || []) as WorkoutListRow[]))
+            setAnamneses(((anamnesesRes.data || []) as AnamnesisModelRow[]))
+            setResponses(((responsesRes.data || []) as LatestAnamnesisResponseRow[]))
+            setDiets(((dietsRes.data || []) as DietListRow[]))
+            setPayments(((paymentsRes.data || []) as PaymentSummaryRow[]))
         }).catch(err => console.error('Erro carregando detalhes:', err))
       } else {
           clearTimeout(timer)
@@ -249,14 +343,115 @@ export default function ListStudents() {
     loadData()
   }, [])
 
+  const plansById = useMemo(() => {
+    return new Map(plans.map(plan => [plan.id, plan]))
+  }, [plans])
+
+  const latestPaymentByStudentId = useMemo(() => {
+    const map = new Map<string, PaymentSummaryRow>()
+    for (const payment of payments) {
+      if (!map.has(payment.payer_id)) {
+        map.set(payment.payer_id, payment)
+      }
+    }
+    return map
+  }, [payments])
+
+  const workoutsTextByStudentId = useMemo(() => {
+    const map = new Map<string, string[]>()
+    workouts.forEach((workout) => {
+      if (!workout.student_id) return
+      const current = map.get(workout.student_id) || []
+      if (workout.title) current.push(workout.title)
+      map.set(workout.student_id, current)
+    })
+    return map
+  }, [workouts])
+
+  const personalDietNamesByStudentId = useMemo(() => {
+    const map = new Map<string, string[]>()
+    diets.forEach((diet) => {
+      if (!diet.student_id) return
+      const current = map.get(diet.student_id) || []
+      if (diet.title) current.push(diet.title)
+      map.set(diet.student_id, current)
+    })
+    return map
+  }, [diets])
+
+  const dietNameById = useMemo(() => {
+    return new Map(diets.map(diet => [diet.id, diet.title || '']))
+  }, [diets])
+
+  const nearestAnamnesisValidUntilByStudentId = useMemo(() => {
+    const map = new Map<string, string>()
+    anamneses.forEach((anamnesis) => {
+      if (!anamnesis.student_id || !anamnesis.ends_at) return
+      const current = map.get(anamnesis.student_id)
+      if (!current || new Date(anamnesis.ends_at).getTime() < new Date(current).getTime()) {
+        map.set(anamnesis.student_id, anamnesis.ends_at)
+      }
+    })
+    return map
+  }, [anamneses])
+
+  const latestAnamnesisResponseByStudentId = useMemo(() => {
+    const map = new Map<string, LatestAnamnesisResponseRow>()
+    responses.forEach((response) => {
+      if (response.student_id) {
+        map.set(response.student_id, response)
+      }
+    })
+    return map
+  }, [responses])
+
+  const financialStatusByStudentId = useMemo(() => {
+    const map = new Map<string, FinancialStatus>()
+    students.forEach((student) => {
+      map.set(
+        student.id,
+        getFinancialStatus(student, plansById.get(student.planId || ''), latestPaymentByStudentId.get(student.id))
+      )
+    })
+    return map
+  }, [students, plansById, latestPaymentByStudentId])
+
+  const anamnesisStatusByStudentId = useMemo(() => {
+    const map = new Map<string, AnamnesisStatus>()
+    students.forEach((student) => {
+      map.set(
+        student.id,
+        getAnamnesisStatus(
+          nearestAnamnesisValidUntilByStudentId.get(student.id),
+          latestAnamnesisResponseByStudentId.get(student.id)
+        )
+      )
+    })
+    return map
+  }, [students, nearestAnamnesisValidUntilByStudentId, latestAnamnesisResponseByStudentId])
+
+  const dietsTextByStudentId = useMemo(() => {
+    const map = new Map<string, string>()
+    students.forEach((student) => {
+      const directDiets = personalDietNamesByStudentId.get(student.id) || []
+      const linkedDiets = (student.dietIds || [])
+        .map(id => dietNameById.get(id))
+        .filter((name): name is string => !!name)
+
+      const uniqueNames = Array.from(new Set([...directDiets, ...linkedDiets]))
+      map.set(student.id, uniqueNames.length > 0 ? uniqueNames.join(', ') : 'Sem dietas')
+    })
+    return map
+  }, [students, personalDietNamesByStudentId, dietNameById])
+
   const handleToggle = async (s: StudentRecord) => {
       const ok = await toggleStudentActive(s.id, s.status === 'ativo' ? 'inativo' : 'ativo')
-      if (ok) {
+      if (ok.success) {
           setStudents(prev => prev.map(x => x.id === s.id ? { ...x, status: x.status === 'ativo' ? 'inativo' : 'ativo' } : x))
       }
   }
 
-  const filtered = students.filter(s => {
+  const filtered = useMemo(() => students.filter(s => {
     const q = query.toLowerCase()
     const addr = s.address ? `${s.address.street} ${s.address.number || ''} ${s.address.neighborhood || ''} ${s.address.city || ''} ${s.address.state || ''} ${s.address.cep || ''} ${s.address.complement || ''}`.toLowerCase() : ''
     const matchesQuery = s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q) || addr.includes(q)
@@ -270,13 +465,12 @@ export default function ListStudents() {
     if (planFilter !== 'all' && s.planId !== planFilter) return false
     
     // Financeiro
-    const plan = plans.find(p => p.id === s.planId)
-    const finStatus = getFinancialStatus(s, plan, payments).status
+    const finStatus = financialStatusByStudentId.get(s.id)?.status || 'none'
     if (financialFilter !== 'all' && finStatus !== financialFilter) return false
 
     // Anamnese
     if (anamnesisFilter !== 'all') {
-        const anamStatus = getAnamnesisStatus(s.id, anamneses, responses).status
+        const anamStatus = anamnesisStatusByStudentId.get(s.id)?.status || 'pending'
         // 'ok': ok, warning
         // 'pending': pending, overdue, error, none
         if (anamnesisFilter === 'ok') {
@@ -289,7 +483,16 @@ export default function ListStudents() {
     }
     
     return true
-  }).sort((a, b) => a.name.localeCompare(b.name))
+  }).sort((a, b) => a.name.localeCompare(b.name)), [
+    students,
+    query,
+    statusFilter,
+    planFilter,
+    financialFilter,
+    anamnesisFilter,
+    financialStatusByStudentId,
+    anamnesisStatusByStudentId,
+  ])
 
   const inputStyle = {
       padding: '10px 14px',
@@ -409,29 +612,23 @@ export default function ListStudents() {
                 
                 {filtered.map((s) => {
                 // Planos
-                const plan = plans.find(p => p.id === s.planId)
-                const finStatus = getFinancialStatus(s, plan, payments)
+                const plan = plansById.get(s.planId || '')
+                const finStatus = financialStatusByStudentId.get(s.id) || getFinancialStatus(s, plan)
                 
                 // Treinos Ativos
-                const studentWorkouts = workouts.filter(w => w.studentId === s.id && w.status === 'ativo')
-                const workoutsStr = studentWorkouts.length > 0 
-                    ? studentWorkouts.map(w => w.name).join(', ') 
+                const workoutNames = workoutsTextByStudentId.get(s.id) || []
+                const workoutsStr = workoutNames.length > 0
+                    ? workoutNames.join(', ')
                     : 'Sem treinos'
 
                 // Frequência
                 const freq = frequencies[s.id] || 0
                 
                 // Dietas
-                const studentPersonalDiets = diets.filter(d => d.studentId === s.id && d.status === 'ativa')
-                const linkedDiets = diets.filter(d => (s.dietIds || []).includes(d.id))
-                const allStudentDiets = [...studentPersonalDiets, ...linkedDiets]
-                const uniqueDiets = Array.from(new Set(allStudentDiets.map(d => d.id))).map(id => allStudentDiets.find(d => d.id === id)!)
-                const dietsStr = uniqueDiets.length > 0
-                    ? uniqueDiets.map(d => d.name).join(', ')
-                    : 'Sem dietas'
+                const dietsStr = dietsTextByStudentId.get(s.id) || 'Sem dietas'
 
                 // Anamnese
-                const anamData = getAnamnesisStatus(s.id, anamneses, responses)
+                const anamData = anamnesisStatusByStudentId.get(s.id) || getAnamnesisStatus(null)
                 
                 const isInactive = s.status === 'inativo'
 
