@@ -74,27 +74,6 @@ type DashboardPlanSummary = {
   id: string
   frequency: PlanRecord['frequency'] | null
   billingCycleDays: number
-function getMonthsToDistribute(frequency?: string | null) {
-  switch (frequency) {
-    case 'bimonthly':
-      return 2
-    case 'quarterly':
-      return 3
-    case 'semiannual':
-      return 6
-    case 'annual':
-      return 12
-    default:
-      return 1
-  }
-}
-
-type ActiveDashboardStudentRow = {
-  id: string
-  personal_id: string
-  created_at: string
-  plan_id: string | null
-  plan_start_date: string | null
 }
 
 type OverviewFilters = {
