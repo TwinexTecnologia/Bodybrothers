@@ -7,8 +7,9 @@ import { listActiveDiets, type DietRecord, listStudentDiets, duplicateDiet, upda
 import { listActiveWorkouts, duplicateWorkout, updateWorkout, setWorkoutStatus, type WorkoutRecord } from '../../store/workouts'
 import { listLibraryModels, listStudentModels, duplicateModel, updateModel, deleteModel, type AnamnesisModel } from '../../store/anamnesis'
 import { listPlans, type PlanRecord } from '../../store/plans'
-import { listAllStudentPayments } from '../../store/financial'
+import { listAllStudentPayments, registerPayment } from '../../store/financial'
 import { isStudentOverdue } from '../../lib/finance_utils'
+import { getCurrentBillingDueDate } from '../../lib/planBilling'
 import Modal from '../../components/Modal'
 import { supabase } from '../../lib/supabase'
 import { generateDietPdf } from '../../lib/pdf'
@@ -97,6 +98,7 @@ export default function EditStudent() {
   })
   const [checkingFinancial, setCheckingFinancial] = useState(false)
   const [blockModalOpen, setBlockModalOpen] = useState(false)
+  const [registeringManualPayment, setRegisteringManualPayment] = useState(false)
   const [searchTerm, setSearchTerm] = useState('') // Estado para busca
 
   // Filtros
@@ -168,6 +170,14 @@ export default function EditStudent() {
           .map(a => ({ id: a.id, label: `📚 ${a.name}` }))
           .sort((a, b) => a.label.localeCompare(b.label))
   }, [libraryAnamnesis])
+
+  const selectedStudent = useMemo(() => {
+      return students.find(student => student.id === selectedId) || null
+  }, [students, selectedId])
+
+  const selectedPlan = useMemo(() => {
+      return plans.find(plan => plan.id === planId) || null
+  }, [plans, planId])
 
   useEffect(() => {
     async function load() {
@@ -410,6 +420,78 @@ export default function EditStudent() {
       
       setLibraryDietId('')
       setLoading(false)
+  }
+
+  const handleMarkCurrentCyclePaid = async () => {
+      if (!selectedId || !selectedStudent) {
+          setMsg('Selecione um aluno para registrar o pagamento.')
+          return
+      }
+
+      if (!selectedPlan) {
+          setMsg('Selecione um plano antes de marcar como pago.')
+          return
+      }
+
+      if (!planStartDate) {
+          setMsg('Informe a data de inicio do plano antes de marcar o pagamento.')
+          return
+      }
+
+      setRegisteringManualPayment(true)
+
+      try {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) {
+              throw new Error('Sessao expirada. Entre novamente para registrar o pagamento.')
+          }
+
+          const payments = await listAllStudentPayments(selectedId)
+          const sortedPayments = [...payments].sort((a, b) => {
+              const dateA = new Date(a.paidAt || a.dueDate).getTime()
+              const dateB = new Date(b.paidAt || b.dueDate).getTime()
+              return dateA - dateB
+          })
+          const lastPayment = sortedPayments[sortedPayments.length - 1]
+          const currentDueDate = getCurrentBillingDueDate(
+              planStartDate,
+              selectedPlan,
+              lastPayment ? (lastPayment.paidAt || lastPayment.dueDate) : null,
+          )
+
+          if (!currentDueDate) {
+              throw new Error('Nao foi possivel calcular o vencimento atual deste aluno.')
+          }
+
+          const dueDate = currentDueDate.toISOString().split('T')[0]
+          const alreadyPaid = payments.some(payment => payment.dueDate === dueDate && payment.status === 'paid')
+
+          if (alreadyPaid) {
+              setMsg('Este ciclo ja esta registrado como pago.')
+              return
+          }
+
+          const ok = await registerPayment({
+              personalId: user.id,
+              studentId: selectedId,
+              amount: selectedPlan.price,
+              dueDate,
+              refDate: currentDueDate,
+              description: `Pagamento manual - ${selectedPlan.name}`,
+          })
+
+          if (!ok) {
+              throw new Error('Nao foi possivel registrar o pagamento manual.')
+          }
+
+          setMsg('Pagamento do ciclo atual registrado com sucesso!')
+      } catch (error) {
+          console.error('Erro ao registrar pagamento manual:', error)
+          const message = error instanceof Error ? error.message : 'Nao foi possivel registrar o pagamento.'
+          setMsg(message)
+      } finally {
+          setRegisteringManualPayment(false)
+      }
   }
 
   const handleRemoveStudentDiet = async (did: string) => {
@@ -1123,6 +1205,27 @@ export default function EditStudent() {
                                     onChange={(e) => setPlanStartDate(e.target.value)} 
                                 />
                             </label>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <button
+                                type="button"
+                                className="btn"
+                                onClick={handleMarkCurrentCyclePaid}
+                                disabled={!selectedPlan || !planStartDate || registeringManualPayment}
+                                style={{
+                                    background: '#16a34a',
+                                    border: 'none',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 8,
+                                }}
+                            >
+                                {registeringManualPayment ? 'Registrando pagamento...' : 'Ja recebeu este ciclo'}
+                            </button>
+                            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                Registra manualmente o pagamento do ciclo atual quando o aluno ja pagou fora do sistema.
+                            </div>
                         </div>
                     </div>
                 </div>
