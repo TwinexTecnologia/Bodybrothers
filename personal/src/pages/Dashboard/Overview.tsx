@@ -82,18 +82,20 @@ type OverviewFilters = {
   month: string
 }
 
-
+export default function Overview() {
   const navigate = useNavigate()
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false,
+  )
   const [filters, setFilters] = useState<OverviewFilters>({
     year: new Date().getFullYear(),
-    month: 'all' // 'all' or '0', '1', ... '11'
+    month: 'all',
   })
 
   const [rawData, setRawData] = useState({
     students: [] as StudentRecord[],
     plans: [] as DashboardPlanSummary[],
-    payments: [] as DebitRecord[]
+    payments: [] as DebitRecord[],
   })
 
   const [stats, setStats] = useState({
