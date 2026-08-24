@@ -1,20 +1,19 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { getAnamnesisResponseData, isAnamnesisAwaitingReview } from '../../lib/anamnesisReview'
+import { getAnamnesisResponseData } from '../../lib/anamnesisReview'
 import { useNavigate } from 'react-router-dom'
 import { Toast, type ToastType } from '../../components/Toast'
 import { reviewAndReapplyAnamnesis } from '../../store/anamnesis'
-import type { StudentRecord } from '../../store/students'
 
 type PendingItem = {
-    student: StudentRecord;
+    student: AnamnesisStudent;
     status: 'expired';
     dueDate: string;
 }
 
 type ReviewItem = {
     id: string;
-    student: StudentRecord;
+    student: AnamnesisStudent;
     answeredAt: string;
     data: any;
 }
@@ -22,6 +21,38 @@ type ReviewItem = {
 type AnamnesisOption = {
     id: string;
     title: string;
+}
+
+type AnamnesisStudent = {
+    id: string;
+    name: string;
+    status: 'ativo' | 'inativo';
+}
+
+type LatestAnamnesisResponseRow = {
+    student_id: string;
+    created_at: string;
+    renew_in_days?: number | null;
+    reviewed_at?: string | null;
+}
+
+type AnamnesisReviewQueueRow = {
+    id: string;
+    student_id: string;
+    created_at: string;
+    renew_in_days?: number | null;
+    model_id?: string | null;
+    data?: unknown;
+}
+
+function chunkArray<T>(items: T[], chunkSize: number) {
+    const chunks: T[][] = []
+
+    for (let index = 0; index < items.length; index += chunkSize) {
+        chunks.push(items.slice(index, index + chunkSize))
+    }
+
+    return chunks
 }
 
 export default function AnamnesisPending() {
@@ -51,54 +82,33 @@ export default function AnamnesisPending() {
         try {
             const { data: { user } } = await supabase.auth.getUser()
             if (user) {
-                const [profileRes, studentsRes, modelsRes, responsesRes] = await Promise.all([
+                const [profileRes, studentsRes, modelsRes] = await Promise.all([
                     supabase
                         .from('profiles')
                         .select('data')
                         .eq('id', user.id)
                         .single(),
                     supabase
-                        .from('profiles')
-                        .select('id, personal_id, full_name, created_at, plan_id, due_day, data')
-                        .eq('personal_id', user.id)
-                        .eq('role', 'aluno'),
+                        .from('personal_active_students')
+                        .select('id, full_name')
+                        .eq('personal_id', user.id),
                     supabase
                         .from('protocols')
                         .select('id, title, status, student_id')
                         .eq('personal_id', user.id)
                         .eq('type', 'anamnesis_model'),
-                    supabase
-                        .from('protocols')
-                        .select('id, student_id, created_at, data, renew_in_days')
-                        .eq('personal_id', user.id)
-                        .eq('type', 'anamnesis')
                 ])
 
                 const reviewRequired = profileRes.data?.data?.config?.anamnesisReviewRequired === true
                 setIsReviewRequired(reviewRequired)
 
-                const students = ((studentsRes.data || []) as any[]).map((student): StudentRecord => ({
+                const students = ((studentsRes.data || []) as any[]).map((student): AnamnesisStudent => ({
                     id: student.id,
-                    personalId: student.personal_id,
                     name: student.full_name || '',
-                    email: student.data?.email || '',
-                    status: student.data?.status === 'inativo' ? 'inativo' : 'ativo',
-                    createdAt: student.created_at,
-                    lastAccess: student.data?.last_app_access_at,
-                    address: student.data?.address,
-                    planId: student.plan_id || student.data?.planId,
-                    planStartDate: student.data?.planStartDate,
-                    dueDay: student.due_day || student.data?.dueDay,
-                    workoutIds: student.data?.workoutIds,
-                    workoutSchedule: student.data?.workoutSchedule,
-                    dietIds: student.data?.dietIds,
-                    avatarUrl: student.data?.avatarUrl,
-                    tempPassword: student.data?.tempPassword,
-                    whatsapp: student.data?.whatsapp
+                    status: 'ativo',
                 }))
                 const allModels = modelsRes.data || []
-                const allResponses = responsesRes.data || []
-                const activeStudents = students.filter(s => s.status === 'ativo')
+                const activeStudents = students
                 const activeStudentsById = new Map(activeStudents.map(student => [student.id, student]))
                 const studentsWithLinkedModel = new Set(
                     allModels
@@ -126,84 +136,118 @@ export default function AnamnesisPending() {
                     }, {})
                 )
 
-                const responsesByStudentId = new Map<string, any[]>()
+                if (allModels.length === 0 || activeStudents.length === 0) {
+                    setPendingItems([])
+                    setReviewItems([])
+                    return
+                }
 
-                allResponses.forEach((response: any) => {
-                    const currentResponses = responsesByStudentId.get(response.student_id) || []
-                    currentResponses.push(response)
-                    responsesByStudentId.set(response.student_id, currentResponses)
-                })
-                
+                const linkedActiveStudentIds = activeStudents
+                    .map(student => student.id)
+                    .filter(studentId => studentsWithLinkedModel.has(studentId))
+
+                const latestStudentIdBatches = chunkArray(linkedActiveStudentIds, 100)
+                const reviewStudentIdBatches = chunkArray(activeStudents.map(student => student.id), 100)
+                const latestResponsesPromise = latestStudentIdBatches.length === 0
+                    ? Promise.resolve([])
+                    : Promise.all(
+                        latestStudentIdBatches.map(studentIds =>
+                            supabase
+                                .from('anamnesis_latest_responses')
+                                .select('student_id, created_at, renew_in_days, reviewed_at')
+                                .eq('personal_id', user.id)
+                                .in('student_id', studentIds)
+                        )
+                    )
+                const reviewQueuePromise = !reviewRequired || reviewStudentIdBatches.length === 0
+                    ? Promise.resolve([])
+                    : Promise.all(
+                        reviewStudentIdBatches.map(studentIds =>
+                            supabase
+                                .from('anamnesis_review_queue')
+                                .select('id, student_id, created_at, renew_in_days, model_id, data')
+                                .eq('personal_id', user.id)
+                                .in('student_id', studentIds)
+                                .order('created_at', { ascending: false })
+                        )
+                    )
+
+                const [latestResponseResults, reviewQueueResults] = await Promise.all([
+                    latestResponsesPromise,
+                    reviewQueuePromise,
+                ])
+
+                const latestResponseError = latestResponseResults.find(result => result.error)?.error
+                if (latestResponseError) throw latestResponseError
+
+                const reviewQueueError = reviewQueueResults.find(result => result.error)?.error
+                if (reviewQueueError) throw reviewQueueError
+
+                const latestResponses = latestResponseResults.flatMap(result => (result.data || []) as LatestAnamnesisResponseRow[])
+                const latestResponseByStudentId = new Map(
+                    latestResponses.map(response => [response.student_id, response])
+                )
                 const resultPending: PendingItem[] = []
-                const resultReview: ReviewItem[] = []
+                let resultReview: ReviewItem[] = []
                 const now = new Date()
 
-                // Se não tiver modelos, não tem pendência
-                if (allModels.length > 0) {
-                    if (reviewRequired) {
-                        allResponses.forEach((response: any) => {
-                            const student = activeStudentsById.get(response.student_id)
-                            if (!student) return
+                if (reviewRequired) {
+                    const reviewQueueRows = reviewQueueResults.flatMap(result => (result.data || []) as AnamnesisReviewQueueRow[])
+                    resultReview = reviewQueueRows.reduce<ReviewItem[]>((items, response) => {
+                        const student = activeStudentsById.get(response.student_id)
+                        if (!student) return items
 
-                            const respData = getAnamnesisResponseData(response)
-                            if (isAnamnesisAwaitingReview(response)) {
-                                resultReview.push({
-                                    id: response.id,
-                                    student,
-                                    answeredAt: response.created_at,
-                                    data: respData
-                                })
+                        const respData = getAnamnesisResponseData({ data: response.data })
+                        items.push({
+                            id: response.id,
+                            student,
+                            answeredAt: response.created_at,
+                            data: {
+                                ...respData,
+                                modelId: response.model_id || respData.modelId,
+                                renew_in_days: response.renew_in_days ?? respData.renew_in_days
                             }
                         })
-                    }
+                        return items
+                    }, [])
+                }
 
-                    activeStudents.forEach(student => {
-                        if (!studentsWithLinkedModel.has(student.id)) return
+                activeStudents.forEach(student => {
+                    if (!studentsWithLinkedModel.has(student.id)) return
 
-                        const studentResponses = (responsesByStudentId.get(student.id) || []).slice()
+                    const last = latestResponseByStudentId.get(student.id)
 
-                        if (studentResponses.length === 0) {
-                            return
-                        } else {
-                            studentResponses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                            const last = studentResponses[0]
+                    if (!last) {
+                        return
+                    } else {
+                        if (reviewRequired && !last.reviewed_at) return
+
+                        // Data base para cálculo de vencimento
+                        // Se reviewRequired = true, usa reviewed_at (se existir)
+                        // Se reviewRequired = false, usa created_at
+                        const baseDateStr = (reviewRequired && last.reviewed_at) 
+                            ? last.reviewed_at 
+                            : last.created_at
+                        
+                        const renewDays = last.renew_in_days || 90
+                        if (renewDays) {
+                            const baseDate = new Date(baseDateStr)
+                            const expireDate = new Date(baseDate.getTime() + (renewDays * 24 * 60 * 60 * 1000))
+                            expireDate.setHours(0, 0, 0, 0)
                             
-                            // Se reviewRequired, ignora data de criação e considera reviewed_at como base
-                            // MAS se ainda não foi revisada, ela cai na lista de cima (resultReview) e não aqui.
-                            // Se já foi revisada, usamos reviewed_at. Se não é required, usamos created_at.
-                            
-                            const lastData = getAnamnesisResponseData(last)
-                            
-                            const isPendingReview = reviewRequired && isAnamnesisAwaitingReview(last)
-                            if (isPendingReview) return 
+                            const nowZero = new Date(now)
+                            nowZero.setHours(0,0,0,0)
 
-                            // Data base para cálculo de vencimento
-                            // Se reviewRequired = true, usa reviewed_at (se existir)
-                            // Se reviewRequired = false, usa created_at
-                            const baseDateStr = (reviewRequired && lastData.reviewed_at) 
-                                ? lastData.reviewed_at 
-                                : last.created_at
-                            
-                            const renewDays = last.renew_in_days || 90
-                            if (renewDays) {
-                                const baseDate = new Date(baseDateStr)
-                                const expireDate = new Date(baseDate.getTime() + (renewDays * 24 * 60 * 60 * 1000))
-                                expireDate.setHours(0, 0, 0, 0)
-                                
-                                const nowZero = new Date(now)
-                                nowZero.setHours(0,0,0,0)
-
-                                if (expireDate <= nowZero) {
-                                    resultPending.push({
-                                        student,
-                                        status: 'expired',
-                                        dueDate: expireDate.toISOString()
-                                    })
-                                }
+                            if (expireDate <= nowZero) {
+                                resultPending.push({
+                                    student,
+                                    status: 'expired',
+                                    dueDate: expireDate.toISOString()
+                                })
                             }
                         }
-                    })
-                }
+                    }
+                })
 
                 setPendingItems(resultPending)
                 setReviewItems(resultReview.sort((a, b) => new Date(b.answeredAt).getTime() - new Date(a.answeredAt).getTime()))

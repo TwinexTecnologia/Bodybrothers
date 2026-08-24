@@ -56,7 +56,6 @@ function trackOverviewQuery<T>(hypothesisId: string, queryName: string, promise:
       throw error
     })
 }
-
 type ActiveDashboardStudentRow = {
   id: string
   personal_id: string
@@ -75,6 +74,27 @@ type DashboardPlanSummary = {
   id: string
   frequency: PlanRecord['frequency'] | null
   billingCycleDays: number
+function getMonthsToDistribute(frequency?: string | null) {
+  switch (frequency) {
+    case 'bimonthly':
+      return 2
+    case 'quarterly':
+      return 3
+    case 'semiannual':
+      return 6
+    case 'annual':
+      return 12
+    default:
+      return 1
+  }
+}
+
+type ActiveDashboardStudentRow = {
+  id: string
+  personal_id: string
+  created_at: string
+  plan_id: string | null
+  plan_start_date: string | null
 }
 
 export default function Overview() {
@@ -192,6 +212,7 @@ export default function Overview() {
             trackOverviewQuery('A', 'students-total', supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('role', 'aluno')),
             trackOverviewQuery('A', 'students-active', supabase.from('personal_active_students_dashboard').select('id, personal_id, created_at, plan_id, plan_start_date').eq('personal_id', user.id)),
             trackOverviewQuery('A', 'plans', supabase.from('plans').select('id, frequency, billing_cycle_days').eq('personal_id', user.id)),
+            trackOverviewQuery('A', 'plans', supabase.from('plans').select('id, frequency').eq('personal_id', user.id)),
             trackOverviewQuery('A', 'payments', supabase.from('debits').select('id, payer_id, amount, due_date, paid_at').eq('receiver_id', user.id).eq('status', 'paid')),
             trackOverviewQuery('A', 'diets-active', supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active')),
             trackOverviewQuery('A', 'diets-inactive', supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active')),

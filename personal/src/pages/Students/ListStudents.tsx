@@ -74,6 +74,84 @@ function getPaymentsStartDate() {
   return date.toISOString().split('T')[0]
 }
 
+type StudentListViewRow = {
+  id: string
+  personal_id: string
+  full_name: string | null
+  email: string | null
+  created_at: string
+  status: 'ativo' | 'inativo'
+  last_access: string | null
+  address: StudentRecord['address'] | null
+  plan_id: string | null
+  plan_start_date: string | null
+  diet_ids: string[] | null
+  avatar_url: string | null
+}
+
+type WorkoutListRow = {
+  id: string
+  student_id: string | null
+  title: string | null
+}
+
+type DietListRow = {
+  id: string
+  student_id: string | null
+  title: string | null
+}
+
+type AnamnesisModelRow = {
+  student_id: string | null
+  ends_at: string | null
+}
+
+type LatestAnamnesisResponseRow = {
+  student_id: string | null
+  created_at: string
+  reviewed_at: string | null
+  renew_in_days: number | null
+}
+
+type PaymentSummaryRow = {
+  payer_id: string
+  due_date: string
+  paid_at: string | null
+}
+
+type FinancialStatus = {
+  status: 'none' | 'paid' | 'pending' | 'warning' | 'overdue'
+  label: string
+  color: string
+  bg: string
+  daysDiff: number | null
+}
+
+type AnamnesisStatus = {
+  status: 'pending' | 'ok' | 'warning' | 'overdue' | 'none' | 'error'
+  label: string
+  color: string
+  fontWeight: number
+}
+
+function getValidityDays(frequency: PlanRecord['frequency']) {
+  switch (frequency) {
+    case 'weekly': return 7
+    case 'monthly': return 30
+    case 'bimonthly': return 60
+    case 'quarterly': return 90
+    case 'semiannual': return 180
+    case 'annual': return 365
+    default: return 30
+  }
+}
+
+function getPaymentsStartDate() {
+  const date = new Date()
+  date.setMonth(date.getMonth() - 12)
+  return date.toISOString().split('T')[0]
+}
+
 // Helper de Status Financeiro (Baseado em Validade Real)
 const getFinancialStatus = (
   student: StudentRecord,
@@ -87,13 +165,14 @@ const getFinancialStatus = (
     if (isFree) {
         return { status: 'paid', label: 'ISENTO', color: '#10b981', bg: '#dcfce7', daysDiff: null }
     }
-
     const today = normalizeDate(new Date())
     const dueDate = getCurrentBillingDueDate(
       student.planStartDate,
       plan,
       lastPayment ? (lastPayment.paid_at || lastPayment.due_date) : null
     )
+    // 1. Pega último pagamento
+    const now = new Date()
 
     if (!dueDate) return { status: 'none', label: '—', color: '#9ca3af', bg: 'transparent', daysDiff: null }
 
@@ -113,6 +192,11 @@ const getFinancialStatus = (
         if (daysRemaining <= 5) return { status: 'warning', label: 'INICIO LOGO', color: '#f59e0b', bg: '#fffbeb', daysDiff: daysRemaining }
         return { status: 'paid', label: 'PROGRAMADO', color: '#166534', bg: '#dcfce7', daysDiff: daysRemaining }
     }
+    // 3. Calcula validade
+    const validityDays = getValidityDays(plan.frequency)
+    const refDate = new Date(lastPayment.paid_at || lastPayment.due_date || 0)
+    const validUntil = new Date(refDate)
+    validUntil.setDate(validUntil.getDate() + validityDays)
 
     if (daysRemaining === 0) {
         return { status: 'warning', label: 'VENCE HOJE', color: '#f59e0b', bg: '#fffbeb', daysDiff: 0 }
