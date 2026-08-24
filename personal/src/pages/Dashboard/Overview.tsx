@@ -82,7 +82,7 @@ type OverviewFilters = {
   month: string
 }
 
-export default function Overview() {
+
   const navigate = useNavigate()
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
   const [filters, setFilters] = useState<OverviewFilters>({
