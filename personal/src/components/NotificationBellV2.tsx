@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { listStudentsByPersonal, type StudentRecord } from '../store/students'
 import { listPlans, type PlanRecord } from '../store/plans'
 import type { DebitRecord } from '../store/financial'
+import { getCurrentBillingDueDate, normalizeDate } from '../lib/planBilling'
 
 function reportNotificationDebug(hypothesisId: string, msg: string, data: Record<string, unknown>) {
     fetch('http://127.0.0.1:7777/event', {
@@ -35,29 +36,6 @@ type PersonalNotification = {
 
 const DAY_MS = 1000 * 60 * 60 * 24
 
-function getValidityDays(frequency: PlanRecord['frequency']) {
-    switch (frequency) {
-        case 'weekly':
-            return 7
-        case 'bimonthly':
-            return 60
-        case 'quarterly':
-            return 90
-        case 'semiannual':
-            return 180
-        case 'annual':
-            return 365
-        case 'monthly':
-        default:
-            return 30
-    }
-}
-
-function normalizeDate(dateValue: string | Date) {
-    const date = new Date(dateValue)
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
 function getFinancialReminder(
     student: StudentRecord,
     plan: PlanRecord | undefined,
@@ -75,19 +53,17 @@ function getFinancialReminder(
         .sort((a, b) => new Date(b.paidAt || b.dueDate).getTime() - new Date(a.paidAt || a.dueDate).getTime())
 
     const lastPayment = studentPayments[0]
-    let dueDate: Date
+    const dueDate = getCurrentBillingDueDate(
+        student.planStartDate,
+        plan,
+        lastPayment ? (lastPayment.paidAt || lastPayment.dueDate) : null,
+    )
+    if (!dueDate) return null
 
-    if (!lastPayment) {
-        dueDate = normalizeDate(student.planStartDate)
-    } else {
-        dueDate = normalizeDate(lastPayment.paidAt || lastPayment.dueDate)
-        dueDate.setDate(dueDate.getDate() + getValidityDays(plan.frequency))
-    }
-
-    const daysRemaining = Math.ceil((dueDate.getTime() - today.getTime()) / DAY_MS)
+    const daysRemaining = Math.round((dueDate.getTime() - today.getTime()) / DAY_MS)
     const studentName = student.name || 'Aluno'
 
-    if (daysRemaining < 0) {
+    if (daysRemaining < -3) {
         const daysOverdue = Math.abs(daysRemaining)
         return {
             id: `financial-overdue-${student.id}-${dueDate.toISOString()}`,
@@ -100,12 +76,12 @@ function getFinancialReminder(
         }
     }
 
-    if (daysRemaining === 0) {
+    if (daysRemaining >= -3 && daysRemaining <= 0) {
         return {
             id: `financial-due-today-${student.id}-${dueDate.toISOString()}`,
             type: 'financial_due_soon',
-            title: 'Pagamento Vence Hoje',
-            description: `${studentName} vence hoje.`,
+            title: daysRemaining === 0 ? 'Pagamento Vence Hoje' : 'Pagamento Recente',
+            description: daysRemaining === 0 ? `${studentName} vence hoje.` : `${studentName} venceu nos últimos ${Math.abs(daysRemaining)} dias.`,
             date: dueDate,
             studentId: student.id,
             link: '/financial',

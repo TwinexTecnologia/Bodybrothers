@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
+import { getPlanBillingDays, normalizeDate } from '../lib/planBilling';
 
 type Plan = {
   id: string
   title: string
   price: number
-  due_day: number
+  billing_cycle_days?: number | null
   frequency?: string
 }
 
@@ -39,13 +40,12 @@ export function useFinancialStatus() {
             
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('plan_id, due_day, data')
+                .select('plan_id, data')
                 .eq('id', user?.id)
                 .single();
             
             const info = {
                 planId: profile?.plan_id || profile?.data?.planId,
-                dueDay: profile?.due_day || profile?.data?.dueDay,
                 planStartDate: profile?.data?.planStartDate
             };
             setFinancialInfo(info);
@@ -94,73 +94,42 @@ export function useFinancialStatus() {
     function generateCharges(info: any, planData: Plan, payList: DebitRecord[]) {
         if (!info.planStartDate || !planData) return [];
 
-        let dateStr = info.planStartDate;
-        if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
-        
-        const parts = dateStr.split('-').map(Number);
-        if (parts.length < 3 || parts.some(isNaN)) return [];
-        
-        const start = new Date(parts[0], parts[1] - 1, parts[2]);
-        start.setHours(0,0,0,0);
-        
-        const today = new Date();
-        const limit = new Date(today);
+        const isFree = planData.price <= 0 || (planData.title && planData.title.toLowerCase().includes('permuta')) || (planData.title && planData.title.toLowerCase().includes('gratuito'));
+        if (isFree) return [];
+
+        const start = normalizeDate(info.planStartDate);
+        const today = normalizeDate(new Date());
+        const limit = normalizeDate(today);
         limit.setMonth(limit.getMonth() + 6);
         
         const generated: any[] = [];
-        const dueDay = info.dueDay || planData.due_day || 10;
+        const billingDays = getPlanBillingDays({
+            billingCycleDays: planData.billing_cycle_days,
+            frequency: planData.frequency,
+        });
 
         let current = new Date(start);
-        
-        if (planData.frequency !== 'weekly') {
-            current.setDate(dueDay);
-        }
 
         let loopCount = 0;
-        while (current <= limit && loopCount < 1000) {
+        while (current <= limit && loopCount < 300) {
             loopCount++;
-            let chargeDate: Date | null = null;
 
-            if (planData.frequency !== 'weekly') {
-                const diffMonths = (current.getFullYear() - start.getFullYear()) * 12 + (current.getMonth() - start.getMonth());
-                
-                let interval = 1;
-                if (planData.frequency === 'bimonthly') interval = 2;
-                else if (planData.frequency === 'quarterly') interval = 3;
-                else if (planData.frequency === 'semiannual') interval = 6;
-                else if (planData.frequency === 'annual') interval = 12;
+            const chargeDate = new Date(current);
+            const dueStr = chargeDate.toISOString().split('T')[0];
+            const payment = payList.find(p => p.dueDate === dueStr);
 
-                if (diffMonths >= 0 && diffMonths % interval === 0) {
-                     chargeDate = new Date(current.getFullYear(), current.getMonth(), dueDay);
-                }
-                current.setMonth(current.getMonth() + 1);
-            } else {
-                chargeDate = new Date(current);
-                current.setDate(current.getDate() + 7);
-            }
+            let status = 'pending';
+            if (payment) status = 'paid';
+            else if (chargeDate < today) status = 'overdue';
 
-            if (chargeDate) {
-                const dueStr = chargeDate.toISOString().split('T')[0];
-                const payment = payList.find(p => {
-                    if (p.dueDate === dueStr) return true;
-                    if (planData.frequency !== 'weekly' && p.monthRef) {
-                        const pDate = new Date(p.monthRef);
-                        return pDate.getMonth() === chargeDate!.getMonth() && pDate.getFullYear() === chargeDate!.getFullYear();
-                    }
-                    return false;
-                });
+            generated.push({
+                date: chargeDate,
+                amount: planData.price,
+                status,
+                payment
+            });
 
-                let status = 'pending';
-                if (payment) status = 'paid';
-                else if (chargeDate < new Date() && chargeDate.getDate() !== new Date().getDate()) status = 'overdue';
-
-                generated.push({
-                    date: chargeDate,
-                    amount: planData.price,
-                    status,
-                    payment
-                });
-            }
+            current.setDate(current.getDate() + billingDays);
         }
         return generated.sort((a,b) => a.date.getTime() - b.date.getTime());
     }

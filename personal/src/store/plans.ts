@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase'
-
-export type PlanFrequency = 'weekly' | 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual'
+import { legacyFrequencyToBillingDays, type LegacyPlanFrequency } from '../lib/planBilling'
 
 export type PlanRecord = {
   id: string
@@ -8,7 +7,8 @@ export type PlanRecord = {
   name: string
   price: number
   dueDay: number
-  frequency: PlanFrequency
+  billingCycleDays: number
+  frequency?: LegacyPlanFrequency | null
   createdAt: string
   active?: boolean
 }
@@ -21,7 +21,10 @@ function mapFromDb(d: any): PlanRecord {
     name: d.title,
     price: Number(d.price),
     dueDay: d.due_day,
-    frequency: d.frequency || 'monthly', // Default para monthly
+    billingCycleDays: Number(d.billing_cycle_days) > 0
+      ? Number(d.billing_cycle_days)
+      : legacyFrequencyToBillingDays(d.frequency),
+    frequency: d.frequency || null,
     createdAt: d.created_at,
     active: d.active
   }
@@ -49,7 +52,8 @@ export async function addPlan(p: Omit<PlanRecord, 'id' | 'createdAt'>): Promise<
       title: p.name,
       price: p.price,
       due_day: p.dueDay,
-      frequency: p.frequency,
+      billing_cycle_days: p.billingCycleDays,
+      frequency: p.frequency || null,
       active: true
     })
     .select()
@@ -88,7 +92,8 @@ export async function updatePlan(id: string, updates: Partial<Omit<PlanRecord, '
   if (updates.name) dbUpdates.title = updates.name
   if (updates.price !== undefined) dbUpdates.price = updates.price
   if (updates.dueDay !== undefined) dbUpdates.due_day = updates.dueDay
-  if (updates.frequency) dbUpdates.frequency = updates.frequency
+  if (updates.billingCycleDays !== undefined) dbUpdates.billing_cycle_days = updates.billingCycleDays
+  if (updates.frequency !== undefined) dbUpdates.frequency = updates.frequency
   if (updates.active !== undefined) dbUpdates.active = updates.active
 
   const { error } = await supabase

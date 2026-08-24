@@ -43,7 +43,6 @@ export default function EditStudent() {
   const [plans, setPlans] = useState<PlanRecord[]>([])
   const [planId, setPlanId] = useState('')
   const [planStartDate, setPlanStartDate] = useState('')
-  const [dueDay, setDueDay] = useState('')
   
   // Protocolos
   const [allWorkouts, setAllWorkouts] = useState<WorkoutRecord[]>([])
@@ -298,7 +297,6 @@ export default function EditStudent() {
             setComplement(s.address?.complement || '')
             setPlanId(s.planId || '')
             setPlanStartDate(s.planStartDate || '')
-            setDueDay(s.dueDay ? String(s.dueDay) : '')
             setSelectedDietIds(s.dietIds || [])
             setWorkoutSchedule(s.workoutSchedule || {})
             setOrderedWorkoutIds(s.workoutIds || [])
@@ -821,7 +819,6 @@ export default function EditStudent() {
             whatsapp: safeWhatsapp,
             planId: planId || undefined,
             planStartDate: planStartDate || undefined,
-            dueDay: dueDay ? parseInt(dueDay) : undefined,
             dietIds: selectedDietIds,
             address: { cep, street, neighborhood, city, state: stateUf, number, complement }
         }
@@ -851,7 +848,6 @@ export default function EditStudent() {
           address: newData.address,
           planId: newData.planId,
           planStartDate: newData.planStartDate,
-          dueDay: newData.dueDay,
           dietIds: newData.dietIds,
           workoutIds: orderedWorkoutIds,
           workoutSchedule,
@@ -859,8 +855,7 @@ export default function EditStudent() {
         })
 
         const { error: profileError } = await supabase.from('profiles').update({
-            plan_id: newData.planId,
-            due_day: newData.dueDay
+            plan_id: newData.planId
         }).eq('id', selectedId)
 
         if (profileError) console.error('Erro ao atualizar colunas reais:', profileError)
@@ -1111,14 +1106,13 @@ export default function EditStudent() {
                             >
                                 <option value="">Selecione...</option>
                                 {plans.map(p => {
-                                    const freqMap: any = { weekly: 'Semanal', monthly: 'Mensal', bimonthly: 'Bimestral', quarterly: 'Trimestral', semiannual: 'Semestral', annual: 'Anual' }
-                                    const freq = freqMap[p.frequency || 'monthly'] || 'Mensal'
-                                    return <option key={p.id} value={p.id}>{p.name} • R$ {p.price.toFixed(2)} ({freq})</option>
+                                    const cycleLabel = p.billingCycleDays === 1 ? '1 dia' : `${p.billingCycleDays} dias`
+                                    return <option key={p.id} value={p.id}>{p.name} • R$ {p.price.toFixed(2)} ({cycleLabel})</option>
                                 })}
                             </select>
                         </label>
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
                             <label className="label">
                                 Início do Plano
                                 <input 
@@ -1128,18 +1122,6 @@ export default function EditStudent() {
                                     value={planStartDate} 
                                     onChange={(e) => setPlanStartDate(e.target.value)} 
                                 />
-                            </label>
-                            <label className="label">
-                                Dia Vencimento
-                                <select 
-                                    className="select" 
-                                    style={{ width: '100%' }}
-                                    value={dueDay} 
-                                    onChange={(e) => setDueDay(e.target.value)}
-                                >
-                                    <option value="">Padrão</option>
-                                    {[...Array(31)].map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
-                                </select>
                             </label>
                         </div>
                     </div>
