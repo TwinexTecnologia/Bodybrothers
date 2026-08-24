@@ -65,36 +65,17 @@ type ActiveDashboardStudentRow = {
   plan_start_date: string | null
 }
 
-type DashboardPlanRow = {
-  id: string
-  frequency: PlanRecord['frequency'] | null
-  billing_cycle_days: number | null
-}
-
-type DashboardPlanSummary = {
-  id: string
-  frequency: PlanRecord['frequency'] | null
-  billingCycleDays: number
-}
-
-type OverviewFilters = {
-  year: number
-  month: string
-}
-
 export default function Overview() {
   const navigate = useNavigate()
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false,
-  )
-  const [filters, setFilters] = useState<OverviewFilters>({
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
+  const [filters, setFilters] = useState({
     year: new Date().getFullYear(),
-    month: 'all',
+    month: 'all' as string,
   })
 
   const [rawData, setRawData] = useState({
     students: [] as StudentRecord[],
-    plans: [] as DashboardPlanSummary[],
+    plans: [] as Array<{ id: string; frequency: PlanRecord['frequency'] | null; billingCycleDays: number }>,
     payments: [] as DebitRecord[],
   })
 
@@ -263,7 +244,11 @@ export default function Overview() {
         })
         // #endregion
 
-        const plans: DashboardPlanSummary[] = ((plansRes.data || []) as DashboardPlanRow[]).map((plan) => ({
+        const plans = ((plansRes.data || []) as Array<{
+          id: string
+          frequency: PlanRecord['frequency'] | null
+          billing_cycle_days: number | null
+        }>).map((plan) => ({
           id: plan.id,
           frequency: plan.frequency || null,
           billingCycleDays: Number(plan.billing_cycle_days) || 0,
