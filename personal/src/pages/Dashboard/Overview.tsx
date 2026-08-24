@@ -97,10 +97,15 @@ type ActiveDashboardStudentRow = {
   plan_start_date: string | null
 }
 
+type OverviewFilters = {
+  year: number
+  month: string
+}
+
 export default function Overview() {
   const navigate = useNavigate()
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<OverviewFilters>({
     year: new Date().getFullYear(),
     month: 'all' // 'all' or '0', '1', ... '11'
   })
