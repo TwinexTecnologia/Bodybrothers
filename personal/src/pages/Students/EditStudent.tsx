@@ -7,8 +7,9 @@ import { listActiveDiets, type DietRecord, listStudentDiets, duplicateDiet, upda
 import { listActiveWorkouts, duplicateWorkout, updateWorkout, setWorkoutStatus, type WorkoutRecord } from '../../store/workouts'
 import { listLibraryModels, listStudentModels, duplicateModel, updateModel, deleteModel, type AnamnesisModel } from '../../store/anamnesis'
 import { listPlans, type PlanRecord } from '../../store/plans'
-import { listAllStudentPayments } from '../../store/financial'
+import { listAllStudentPayments, registerPayment } from '../../store/financial'
 import { isStudentOverdue } from '../../lib/finance_utils'
+import { getCurrentBillingDueDate } from '../../lib/planBilling'
 import Modal from '../../components/Modal'
 import { supabase } from '../../lib/supabase'
 import { generateDietPdf } from '../../lib/pdf'
@@ -43,7 +44,6 @@ export default function EditStudent() {
   const [plans, setPlans] = useState<PlanRecord[]>([])
   const [planId, setPlanId] = useState('')
   const [planStartDate, setPlanStartDate] = useState('')
-  const [dueDay, setDueDay] = useState('')
   
   // Protocolos
   const [allWorkouts, setAllWorkouts] = useState<WorkoutRecord[]>([])
@@ -98,6 +98,7 @@ export default function EditStudent() {
   })
   const [checkingFinancial, setCheckingFinancial] = useState(false)
   const [blockModalOpen, setBlockModalOpen] = useState(false)
+  const [registeringManualPayment, setRegisteringManualPayment] = useState(false)
   const [searchTerm, setSearchTerm] = useState('') // Estado para busca
 
   // Filtros
@@ -169,6 +170,14 @@ export default function EditStudent() {
           .map(a => ({ id: a.id, label: `📚 ${a.name}` }))
           .sort((a, b) => a.label.localeCompare(b.label))
   }, [libraryAnamnesis])
+
+  const selectedStudent = useMemo(() => {
+      return students.find(student => student.id === selectedId) || null
+  }, [students, selectedId])
+
+  const selectedPlan = useMemo(() => {
+      return plans.find(plan => plan.id === planId) || null
+  }, [plans, planId])
 
   useEffect(() => {
     async function load() {
@@ -298,7 +307,6 @@ export default function EditStudent() {
             setComplement(s.address?.complement || '')
             setPlanId(s.planId || '')
             setPlanStartDate(s.planStartDate || '')
-            setDueDay(s.dueDay ? String(s.dueDay) : '')
             setSelectedDietIds(s.dietIds || [])
             setWorkoutSchedule(s.workoutSchedule || {})
             setOrderedWorkoutIds(s.workoutIds || [])
@@ -412,6 +420,78 @@ export default function EditStudent() {
       
       setLibraryDietId('')
       setLoading(false)
+  }
+
+  const handleMarkCurrentCyclePaid = async () => {
+      if (!selectedId || !selectedStudent) {
+          setMsg('Selecione um aluno para registrar o pagamento.')
+          return
+      }
+
+      if (!selectedPlan) {
+          setMsg('Selecione um plano antes de marcar como pago.')
+          return
+      }
+
+      if (!planStartDate) {
+          setMsg('Informe a data de inicio do plano antes de marcar o pagamento.')
+          return
+      }
+
+      setRegisteringManualPayment(true)
+
+      try {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) {
+              throw new Error('Sessao expirada. Entre novamente para registrar o pagamento.')
+          }
+
+          const payments = await listAllStudentPayments(selectedId)
+          const sortedPayments = [...payments].sort((a, b) => {
+              const dateA = new Date(a.paidAt || a.dueDate).getTime()
+              const dateB = new Date(b.paidAt || b.dueDate).getTime()
+              return dateA - dateB
+          })
+          const lastPayment = sortedPayments[sortedPayments.length - 1]
+          const currentDueDate = getCurrentBillingDueDate(
+              planStartDate,
+              selectedPlan,
+              lastPayment ? (lastPayment.paidAt || lastPayment.dueDate) : null,
+          )
+
+          if (!currentDueDate) {
+              throw new Error('Nao foi possivel calcular o vencimento atual deste aluno.')
+          }
+
+          const dueDate = currentDueDate.toISOString().split('T')[0]
+          const alreadyPaid = payments.some(payment => payment.dueDate === dueDate && payment.status === 'paid')
+
+          if (alreadyPaid) {
+              setMsg('Este ciclo ja esta registrado como pago.')
+              return
+          }
+
+          const ok = await registerPayment({
+              personalId: user.id,
+              studentId: selectedId,
+              amount: selectedPlan.price,
+              dueDate,
+              refDate: currentDueDate,
+              description: `Pagamento manual - ${selectedPlan.name}`,
+          })
+
+          if (!ok) {
+              throw new Error('Nao foi possivel registrar o pagamento manual.')
+          }
+
+          setMsg('Pagamento do ciclo atual registrado com sucesso!')
+      } catch (error) {
+          console.error('Erro ao registrar pagamento manual:', error)
+          const message = error instanceof Error ? error.message : 'Nao foi possivel registrar o pagamento.'
+          setMsg(message)
+      } finally {
+          setRegisteringManualPayment(false)
+      }
   }
 
   const handleRemoveStudentDiet = async (did: string) => {
@@ -821,7 +901,6 @@ export default function EditStudent() {
             whatsapp: safeWhatsapp,
             planId: planId || undefined,
             planStartDate: planStartDate || undefined,
-            dueDay: dueDay ? parseInt(dueDay) : undefined,
             dietIds: selectedDietIds,
             address: { cep, street, neighborhood, city, state: stateUf, number, complement }
         }
@@ -851,7 +930,6 @@ export default function EditStudent() {
           address: newData.address,
           planId: newData.planId,
           planStartDate: newData.planStartDate,
-          dueDay: newData.dueDay,
           dietIds: newData.dietIds,
           workoutIds: orderedWorkoutIds,
           workoutSchedule,
@@ -859,8 +937,7 @@ export default function EditStudent() {
         })
 
         const { error: profileError } = await supabase.from('profiles').update({
-            plan_id: newData.planId,
-            due_day: newData.dueDay
+            plan_id: newData.planId
         }).eq('id', selectedId)
 
         if (profileError) console.error('Erro ao atualizar colunas reais:', profileError)
@@ -1111,14 +1188,13 @@ export default function EditStudent() {
                             >
                                 <option value="">Selecione...</option>
                                 {plans.map(p => {
-                                    const freqMap: any = { weekly: 'Semanal', monthly: 'Mensal', bimonthly: 'Bimestral', quarterly: 'Trimestral', semiannual: 'Semestral', annual: 'Anual' }
-                                    const freq = freqMap[p.frequency || 'monthly'] || 'Mensal'
-                                    return <option key={p.id} value={p.id}>{p.name} • R$ {p.price.toFixed(2)} ({freq})</option>
+                                    const cycleLabel = p.billingCycleDays === 1 ? '1 dia' : `${p.billingCycleDays} dias`
+                                    return <option key={p.id} value={p.id}>{p.name} • R$ {p.price.toFixed(2)} ({cycleLabel})</option>
                                 })}
                             </select>
                         </label>
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
                             <label className="label">
                                 Início do Plano
                                 <input 
@@ -1129,18 +1205,27 @@ export default function EditStudent() {
                                     onChange={(e) => setPlanStartDate(e.target.value)} 
                                 />
                             </label>
-                            <label className="label">
-                                Dia Vencimento
-                                <select 
-                                    className="select" 
-                                    style={{ width: '100%' }}
-                                    value={dueDay} 
-                                    onChange={(e) => setDueDay(e.target.value)}
-                                >
-                                    <option value="">Padrão</option>
-                                    {[...Array(31)].map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
-                                </select>
-                            </label>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <button
+                                type="button"
+                                className="btn"
+                                onClick={handleMarkCurrentCyclePaid}
+                                disabled={!selectedPlan || !planStartDate || registeringManualPayment}
+                                style={{
+                                    background: '#16a34a',
+                                    border: 'none',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 8,
+                                }}
+                            >
+                                {registeringManualPayment ? 'Registrando pagamento...' : 'Ja recebeu este ciclo'}
+                            </button>
+                            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                Registra manualmente o pagamento do ciclo atual quando o aluno ja pagou fora do sistema.
+                            </div>
                         </div>
                     </div>
                 </div>

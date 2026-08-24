@@ -29,6 +29,8 @@ import { listPlans, type PlanRecord } from '../../store/plans'
 import { listMonthPayments, registerPayment, undoPayment, listPaymentHistory, type DebitRecord } from '../../store/financial'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/Modal'
+import { generateExpectedCharges } from '../../lib/finance_utils'
+import { getPlanBillingDays, normalizeDate } from '../../lib/planBilling'
 
 export default function FinancialList() {
     return (
@@ -39,7 +41,7 @@ export default function FinancialList() {
 }
 
 function FinancialListContent() {
-  const [tab, setTab] = useState<'monthly' | 'history'>('monthly')
+  const [tab, setTab] = useState<'charges' | 'history'>('charges')
   const [students, setStudents] = useState<StudentRecord[]>([])
   const [plans, setPlans] = useState<PlanRecord[]>([])
   const [payments, setPayments] = useState<DebitRecord[]>([])
@@ -47,10 +49,8 @@ function FinancialListContent() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState('') 
   const [selectedStudentId, setSelectedStudentId] = useState('') 
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
-  const [historySearch, setHistorySearch] = useState('') 
 
   // History State
   const [historyFilter, setHistoryFilter] = useState({ 
@@ -102,7 +102,7 @@ function FinancialListContent() {
   }
 
   useEffect(() => {
-    if (tab === 'monthly') loadData()
+    if (tab === 'charges') loadData()
     else loadHistory()
   }, [currentDate, tab, historyFilter])
 
@@ -125,7 +125,7 @@ function FinancialListContent() {
               amount: plan.price,
               dueDate: dueDate.toISOString().split('T')[0],
               refDate: currentDate,
-              description: `Mensalidade - ${plan.name}`
+              description: `Cobranca - ${plan.name}`
           })
           if (ok) {
               await loadData()
@@ -163,114 +163,16 @@ function FinancialListContent() {
       .filter(s => s.status === 'ativo' && s.planId)
       .filter(s => selectedStudentId ? s.id === selectedStudentId : true)
   
-  // Função OTIMIZADA para gerar as cobranças do mês visualizado (Sem Loop Infinito)
   const generateCharges = (student: StudentRecord, plan: PlanRecord, viewDate: Date) => {
       if (!student.planStartDate || typeof student.planStartDate !== 'string') return []
-
-      // Parse data início de forma segura (aceita YYYY-MM-DD ou ISO)
-      let dateStr = student.planStartDate
-      if (dateStr.includes('T')) dateStr = dateStr.split('T')[0]
-      
-      const parts = dateStr.split('-').map(Number)
-      if (parts.length < 3 || parts.some(isNaN)) return [] // Data inválida
-      
-      const [sy, sm, sd] = parts
-      // IMPORTANTE: Mês no Date construtor é 0-based.
-      // Se parts = [2025, 1, 1], new Date(2025, 0, 1) = 01 Jan 2025
-      const start = new Date(sy, sm - 1, sd)
-      start.setHours(0,0,0,0)
-      
-      // Validação extra se a data gerada é válida
-      if (isNaN(start.getTime())) return []
-
-      // Se o plano começou depois do mês visualizado, não tem cobrança
-      // Mas cuidado com dia: se começou 31/01 e estamos vendo Jan, tem cobrança? Sim.
-      // Vamos comparar Mês/Ano.
       const viewMonth = viewDate.getMonth()
       const viewYear = viewDate.getFullYear()
-      
-      // Primeiro dia do mês visualizado
       const viewStart = new Date(viewYear, viewMonth, 1)
-      // Último dia do mês visualizado
       const viewEnd = new Date(viewYear, viewMonth + 1, 0)
-      
-      if (start > viewEnd) return [] // Plano começa no futuro
 
-      const charges: Array<{ dueDate: Date, originalDate: Date }> = []
-      const dueDay = student.dueDay || 10
-
-      // Lógica Matemática para Frequências Mensais (Evita Loop)
-      if (plan.frequency !== 'weekly') {
-          const freqMap: Record<string, number> = {
-              'monthly': 1,
-              'bimonthly': 2,
-              'quarterly': 3,
-              'semiannual': 6,
-              'annual': 12
-          }
-          const interval = freqMap[plan.frequency || 'monthly'] || 1
-          
-          // Calcula diferença de meses entre o início e a visualização
-          // (AnoVis - AnoIni) * 12 + (MesVis - MesIni)
-          // Ex: Start 2025-01. View 2025-01. Diff = 0.
-          // Ex: Start 2025-01. View 2025-02. Diff = 1.
-          const diffMonths = (viewYear - start.getFullYear()) * 12 + (viewMonth - start.getMonth())
-          
-          // Se a diferença for múltiplo do intervalo, tem cobrança neste mês!
-          // Ex: Trimestral (3). Jan(0), Abr(3), Jul(6)... Resto 0.
-          if (diffMonths >= 0 && diffMonths % interval === 0) {
-              const chargeDate = new Date(viewYear, viewMonth, dueDay)
-              
-              // Verifica se a data de cobrança é válida (não antes do início absoluto)
-              // Ex: Inicio 20/01. Due 10. Charge 10/01.
-              // Se for o PRÓPRIO mês de início, permitimos cobrar dia 10 mesmo tendo começado dia 20?
-              // Regra de negócio: Sim, a mensalidade do mês de entrada é devida.
-              // A menos que queiram pro-rata, mas aqui é valor cheio.
-              
-              charges.push({ dueDate: chargeDate, originalDate: chargeDate })
-          }
-      } 
-      else {
-          // Lógica Semanal (Itera apenas dentro do mês visualizado - Max 5 iterações)
-          // Acha o primeiro dia do ciclo que cai neste mês
-          // Ciclo semanal baseia-se no dia da semana do start? Ou a cada 7 dias corridos?
-          // 7 dias corridos é mais seguro.
-          
-          // Diferença em dias do inicio até o dia 1 do mês visualizado
-          const oneDay = 24 * 60 * 60 * 1000
-          
-          // Itera do dia 1 ao fim do mês checando se bate com o ciclo
-          let currentCheck = new Date(viewStart)
-          // Se o mês visualizado for ANTERIOR ao start, loop não roda (start > viewEnd check acima garante)
-          // Mas se o mês visualizado for O MESMO do start, devemos começar do start, não do dia 1.
-          if (currentCheck < start) currentCheck = new Date(start) 
-          
-          // Limite de segurança para loop semanal
-          let loopSafe = 0
-          while (currentCheck <= viewEnd && loopSafe < 10) {
-              loopSafe++
-              const diffTime = currentCheck.getTime() - start.getTime()
-              const diffDays = Math.floor(diffTime / oneDay)
-              
-              // Pequena tolerância para float errors? Math.floor deve resolver.
-              
-              if (diffDays >= 0 && diffDays % 7 === 0) {
-                   charges.push({ dueDate: new Date(currentCheck), originalDate: new Date(currentCheck) })
-                   // Otimização: Pula 7 dias
-                   currentCheck.setDate(currentCheck.getDate() + 7)
-              } else {
-                   // Se não bateu (ex: começou do dia 1 mas ciclo é dia 2), ajusta.
-                   // Mas estamos iterando dia a dia ou pulando?
-                   // O ideal seria calcular o primeiro dia do ciclo no mês e pular de 7 em 7.
-                   // Primeiro dia do ciclo >= currentCheck:
-                   // start + N*7 >= currentCheck
-                   // Mas vamos manter iteração simples dia-a-dia com salto se achar, é seguro para max 31 dias.
-                   currentCheck.setDate(currentCheck.getDate() + 1)
-              }
-          }
-      }
-      
-      return charges
+      return generateExpectedCharges(student, plan, viewEnd)
+        .filter((date) => date >= viewStart && date <= viewEnd)
+        .map((date) => ({ dueDate: normalizeDate(date), originalDate: normalizeDate(date) }))
   }
 
   const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime())
@@ -334,17 +236,10 @@ function FinancialListContent() {
           // Calcula a PRÓXIMA cobrança real após esta
           let nextChargeDate: Date | null = null
           
-          if (plan.frequency && c.dueDate && !isNaN(c.dueDate.getTime())) {
+          if (c.dueDate && !isNaN(c.dueDate.getTime())) {
               try {
                 const d = new Date(c.dueDate)
-                switch (plan.frequency) {
-                    case 'weekly': d.setDate(d.getDate() + 7); break;
-                    case 'bimonthly': d.setMonth(d.getMonth() + 2); break;
-                    case 'quarterly': d.setMonth(d.getMonth() + 3); break;
-                    case 'semiannual': d.setMonth(d.getMonth() + 6); break;
-                    case 'annual': d.setFullYear(d.getFullYear() + 1); break;
-                    case 'monthly': default: d.setMonth(d.getMonth() + 1); break;
-                }
+                d.setDate(d.getDate() + getPlanBillingDays(plan))
                 if (!isNaN(d.getTime())) {
                     nextChargeDate = d
                 }
@@ -390,17 +285,17 @@ function FinancialListContent() {
           <h1 style={{ margin: 0, flex: 1 }}>Financeiro</h1>
           <div style={{ display: 'flex', background: '#f1f5f9', padding: 4, borderRadius: 8 }}>
               <button 
-                onClick={() => setTab('monthly')}
+                onClick={() => setTab('charges')}
                 style={{
                     padding: '8px 20px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                    background: tab === 'monthly' ? '#fff' : 'transparent',
-                    fontWeight: tab === 'monthly' ? 600 : 500,
-                    color: tab === 'monthly' ? '#0f172a' : '#64748b',
-                    boxShadow: tab === 'monthly' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    background: tab === 'charges' ? '#fff' : 'transparent',
+                    fontWeight: tab === 'charges' ? 600 : 500,
+                    color: tab === 'charges' ? '#0f172a' : '#64748b',
+                    boxShadow: tab === 'charges' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                     transition: 'all 0.2s'
                 }}
               >
-                  Mensalidades
+                  Cobranças
               </button>
               <button 
                 onClick={() => setTab('history')}
@@ -418,7 +313,7 @@ function FinancialListContent() {
           </div>
       </div>
       
-      {tab === 'monthly' ? (
+      {tab === 'charges' ? (
         <>
             {/* Seletor de Mês */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>

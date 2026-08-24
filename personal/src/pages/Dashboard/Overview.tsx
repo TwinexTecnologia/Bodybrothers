@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import type { StudentRecord } from '../../store/students'
 import type { PlanRecord } from '../../store/plans'
 import type { DebitRecord } from '../../store/financial'
+import { getCurrentBillingDueDate, getMonthsToDistribute, normalizeDate } from '../../lib/planBilling'
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts'
 
@@ -56,21 +57,6 @@ function trackOverviewQuery<T>(hypothesisId: string, queryName: string, promise:
     })
 }
 
-function getMonthsToDistribute(frequency?: string | null) {
-  switch (frequency) {
-    case 'bimonthly':
-      return 2
-    case 'quarterly':
-      return 3
-    case 'semiannual':
-      return 6
-    case 'annual':
-      return 12
-    default:
-      return 1
-  }
-}
-
 type ActiveDashboardStudentRow = {
   id: string
   personal_id: string
@@ -84,13 +70,13 @@ export default function Overview() {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
   const [filters, setFilters] = useState({
     year: new Date().getFullYear(),
-    month: 'all' // 'all' or '0', '1', ... '11'
+    month: 'all' as string,
   })
 
   const [rawData, setRawData] = useState({
     students: [] as StudentRecord[],
-    plans: [] as PlanRecord[],
-    payments: [] as DebitRecord[]
+    plans: [] as Array<{ id: string; frequency: PlanRecord['frequency'] | null; billingCycleDays: number }>,
+    payments: [] as DebitRecord[],
   })
 
   const [stats, setStats] = useState({
@@ -125,7 +111,7 @@ export default function Overview() {
     const { students, plans, payments } = rawData
     const monthTotals = new Array(12).fill(0)
     const studentPlanById = new Map(students.map(student => [student.id, student.planId]))
-    const planFrequencyById = new Map(plans.map(plan => [plan.id, plan.frequency]))
+    const planById = new Map(plans.map(plan => [plan.id, plan]))
 
     payments.forEach(payment => {
       if (!payment.paidAt && !payment.dueDate) return
@@ -133,7 +119,7 @@ export default function Overview() {
 
       const baseDate = new Date(payment.dueDate || payment.paidAt!)
       const planId = studentPlanById.get(payment.payerId)
-      const monthsToDistribute = getMonthsToDistribute(planId ? planFrequencyById.get(planId) : null)
+      const monthsToDistribute = getMonthsToDistribute(planId ? planById.get(planId) : null)
       const monthlyValue = payment.amount / monthsToDistribute
 
       for (let i = 0; i < monthsToDistribute; i++) {
@@ -193,7 +179,7 @@ export default function Overview() {
         ] = await Promise.all([
             trackOverviewQuery('A', 'students-total', supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('role', 'aluno')),
             trackOverviewQuery('A', 'students-active', supabase.from('personal_active_students_dashboard').select('id, personal_id, created_at, plan_id, plan_start_date').eq('personal_id', user.id)),
-            trackOverviewQuery('A', 'plans', supabase.from('plans').select('id, frequency').eq('personal_id', user.id)),
+            trackOverviewQuery('A', 'plans', supabase.from('plans').select('id, frequency, billing_cycle_days').eq('personal_id', user.id)),
             trackOverviewQuery('A', 'payments', supabase.from('debits').select('id, payer_id, amount, due_date, paid_at').eq('receiver_id', user.id).eq('status', 'paid')),
             trackOverviewQuery('A', 'diets-active', supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active')),
             trackOverviewQuery('A', 'diets-inactive', supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active')),
@@ -258,8 +244,16 @@ export default function Overview() {
         })
         // #endregion
 
-        const plans = (plansRes.data || []) as PlanRecord[]
-        const planFrequencyById = new Map(plans.map(plan => [plan.id, plan.frequency]))
+        const plans = ((plansRes.data || []) as Array<{
+          id: string
+          frequency: PlanRecord['frequency'] | null
+          billing_cycle_days: number | null
+        }>).map((plan) => ({
+          id: plan.id,
+          frequency: plan.frequency || null,
+          billingCycleDays: Number(plan.billing_cycle_days) || 0,
+        }))
+        const planById = new Map(plans.map(plan => [plan.id, plan]))
         
         const paymentsRaw = paymentsRes.data || []
         const allPayments: DebitRecord[] = paymentsRaw.map((d: any) => ({
@@ -298,7 +292,7 @@ export default function Overview() {
         // CALCULO DO CARD "Faturamento Mensal (Mês Atual)"
         // 1. Regime de Competência (monthlyRevenue)
         let monthlyRevenue = 0
-        const now = new Date()
+        const now = normalizeDate(new Date())
         const currentMonth = now.getMonth()
         const currentYear = now.getFullYear()
 
@@ -321,7 +315,7 @@ export default function Overview() {
             // Calculo Competência (mantendo lógica anterior)
             const baseDate = new Date(payment.dueDate || payment.paidAt!)
             const monthsToDistribute = getMonthsToDistribute(
-              planFrequencyById.get(activeStudentPlanById.get(payment.payerId) || '')
+              planById.get(activeStudentPlanById.get(payment.payerId) || '')
             )
             
             const monthlyValue = payment.amount / monthsToDistribute
@@ -338,46 +332,21 @@ export default function Overview() {
         let pendingFinanceCount = 0
         activeStudentsList.forEach(student => {
             if (!student.planId || !student.planStartDate) return
-            const planFrequency = planFrequencyById.get(student.planId)
-            if (!planFrequency) return
+            const plan = planById.get(student.planId)
+            if (!plan) return
             const studentPayments = paymentsByStudentId.get(student.id) || []
-            // NOVA LÓGICA DE VENCIMENTO REAL (HISTÓRICO)
-            // Não olha apenas o mês atual, mas sim se o último pagamento cobre o dia de hoje.
             const lastPayment = studentPayments[0]
-            
-            // Se nunca pagou e já passou da data de início + tolerância, está devendo
-            if (!lastPayment) {
-                if (student.planStartDate) {
-                    const start = new Date(student.planStartDate)
-                    const gracePeriod = new Date(start)
-                    gracePeriod.setDate(gracePeriod.getDate() + 5) // 5 dias de tolerância inicial
-                    if (now > gracePeriod) {
-                        pendingFinanceCount++
-                    }
-                }
-                return
-            }
+            const dueDate = getCurrentBillingDueDate(
+              student.planStartDate,
+              plan,
+              lastPayment ? (lastPayment.paidAt || lastPayment.dueDate) : null
+            )
+            if (!dueDate) return
 
-            // 2. Calcula a validade do último pagamento
-            const refDate = new Date(lastPayment.paidAt || lastPayment.dueDate || 0)
-            let validityDays = 30 // Padrão mensal
+            const overdueThreshold = new Date(dueDate)
+            overdueThreshold.setDate(overdueThreshold.getDate() + 3)
 
-            switch (planFrequency) {
-                case 'weekly': validityDays = 7; break
-                case 'monthly': validityDays = 30; break
-                case 'bimonthly': validityDays = 60; break
-                case 'quarterly': validityDays = 90; break
-                case 'semiannual': validityDays = 180; break
-                case 'annual': validityDays = 365; break
-            }
-
-            const validUntil = new Date(refDate)
-            validUntil.setDate(validUntil.getDate() + validityDays)
-            // Adiciona uma margem de tolerância de 3 dias para não ficar vermelho no fds
-            validUntil.setDate(validUntil.getDate() + 3)
-
-            // Se a validade já passou, está pendente
-            if (now > validUntil) {
+            if (now > overdueThreshold) {
                 pendingFinanceCount++
             }
         })

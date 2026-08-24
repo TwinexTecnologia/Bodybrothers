@@ -2,19 +2,11 @@ import { Wallet, Calendar, CheckCircle, AlertCircle, CreditCard, Clock, Download
 import { useFinancialStatus } from '../../hooks/useFinancialStatus'
 import { generateFinancePdf } from '../../lib/finance_pdf'
 import { useAuth } from '../../auth/useAuth'
-
-const frequencyMap: Record<string, string> = {
-    weekly: 'Semanal',
-    monthly: 'Mensal',
-    bimonthly: 'Bimestral',
-    quarterly: 'Trimestral',
-    semiannual: 'Semestral',
-    annual: 'Anual'
-}
+import { getPlanBillingLabel, getPlanPriceSuffix } from '../../lib/planBilling'
 
 export default function ListPendences() {
   const { user } = useAuth()
-  const { loading, plan, financialInfo, chargesList, overdueCount } = useFinancialStatus()
+  const { loading, plan, chargesList, overdueCount } = useFinancialStatus()
 
   // Filtra lista para exibição limpa (Pendentes + Proximos)
   const displayList = chargesList.filter(c => {
@@ -38,7 +30,7 @@ export default function ListPendences() {
       const allCharges = [...chargesList].sort((a, b) => b.date.getTime() - a.date.getTime())
       
       const pdfData = allCharges.map(c => ({
-          description: `Mensalidade (${c.date.toLocaleDateString('pt-BR', { month: 'long' })})`,
+          description: `Cobranca (${c.date.toLocaleDateString('pt-BR')})`,
           dueDate: c.date,
           paidAt: c.status === 'paid' ? c.payment.paidAt : null,
           status: c.status,
@@ -53,8 +45,8 @@ export default function ListPendences() {
   }
 
   const nextCharge = chargesList.find(c => c.date >= new Date(new Date().setHours(0,0,0,0)))
-  const freqLabel = plan?.frequency ? frequencyMap[plan.frequency] : 'Mensal'
-  const suffix = plan?.frequency === 'weekly' ? '/sem' : plan?.frequency === 'annual' ? '/ano' : '/mês'
+  const billingLabel = plan ? getPlanBillingLabel({ billingCycleDays: plan.billing_cycle_days, frequency: plan.frequency }) : '30 dias'
+  const suffix = plan ? getPlanPriceSuffix({ billingCycleDays: plan.billing_cycle_days, frequency: plan.frequency }) : '/30 dias'
 
   if (loading) return <div style={{ padding: 24 }}>Carregando informações financeiras...</div>
 
@@ -101,7 +93,7 @@ export default function ListPendences() {
                         <div className="mobile-stack" style={{ marginBottom: 24 }}>
                             <div>
                                 <h3 style={{ margin: '0 0 4px 0', fontSize: '1.5rem', color: '#0f172a' }}>{plan.title}</h3>
-                                <p style={{ margin: 0, color: '#64748b' }}>Cobrança {freqLabel.toLowerCase()}</p>
+                                <p style={{ margin: 0, color: '#64748b' }}>Cobrança a cada {billingLabel}</p>
                             </div>
                             <div style={{ textAlign: 'right' }}>
                                 <span style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0f172a' }}>
@@ -113,9 +105,9 @@ export default function ListPendences() {
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, borderTop: '1px solid #f1f5f9', paddingTop: 24 }}>
                             <div>
-                                <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: 4 }}>Dia de Vencimento</div>
+                                <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: 4 }}>Ciclo de Cobrança</div>
                                 <div style={{ fontWeight: 600, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <Calendar size={18} /> Dia {financialInfo.dueDay || plan.due_day}
+                                    <Calendar size={18} /> {billingLabel}
                                 </div>
                             </div>
                             <div>
@@ -137,7 +129,7 @@ export default function ListPendences() {
                         <div>
                             <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: '#991b1b' }}>Pendência Identificada</h3>
                             <p style={{ margin: 0, color: '#b91c1c' }}>
-                                Você possui {overdueCount} mensalidade(s) em aberto. Regularize para evitar bloqueios.
+                                Você possui {overdueCount} cobranca(s) em aberto. Regularize para evitar bloqueios.
                             </p>
                         </div>
                     </div>
@@ -149,7 +141,7 @@ export default function ListPendences() {
                         <div>
                             <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: '#166534' }}>Situação Regular</h3>
                             <p style={{ margin: 0, color: '#15803d' }}>
-                                Parabéns! Suas mensalidades estão em dia.
+                                Parabens! Seus pagamentos estao em dia.
                             </p>
                         </div>
                     </div>
@@ -178,7 +170,7 @@ export default function ListPendences() {
                                         {item.status === 'paid' ? <CheckCircle size={20} /> : <Clock size={20} />}
                                     </div>
                                     <div>
-                                        <div style={{ fontWeight: 600, color: '#0f172a' }}>Mensalidade</div>
+                                        <div style={{ fontWeight: 600, color: '#0f172a' }}>Cobrança</div>
                                         <div style={{ fontSize: '0.85rem', color: item.status === 'overdue' ? '#ef4444' : '#64748b' }}>
                                             {item.status === 'paid' ? `Pago em ${new Date(item.payment.paidAt).toLocaleDateString('pt-BR')}` : `Vence em ${item.date.toLocaleDateString('pt-BR')}`}
                                         </div>

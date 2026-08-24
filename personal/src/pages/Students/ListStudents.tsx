@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { MessageSquare, ClipboardList } from 'lucide-react'
 import StudentFeedbackModal from '../../components/StudentFeedbackModal'
 import StudentAnamnesisModal from '../../components/StudentAnamnesisModal'
+import { getCurrentBillingDueDate, normalizeDate } from '../../lib/planBilling'
 
 type StudentListViewRow = {
   id: string
@@ -67,18 +68,6 @@ type AnamnesisStatus = {
   fontWeight: number
 }
 
-function getValidityDays(frequency: PlanRecord['frequency']) {
-  switch (frequency) {
-    case 'weekly': return 7
-    case 'monthly': return 30
-    case 'bimonthly': return 60
-    case 'quarterly': return 90
-    case 'semiannual': return 180
-    case 'annual': return 365
-    default: return 30
-  }
-}
-
 function getPaymentsStartDate() {
   const date = new Date()
   date.setMonth(date.getMonth() - 12)
@@ -99,42 +88,41 @@ const getFinancialStatus = (
         return { status: 'paid', label: 'ISENTO', color: '#10b981', bg: '#dcfce7', daysDiff: null }
     }
 
-    // 1. Pega último pagamento
-    const now = new Date()
+    const today = normalizeDate(new Date())
+    const dueDate = getCurrentBillingDueDate(
+      student.planStartDate,
+      plan,
+      lastPayment ? (lastPayment.paid_at || lastPayment.due_date) : null
+    )
 
-    // 2. Se nunca pagou
-    if (!lastPayment) {
-        const start = new Date(student.planStartDate)
-        const diffTime = now.getTime() - start.getTime()
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-        
-        // Se começou há menos de 5 dias, considera Pendente (Amarelo)
-        if (diffDays <= 5) return { status: 'pending', label: 'NOVO', color: '#f59e0b', bg: '#fef3c7', daysDiff: diffDays }
-        // Se já passou, Atrasado (Vermelho)
-        return { status: 'overdue', label: 'ATRASADO', color: '#ef4444', bg: '#fee2e2', daysDiff: diffDays }
+    if (!dueDate) return { status: 'none', label: '—', color: '#9ca3af', bg: 'transparent', daysDiff: null }
+
+    const diffMs = dueDate.getTime() - today.getTime()
+    const daysRemaining = Math.round(diffMs / (1000 * 60 * 60 * 24))
+
+    if (daysRemaining < -3) {
+        return { status: 'overdue', label: 'ATRASADO', color: '#ef4444', bg: '#fee2e2', daysDiff: Math.abs(daysRemaining) }
     }
-
-    // 3. Calcula validade
-    const validityDays = getValidityDays(plan.frequency)
-    const refDate = new Date(lastPayment.paid_at || lastPayment.due_date || 0)
-    const validUntil = new Date(refDate)
-    validUntil.setDate(validUntil.getDate() + validityDays)
-
-    // Dias restantes para vencer (negativo = vencido)
-    const diffTime = validUntil.getTime() - now.getTime()
-    const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
     if (daysRemaining < 0) {
-        // Vencido
-        // Se venceu há pouco tempo (até 3 dias), mostra como pendente/atenção
-        if (daysRemaining > -4) return { status: 'pending', label: 'VENCEU', color: '#f59e0b', bg: '#fef3c7', daysDiff: Math.abs(daysRemaining) }
-        return { status: 'overdue', label: 'ATRASADO', color: '#ef4444', bg: '#fee2e2', daysDiff: Math.abs(daysRemaining) }
-    } else {
-        // Em dia
-        // Se falta pouco para vencer (5 dias), avisa
-        if (daysRemaining <= 5) return { status: 'warning', label: 'VENCE LOGO', color: '#f59e0b', bg: '#fffbeb', daysDiff: daysRemaining }
-        return { status: 'paid', label: 'EM DIA', color: '#166534', bg: '#dcfce7', daysDiff: daysRemaining }
+        return { status: 'pending', label: 'VENCEU', color: '#f59e0b', bg: '#fef3c7', daysDiff: Math.abs(daysRemaining) }
     }
+
+    if (!lastPayment) {
+        if (daysRemaining === 0) return { status: 'pending', label: 'NOVO', color: '#f59e0b', bg: '#fef3c7', daysDiff: 0 }
+        if (daysRemaining <= 5) return { status: 'warning', label: 'INICIO LOGO', color: '#f59e0b', bg: '#fffbeb', daysDiff: daysRemaining }
+        return { status: 'paid', label: 'PROGRAMADO', color: '#166534', bg: '#dcfce7', daysDiff: daysRemaining }
+    }
+
+    if (daysRemaining === 0) {
+        return { status: 'warning', label: 'VENCE HOJE', color: '#f59e0b', bg: '#fffbeb', daysDiff: 0 }
+    }
+
+    if (daysRemaining <= 5) {
+        return { status: 'warning', label: 'VENCE LOGO', color: '#f59e0b', bg: '#fffbeb', daysDiff: daysRemaining }
+    }
+
+    return { status: 'paid', label: 'EM DIA', color: '#166534', bg: '#dcfce7', daysDiff: daysRemaining }
 }
 
 const getAnamnesisStatus = (
