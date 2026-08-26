@@ -230,7 +230,8 @@ export default function SupportChatWidget() {
               display: 'flex',
               flexDirection: 'column',
               gap: 12,
-              minHeight: 220,
+              minHeight: 140,
+              flex: '1 1 auto',
             }}
           >
             {loading && messages.length === 0 && attachments.length === 0 ? (
@@ -335,7 +336,7 @@ export default function SupportChatWidget() {
             )}
           </div>
 
-          <div style={{ padding: 16, borderTop: '1px solid #e2e8f0', background: '#fff' }}>
+          <div style={{ padding: 16, borderTop: '1px solid #e2e8f0', background: '#fff', flexShrink: 0 }}>
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
@@ -357,7 +358,7 @@ export default function SupportChatWidget() {
             </div>
 
             {pendingFiles.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10, maxHeight: 88, overflowY: 'auto', paddingRight: 4 }}>
                 {pendingFiles.map((file, index) => (
                   <div
                     key={`${file.name}-${index}`}
@@ -373,7 +374,7 @@ export default function SupportChatWidget() {
                       fontSize: '0.78rem',
                     }}
                   >
-                    <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {file.name}
                     </span>
                     <button
@@ -388,7 +389,7 @@ export default function SupportChatWidget() {
               </div>
             )}
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 12 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: 10, marginTop: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 150px', minWidth: 0 }}>
                 <input
                   ref={fileInputRef}
@@ -412,6 +413,7 @@ export default function SupportChatWidget() {
                     padding: '10px 14px',
                     cursor: 'pointer',
                     width: '100%',
+                    minHeight: 44,
                   }}
                 >
                   <Paperclip size={16} />
@@ -437,6 +439,7 @@ export default function SupportChatWidget() {
                   padding: '10px 16px',
                   cursor: 'pointer',
                   fontWeight: 600,
+                  minHeight: 44,
                 }}
               >
                 <Send size={16} />

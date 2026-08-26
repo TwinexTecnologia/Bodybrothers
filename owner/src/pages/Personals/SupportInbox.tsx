@@ -509,7 +509,7 @@ export default function SupportInbox() {
                     />
 
                     {pendingFiles.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10, maxHeight: 88, overflowY: 'auto', paddingRight: 4 }}>
                         {pendingFiles.map((file, index) => (
                           <div
                             key={`${file.name}-${index}`}
@@ -525,7 +525,7 @@ export default function SupportInbox() {
                               fontSize: '0.78rem',
                             }}
                           >
-                            <span style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {file.name}
                             </span>
                             <button
@@ -540,7 +540,7 @@ export default function SupportInbox() {
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input ref={fileInputRef} type="file" multiple onChange={handleUpload} style={{ display: 'none' }} />
                         <button
@@ -556,6 +556,7 @@ export default function SupportInbox() {
                             background: '#fff',
                             padding: '10px 14px',
                             cursor: 'pointer',
+                            minHeight: 44,
                           }}
                         >
                           <span>📎</span>
@@ -579,6 +580,7 @@ export default function SupportInbox() {
                           padding: '10px 16px',
                           cursor: 'pointer',
                           fontWeight: 700,
+                          minHeight: 44,
                         }}
                       >
                         <span>➤</span>
@@ -660,7 +662,7 @@ export default function SupportInbox() {
                       </button>
 
                       {pendingClosingFiles.length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10, maxHeight: 88, overflowY: 'auto', paddingRight: 4 }}>
                           {pendingClosingFiles.map((file, index) => (
                             <div
                               key={`${file.name}-${index}`}
@@ -676,7 +678,7 @@ export default function SupportInbox() {
                                 fontSize: '0.78rem',
                               }}
                             >
-                              <span style={{ maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <span style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {file.name}
                               </span>
                               <button
