@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent } from 'react'
 import { MessageCircle, Paperclip, Send, X } from 'lucide-react'
 import {
   ensureCurrentPersonalSupportThread,
@@ -12,6 +12,21 @@ import {
 } from '../store/support'
 
 const POLL_MS = 8000
+
+function getClipboardImageFiles(event: ClipboardEvent<HTMLTextAreaElement>) {
+  const items = Array.from(event.clipboardData?.items || [])
+  return items
+    .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+    .map((item, index) => {
+      const file = item.getAsFile()
+      if (!file) return null
+
+      const extension = file.type.split('/')[1] || 'png'
+      const safeName = file.name && file.name !== 'image.png' ? file.name : `imagem-colada-${Date.now()}-${index}.${extension}`
+      return new File([file], safeName, { type: file.type })
+    })
+    .filter((file): file is File => !!file)
+}
 
 export default function SupportChatWidget() {
   const [open, setOpen] = useState(false)
@@ -145,6 +160,15 @@ export default function SupportChatWidget() {
     setError('')
     setPendingFiles((current) => [...current, ...files])
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function handlePasteImage(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = getClipboardImageFiles(event)
+    if (!files.length) return
+
+    event.preventDefault()
+    setError('')
+    setPendingFiles((current) => [...current, ...files])
   }
 
   return (
@@ -315,6 +339,7 @@ export default function SupportChatWidget() {
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onPaste={handlePasteImage}
               placeholder="Descreva sua duvida ou problema..."
               rows={3}
               style={{
@@ -327,6 +352,9 @@ export default function SupportChatWidget() {
                 boxSizing: 'border-box',
               }}
             />
+            <div style={{ marginTop: 8, color: '#64748b', fontSize: '0.76rem' }}>
+              Voce pode anexar arquivo ou colar imagem com `Ctrl + V`.
+            </div>
 
             {pendingFiles.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
