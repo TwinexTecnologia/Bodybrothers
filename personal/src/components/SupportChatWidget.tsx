@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent } from 'react'
 import { MessageCircle, Paperclip, Send, X } from 'lucide-react'
 import {
   ensureCurrentPersonalSupportThread,
@@ -12,6 +12,21 @@ import {
 } from '../store/support'
 
 const POLL_MS = 8000
+
+function getClipboardImageFiles(event: ClipboardEvent<HTMLTextAreaElement>) {
+  const items = Array.from(event.clipboardData?.items || [])
+  return items
+    .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+    .map((item, index) => {
+      const file = item.getAsFile()
+      if (!file) return null
+
+      const extension = file.type.split('/')[1] || 'png'
+      const safeName = file.name && file.name !== 'image.png' ? file.name : `imagem-colada-${Date.now()}-${index}.${extension}`
+      return new File([file], safeName, { type: file.type })
+    })
+    .filter((file): file is File => !!file)
+}
 
 export default function SupportChatWidget() {
   const [open, setOpen] = useState(false)
@@ -147,6 +162,15 @@ export default function SupportChatWidget() {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  function handlePasteImage(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = getClipboardImageFiles(event)
+    if (!files.length) return
+
+    event.preventDefault()
+    setError('')
+    setPendingFiles((current) => [...current, ...files])
+  }
+
   return (
     <>
       {open && (
@@ -206,7 +230,8 @@ export default function SupportChatWidget() {
               display: 'flex',
               flexDirection: 'column',
               gap: 12,
-              minHeight: 220,
+              minHeight: 140,
+              flex: '1 1 auto',
             }}
           >
             {loading && messages.length === 0 && attachments.length === 0 ? (
@@ -311,10 +336,11 @@ export default function SupportChatWidget() {
             )}
           </div>
 
-          <div style={{ padding: 16, borderTop: '1px solid #e2e8f0', background: '#fff' }}>
+          <div style={{ padding: 16, borderTop: '1px solid #e2e8f0', background: '#fff', flexShrink: 0 }}>
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onPaste={handlePasteImage}
               placeholder="Descreva sua duvida ou problema..."
               rows={3}
               style={{
@@ -327,9 +353,12 @@ export default function SupportChatWidget() {
                 boxSizing: 'border-box',
               }}
             />
+            <div style={{ marginTop: 8, color: '#64748b', fontSize: '0.76rem' }}>
+              Voce pode anexar arquivo ou colar imagem com `Ctrl + V`.
+            </div>
 
             {pendingFiles.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10, maxHeight: 88, overflowY: 'auto', paddingRight: 4 }}>
                 {pendingFiles.map((file, index) => (
                   <div
                     key={`${file.name}-${index}`}
@@ -345,7 +374,7 @@ export default function SupportChatWidget() {
                       fontSize: '0.78rem',
                     }}
                   >
-                    <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {file.name}
                     </span>
                     <button
@@ -360,7 +389,7 @@ export default function SupportChatWidget() {
               </div>
             )}
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 12 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: 10, marginTop: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 150px', minWidth: 0 }}>
                 <input
                   ref={fileInputRef}
@@ -384,6 +413,7 @@ export default function SupportChatWidget() {
                     padding: '10px 14px',
                     cursor: 'pointer',
                     width: '100%',
+                    minHeight: 44,
                   }}
                 >
                   <Paperclip size={16} />
@@ -409,6 +439,7 @@ export default function SupportChatWidget() {
                   padding: '10px 16px',
                   cursor: 'pointer',
                   fontWeight: 600,
+                  minHeight: 44,
                 }}
               >
                 <Send size={16} />

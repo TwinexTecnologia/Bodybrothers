@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   finalizeSupportThread,
@@ -12,6 +12,21 @@ import {
 } from '../../store/support'
 
 const POLL_MS = 8000
+
+function getClipboardImageFiles(event: ClipboardEvent<HTMLTextAreaElement>) {
+  const items = Array.from(event.clipboardData?.items || [])
+  return items
+    .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+    .map((item, index) => {
+      const file = item.getAsFile()
+      if (!file) return null
+
+      const extension = file.type.split('/')[1] || 'png'
+      const safeName = file.name && file.name !== 'image.png' ? file.name : `imagem-colada-${Date.now()}-${index}.${extension}`
+      return new File([file], safeName, { type: file.type })
+    })
+    .filter((file): file is File => !!file)
+}
 
 export default function SupportInbox() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -222,6 +237,16 @@ export default function SupportInbox() {
 
     setPendingClosingFiles((current) => [...current, ...files])
     if (closingFileInputRef.current) closingFileInputRef.current.value = ''
+  }
+
+  function handleClosingPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = getClipboardImageFiles(event)
+    if (!files.length) return
+
+    event.preventDefault()
+    setError('')
+    setSuccess('')
+    setPendingClosingFiles((current) => [...current, ...files])
   }
 
   return (
@@ -484,7 +509,7 @@ export default function SupportInbox() {
                     />
 
                     {pendingFiles.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10, maxHeight: 88, overflowY: 'auto', paddingRight: 4 }}>
                         {pendingFiles.map((file, index) => (
                           <div
                             key={`${file.name}-${index}`}
@@ -500,7 +525,7 @@ export default function SupportInbox() {
                               fontSize: '0.78rem',
                             }}
                           >
-                            <span style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {file.name}
                             </span>
                             <button
@@ -515,7 +540,7 @@ export default function SupportInbox() {
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input ref={fileInputRef} type="file" multiple onChange={handleUpload} style={{ display: 'none' }} />
                         <button
@@ -531,6 +556,7 @@ export default function SupportInbox() {
                             background: '#fff',
                             padding: '10px 14px',
                             cursor: 'pointer',
+                            minHeight: 44,
                           }}
                         >
                           <span>📎</span>
@@ -554,6 +580,7 @@ export default function SupportInbox() {
                           padding: '10px 16px',
                           cursor: 'pointer',
                           fontWeight: 700,
+                          minHeight: 44,
                         }}
                       >
                         <span>➤</span>
@@ -583,6 +610,7 @@ export default function SupportInbox() {
                       <textarea
                         value={summary}
                         onChange={(event) => setSummary(event.target.value)}
+                        onPaste={handleClosingPaste}
                         placeholder="Resumo do problema e da solucao aplicada"
                         rows={7}
                         style={{
@@ -596,6 +624,9 @@ export default function SupportInbox() {
                     </label>
                     <div style={{ marginTop: 8, color: '#64748b', fontSize: '0.76rem' }}>
                       Para finalizar, preencha `Assunto` e `Descricao final`.
+                    </div>
+                    <div style={{ marginTop: 4, color: '#64748b', fontSize: '0.76rem' }}>
+                      Voce tambem pode colar imagem com `Ctrl + V` para virar evidencia.
                     </div>
 
                     <div style={{ marginTop: 12 }}>
@@ -631,7 +662,7 @@ export default function SupportInbox() {
                       </button>
 
                       {pendingClosingFiles.length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10, maxHeight: 88, overflowY: 'auto', paddingRight: 4 }}>
                           {pendingClosingFiles.map((file, index) => (
                             <div
                               key={`${file.name}-${index}`}
@@ -647,7 +678,7 @@ export default function SupportInbox() {
                                 fontSize: '0.78rem',
                               }}
                             >
-                              <span style={{ maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <span style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {file.name}
                               </span>
                               <button
