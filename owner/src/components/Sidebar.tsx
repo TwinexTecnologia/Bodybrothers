@@ -66,6 +66,7 @@ export default function Sidebar() {
             <div className="submenu">
               <NavLink to="/personals/list" className={({ isActive }) => (isActive ? 'active' : undefined)}>Listar Personais</NavLink>
               <NavLink to="/personals/students" className={({ isActive }) => (isActive ? 'active' : undefined)}>Ver Alunos de um Personal</NavLink>
+              <NavLink to="/personals/support" className={({ isActive }) => (isActive ? 'active' : undefined)}>Atendimentos</NavLink>
               <NavLink to="/personals/permissions" className={({ isActive }) => (isActive ? 'active' : undefined)}>Permissões de Acesso</NavLink>
               <NavLink to="/personals/branding" className={({ isActive }) => (isActive ? 'active' : undefined)}>Branding do Personal</NavLink>
             </div>

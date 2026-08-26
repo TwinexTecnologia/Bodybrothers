@@ -6,6 +6,7 @@ import CreatePersonal from './pages/Personals/CreatePersonal'
 import EditPersonal from './pages/Personals/EditPersonal'
 import ResetPassword from './pages/Personals/ResetPassword'
 import ViewPersonalStudents from './pages/Personals/ViewPersonalStudents'
+import SupportInbox from './pages/Personals/SupportInbox'
 import PersonalBranding from './pages/Personals/PersonalBranding'
 import Permissions from './pages/Personals/Permissions'
 import DebitCreate from './pages/Billing/DebitCreate'
@@ -41,6 +42,7 @@ export default function AppRoutes() {
       <Route path="/personals/edit" element={<Protected><EditPersonal /></Protected>} />
       <Route path="/personals/reset-password" element={<Protected><ResetPassword /></Protected>} />
       <Route path="/personals/students" element={<Protected><ViewPersonalStudents /></Protected>} />
+      <Route path="/personals/support" element={<Protected><SupportInbox /></Protected>} />
       <Route path="/personals/branding" element={<Protected><PersonalBranding /></Protected>} />
       <Route path="/personals/permissions" element={<Protected><Permissions /></Protected>} />
 

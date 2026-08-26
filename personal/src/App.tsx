@@ -6,6 +6,7 @@ import { AuthProvider } from './auth/AuthContext'
 import { useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import NotificationBellV2 from './components/NotificationBellV2'
+import SupportChatWidget from './components/SupportChatWidget'
 
 export default function App() {
   const location = useLocation()
@@ -81,6 +82,7 @@ export default function App() {
               <AppRoutes />
             </div>
           </div>
+          <SupportChatWidget />
         </Layout>
       )}
     </AuthProvider>
