@@ -38,6 +38,7 @@ import CRM from './pages/CRM/CRM'
 import CRMDashboard from './pages/CRM/Dashboard'
 import StudentLogin from './pages/StudentApp/Login'
 import StudentHome from './pages/StudentApp/Home'
+import HelpCenter from './pages/Help/HelpCenter'
 
 function DefaultRedirect() {
   const { isAuthenticated, isSubscriptionRestricted } = useAuth()
@@ -98,6 +99,7 @@ export default function AppRoutes() {
       <Route path="/chat/history" element={<Protected><History /></Protected>} />
       
       <Route path="/financial" element={<Protected><FinancialList /></Protected>} />
+      <Route path="/help/center" element={<Protected allowRestricted><HelpCenter /></Protected>} />
 
       <Route path="/account/profile" element={<Protected allowRestricted><Profile /></Protected>} />
       <Route path="/account/branding" element={<Protected><Branding /></Protected>} />

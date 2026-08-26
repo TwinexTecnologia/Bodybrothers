@@ -156,6 +156,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: 'Financeiro', to: '/financial', icon: Wallet },
   ]), [])
 
+  const helpItems = useMemo<MenuItem[]>(() => ([
+    { label: 'Central de Ajuda', to: '/help/center', icon: BookOpen },
+  ]), [])
+
   const settingsItems = useMemo<MenuItem[]>(() => {
     const items: MenuItem[] = [
       { label: 'Perfil do Personal', to: '/account/profile', icon: UserCircle2 },
@@ -324,6 +328,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
           </div>
         )}
+
+        <div className="sidebar-group">
+          <div className="sidebar-group-title">Ajuda</div>
+          <div className="sidebar-group-links">
+            {helpItems.map(item => renderMenuItem(item))}
+          </div>
+        </div>
 
         <div className="sidebar-group sidebar-group-system">
           <div className="sidebar-group-title">Sistema</div>
