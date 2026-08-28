@@ -1,20 +1,118 @@
 import { useEffect, useState, useMemo } from 'react'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Camera, CheckCircle2, LoaderCircle, Save } from 'lucide-react'
+import { Camera, CheckCircle2, LoaderCircle, Save, Search } from 'lucide-react'
 import { listStudentsByPersonal, updateStudent, getStudent, toggleStudentActive, type StudentRecord } from '../../store/students'
 import { listActiveDiets, type DietRecord, listStudentDiets, duplicateDiet, updateDiet, deleteDietIfPersonalized } from '../../store/diets'
 import { listActiveWorkouts, duplicateWorkout, updateWorkout, setWorkoutStatus, type WorkoutRecord } from '../../store/workouts'
 import { listLibraryModels, listStudentModels, duplicateModel, updateModel, deleteModel, type AnamnesisModel } from '../../store/anamnesis'
 import { listPlans, type PlanRecord } from '../../store/plans'
-import { listAllStudentPayments } from '../../store/financial'
+import { listAllStudentPayments, registerPayment } from '../../store/financial'
 import { isStudentOverdue } from '../../lib/finance_utils'
+import { getCurrentBillingDueDate } from '../../lib/planBilling'
 import Modal from '../../components/Modal'
 import { supabase } from '../../lib/supabase'
 import { generateDietPdf } from '../../lib/pdf'
 import { updateStudentAuthCredentials } from '../../lib/studentAuth'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+
+type SearchablePickerOption = {
+  id: string
+  label: string
+}
+
+function SearchablePicker({
+  value,
+  onChange,
+  search,
+  onSearchChange,
+  options,
+  searchPlaceholder,
+  emptyText,
+  selectedLabel,
+}: {
+  value: string
+  onChange: (value: string) => void
+  search: string
+  onSearchChange: (value: string) => void
+  options: SearchablePickerOption[]
+  searchPlaceholder: string
+  emptyText: string
+  selectedLabel?: string
+}) {
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          background: '#fff',
+          border: '1px solid #cbd5e1',
+          borderRadius: 10,
+          padding: '0 12px',
+        }}
+      >
+        <Search size={16} color="#64748b" />
+        <input
+          className="input"
+          type="text"
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder={searchPlaceholder}
+          style={{ border: 'none', boxShadow: 'none', padding: '10px 0', background: 'transparent' }}
+        />
+      </div>
+
+      <div
+        style={{
+          border: '1px solid #dbe2ea',
+          borderRadius: 10,
+          background: '#fff',
+          maxHeight: 190,
+          overflowY: 'auto',
+          padding: 6,
+          display: 'grid',
+          gap: 6,
+        }}
+      >
+        {options.length === 0 ? (
+          <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '0.9em' }}>{emptyText}</div>
+        ) : (
+          options.map((option) => {
+            const active = option.id === value
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => onChange(option.id)}
+                style={{
+                  textAlign: 'left',
+                  border: active ? '1px solid #93c5fd' : '1px solid #e2e8f0',
+                  background: active ? '#eff6ff' : '#fff',
+                  color: '#0f172a',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  cursor: 'pointer',
+                  fontSize: '0.9em',
+                  lineHeight: 1.5,
+                }}
+              >
+                {option.label}
+              </button>
+            )
+          })
+        )}
+      </div>
+
+      <div style={{ fontSize: '0.8em', color: '#64748b', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+        <span>{options.length} opcao(oes) encontrada(s)</span>
+        <span>{selectedLabel ? `Selecionado: ${selectedLabel}` : 'Nenhum item selecionado'}</span>
+      </div>
+    </div>
+  )
+}
 
 export default function EditStudent() {
   const navigate = useNavigate()
@@ -43,7 +141,6 @@ export default function EditStudent() {
   const [plans, setPlans] = useState<PlanRecord[]>([])
   const [planId, setPlanId] = useState('')
   const [planStartDate, setPlanStartDate] = useState('')
-  const [dueDay, setDueDay] = useState('')
   
   // Protocolos
   const [allWorkouts, setAllWorkouts] = useState<WorkoutRecord[]>([])
@@ -63,6 +160,9 @@ export default function EditStudent() {
   // Controle de Treinos e Dietas
   const [libraryWorkoutId, setLibraryWorkoutId] = useState('')
   const [libraryDietId, setLibraryDietId] = useState('')
+  const [workoutOptionSearch, setWorkoutOptionSearch] = useState('')
+  const [dietOptionSearch, setDietOptionSearch] = useState('')
+  const [anamnesisOptionSearch, setAnamnesisOptionSearch] = useState('')
   
   // Estado para Modal de Confirmação de Vínculo Inteligente
   const [smartLinkState, setSmartLinkState] = useState<{
@@ -98,6 +198,7 @@ export default function EditStudent() {
   })
   const [checkingFinancial, setCheckingFinancial] = useState(false)
   const [blockModalOpen, setBlockModalOpen] = useState(false)
+  const [registeringManualPayment, setRegisteringManualPayment] = useState(false)
   const [searchTerm, setSearchTerm] = useState('') // Estado para busca
 
   // Filtros
@@ -152,6 +253,12 @@ export default function EditStudent() {
       return activeOptions.sort((a, b) => a.label.localeCompare(b.label))
   }, [allWorkouts, selectedId, studentMap])
 
+  const filteredWorkoutOptions = useMemo(() => {
+      const term = workoutOptionSearch.trim().toLowerCase()
+      if (!term) return workoutOptions
+      return workoutOptions.filter(option => option.label.toLowerCase().includes(term))
+  }, [workoutOptions, workoutOptionSearch])
+
   const dietOptions = useMemo(() => {
       const activeOptions = (diets || [])
         .filter(d => d && d.studentId !== selectedId)
@@ -163,12 +270,44 @@ export default function EditStudent() {
 
       return activeOptions.sort((a, b) => a.label.localeCompare(b.label))
   }, [diets, selectedId, studentMap])
+
+  const filteredDietOptions = useMemo(() => {
+      const term = dietOptionSearch.trim().toLowerCase()
+      if (!term) return dietOptions
+      return dietOptions.filter(option => option.label.toLowerCase().includes(term))
+  }, [dietOptions, dietOptionSearch])
   
   const anamnesisOptions = useMemo(() => {
       return (libraryAnamnesis || [])
           .map(a => ({ id: a.id, label: `📚 ${a.name}` }))
           .sort((a, b) => a.label.localeCompare(b.label))
   }, [libraryAnamnesis])
+
+  const filteredAnamnesisOptions = useMemo(() => {
+      const term = anamnesisOptionSearch.trim().toLowerCase()
+      if (!term) return anamnesisOptions
+      return anamnesisOptions.filter(option => option.label.toLowerCase().includes(term))
+  }, [anamnesisOptions, anamnesisOptionSearch])
+
+  const selectedWorkoutOption = useMemo(() => {
+      return workoutOptions.find(option => option.id === libraryWorkoutId) || null
+  }, [workoutOptions, libraryWorkoutId])
+
+  const selectedDietOption = useMemo(() => {
+      return dietOptions.find(option => option.id === libraryDietId) || null
+  }, [dietOptions, libraryDietId])
+
+  const selectedAnamnesisOption = useMemo(() => {
+      return anamnesisOptions.find(option => option.id === selectedAnamnesisId) || null
+  }, [anamnesisOptions, selectedAnamnesisId])
+
+  const selectedStudent = useMemo(() => {
+      return students.find(student => student.id === selectedId) || null
+  }, [students, selectedId])
+
+  const selectedPlan = useMemo(() => {
+      return plans.find(plan => plan.id === planId) || null
+  }, [plans, planId])
 
   useEffect(() => {
     async function load() {
@@ -298,7 +437,6 @@ export default function EditStudent() {
             setComplement(s.address?.complement || '')
             setPlanId(s.planId || '')
             setPlanStartDate(s.planStartDate || '')
-            setDueDay(s.dueDay ? String(s.dueDay) : '')
             setSelectedDietIds(s.dietIds || [])
             setWorkoutSchedule(s.workoutSchedule || {})
             setOrderedWorkoutIds(s.workoutIds || [])
@@ -411,7 +549,80 @@ export default function EditStudent() {
       }
       
       setLibraryDietId('')
+      setDietOptionSearch('')
       setLoading(false)
+  }
+
+  const handleMarkCurrentCyclePaid = async () => {
+      if (!selectedId || !selectedStudent) {
+          setMsg('Selecione um aluno para registrar o pagamento.')
+          return
+      }
+
+      if (!selectedPlan) {
+          setMsg('Selecione um plano antes de marcar como pago.')
+          return
+      }
+
+      if (!planStartDate) {
+          setMsg('Informe a data de inicio do plano antes de marcar o pagamento.')
+          return
+      }
+
+      setRegisteringManualPayment(true)
+
+      try {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) {
+              throw new Error('Sessao expirada. Entre novamente para registrar o pagamento.')
+          }
+
+          const payments = await listAllStudentPayments(selectedId)
+          const sortedPayments = [...payments].sort((a, b) => {
+              const dateA = new Date(a.paidAt || a.dueDate).getTime()
+              const dateB = new Date(b.paidAt || b.dueDate).getTime()
+              return dateA - dateB
+          })
+          const lastPayment = sortedPayments[sortedPayments.length - 1]
+          const currentDueDate = getCurrentBillingDueDate(
+              planStartDate,
+              selectedPlan,
+              lastPayment ? (lastPayment.paidAt || lastPayment.dueDate) : null,
+          )
+
+          if (!currentDueDate) {
+              throw new Error('Nao foi possivel calcular o vencimento atual deste aluno.')
+          }
+
+          const dueDate = currentDueDate.toISOString().split('T')[0]
+          const alreadyPaid = payments.some(payment => payment.dueDate === dueDate && payment.status === 'paid')
+
+          if (alreadyPaid) {
+              setMsg('Este ciclo ja esta registrado como pago.')
+              return
+          }
+
+          const ok = await registerPayment({
+              personalId: user.id,
+              studentId: selectedId,
+              amount: selectedPlan.price,
+              dueDate,
+              refDate: currentDueDate,
+              description: `Pagamento manual - ${selectedPlan.name}`,
+          })
+
+          if (!ok) {
+              throw new Error('Nao foi possivel registrar o pagamento manual.')
+          }
+
+          setMsg('Pagamento do ciclo atual registrado com sucesso!')
+      } catch (error) {
+          console.error('Erro ao registrar pagamento manual:', error)
+          const message = error instanceof Error ? error.message : 'Nao foi possivel registrar o pagamento.'
+          setMsg(message)
+      } finally {
+          setRegisteringManualPayment(false)
+      }
   }
 
   const handleRemoveStudentDiet = async (did: string) => {
@@ -543,6 +754,7 @@ export default function EditStudent() {
           await persistWorkoutOrder(nextIds)
       }
       setLibraryWorkoutId('')
+      setWorkoutOptionSearch('')
       setLoading(false)
   }
 
@@ -625,6 +837,7 @@ export default function EditStudent() {
         await reloadAnamnesis()
         await reloadLibraryList()
         setSelectedAnamnesisId('')
+        setAnamnesisOptionSearch('')
       } catch (error) {
         console.error('Erro:', error)
         alert('Erro ao adicionar. Tente novamente.')
@@ -821,7 +1034,6 @@ export default function EditStudent() {
             whatsapp: safeWhatsapp,
             planId: planId || undefined,
             planStartDate: planStartDate || undefined,
-            dueDay: dueDay ? parseInt(dueDay) : undefined,
             dietIds: selectedDietIds,
             address: { cep, street, neighborhood, city, state: stateUf, number, complement }
         }
@@ -851,7 +1063,6 @@ export default function EditStudent() {
           address: newData.address,
           planId: newData.planId,
           planStartDate: newData.planStartDate,
-          dueDay: newData.dueDay,
           dietIds: newData.dietIds,
           workoutIds: orderedWorkoutIds,
           workoutSchedule,
@@ -859,8 +1070,7 @@ export default function EditStudent() {
         })
 
         const { error: profileError } = await supabase.from('profiles').update({
-            plan_id: newData.planId,
-            due_day: newData.dueDay
+            plan_id: newData.planId
         }).eq('id', selectedId)
 
         if (profileError) console.error('Erro ao atualizar colunas reais:', profileError)
@@ -1111,14 +1321,13 @@ export default function EditStudent() {
                             >
                                 <option value="">Selecione...</option>
                                 {plans.map(p => {
-                                    const freqMap: any = { weekly: 'Semanal', monthly: 'Mensal', bimonthly: 'Bimestral', quarterly: 'Trimestral', semiannual: 'Semestral', annual: 'Anual' }
-                                    const freq = freqMap[p.frequency || 'monthly'] || 'Mensal'
-                                    return <option key={p.id} value={p.id}>{p.name} • R$ {p.price.toFixed(2)} ({freq})</option>
+                                    const cycleLabel = p.billingCycleDays === 1 ? '1 dia' : `${p.billingCycleDays} dias`
+                                    return <option key={p.id} value={p.id}>{p.name} • R$ {p.price.toFixed(2)} ({cycleLabel})</option>
                                 })}
                             </select>
                         </label>
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
                             <label className="label">
                                 Início do Plano
                                 <input 
@@ -1129,18 +1338,27 @@ export default function EditStudent() {
                                     onChange={(e) => setPlanStartDate(e.target.value)} 
                                 />
                             </label>
-                            <label className="label">
-                                Dia Vencimento
-                                <select 
-                                    className="select" 
-                                    style={{ width: '100%' }}
-                                    value={dueDay} 
-                                    onChange={(e) => setDueDay(e.target.value)}
-                                >
-                                    <option value="">Padrão</option>
-                                    {[...Array(31)].map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
-                                </select>
-                            </label>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <button
+                                type="button"
+                                className="btn"
+                                onClick={handleMarkCurrentCyclePaid}
+                                disabled={!selectedPlan || !planStartDate || registeringManualPayment}
+                                style={{
+                                    background: '#16a34a',
+                                    border: 'none',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 8,
+                                }}
+                            >
+                                {registeringManualPayment ? 'Registrando pagamento...' : 'Ja recebeu este ciclo'}
+                            </button>
+                            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                Registra manualmente o pagamento do ciclo atual quando o aluno ja pagou fora do sistema.
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1171,13 +1389,19 @@ export default function EditStudent() {
                         </button>
                     </div>
                     
-                    <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8 }}>
-                        <select className="select" style={{ fontSize: '0.9em' }} value={libraryWorkoutId} onChange={e => setLibraryWorkoutId(e.target.value)}>
-                            <option value="">Adicionar modelo ou copiar de aluno...</option>
-                            {workoutOptions.map(o => (
-                                <option key={o.id} value={o.id}>{o.label}</option>
-                            ))}
-                        </select>
+                    <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 260, display: 'grid', gap: 8 }}>
+                            <SearchablePicker
+                                value={libraryWorkoutId}
+                                onChange={setLibraryWorkoutId}
+                                search={workoutOptionSearch}
+                                onSearchChange={setWorkoutOptionSearch}
+                                options={filteredWorkoutOptions}
+                                searchPlaceholder="Pesquisar treino ou aluno..."
+                                emptyText="Nenhum treino encontrado na busca"
+                                selectedLabel={selectedWorkoutOption?.label}
+                            />
+                        </div>
                         <button className="btn" onClick={handleAddWorkout} disabled={!libraryWorkoutId} style={{ background: '#0f172a', whiteSpace: 'nowrap' }}>+ Add</button>
                     </div>
 
@@ -1276,13 +1500,19 @@ export default function EditStudent() {
                         <span>🥗 Dietas</span>
                     </div>
 
-                    <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8 }}>
-                        <select className="select" style={{ fontSize: '0.9em' }} value={libraryDietId} onChange={e => setLibraryDietId(e.target.value)}>
-                            <option value="">Adicionar modelo ou copiar de aluno...</option>
-                            {dietOptions.map(o => (
-                                <option key={o.id} value={o.id}>{o.label}</option>
-                            ))}
-                        </select>
+                    <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 260, display: 'grid', gap: 8 }}>
+                            <SearchablePicker
+                                value={libraryDietId}
+                                onChange={setLibraryDietId}
+                                search={dietOptionSearch}
+                                onSearchChange={setDietOptionSearch}
+                                options={filteredDietOptions}
+                                searchPlaceholder="Pesquisar dieta ou aluno..."
+                                emptyText="Nenhuma dieta encontrada na busca"
+                                selectedLabel={selectedDietOption?.label}
+                            />
+                        </div>
                         <button className="btn" onClick={handleAddDiet} disabled={!libraryDietId} style={{ background: '#0f172a', whiteSpace: 'nowrap' }}>+ Add</button>
                     </div>
 
@@ -1328,10 +1558,16 @@ export default function EditStudent() {
                     <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                         <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
                             <span style={{ fontSize: '0.85em', fontWeight: 600, color: '#475569' }}>Modelo de Anamnese</span>
-                            <select className="select" style={{ fontSize: '0.9em', width: '100%' }} value={selectedAnamnesisId} onChange={e => setSelectedAnamnesisId(e.target.value)}>
-                                <option value="">Selecione...</option>
-                                {libraryAnamnesis.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                            </select>
+                            <SearchablePicker
+                                value={selectedAnamnesisId}
+                                onChange={setSelectedAnamnesisId}
+                                search={anamnesisOptionSearch}
+                                onSearchChange={setAnamnesisOptionSearch}
+                                options={filteredAnamnesisOptions}
+                                searchPlaceholder="Pesquisar modelo de anamnese..."
+                                emptyText="Nenhuma anamnese encontrada na busca"
+                                selectedLabel={selectedAnamnesisOption?.label}
+                            />
                         </label>
                         <label style={{ width: 100, display: 'flex', flexDirection: 'column', gap: 4 }}>
                             <span style={{ fontSize: '0.85em', fontWeight: 600, color: '#475569' }}>Validade (dias)</span>
