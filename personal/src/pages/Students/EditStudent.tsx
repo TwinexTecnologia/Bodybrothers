@@ -300,7 +300,6 @@ export default function EditStudent() {
   const selectedAnamnesisOption = useMemo(() => {
       return anamnesisOptions.find(option => option.id === selectedAnamnesisId) || null
   }, [anamnesisOptions, selectedAnamnesisId])
-
   const selectedStudent = useMemo(() => {
       return students.find(student => student.id === selectedId) || null
   }, [students, selectedId])

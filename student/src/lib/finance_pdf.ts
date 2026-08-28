@@ -60,7 +60,7 @@ export async function generateFinancePdf(studentName: string, planTitle: string,
             
             html += `
                 <tr style="background: ${bg};">
-                    <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${p.description || 'Mensalidade'}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${p.description || 'Cobranca'}</td>
                     <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${new Date(p.dueDate).toLocaleDateString('pt-BR')}</td>
                     <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${p.paidAt ? new Date(p.paidAt).toLocaleDateString('pt-BR') : '-'}</td>
                     <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: ${statusColor}; font-weight: bold;">${statusLabel}</td>

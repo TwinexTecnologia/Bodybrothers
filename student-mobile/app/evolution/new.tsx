@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { router } from 'expo-router';
 import { ChevronLeft, Camera, X, Save } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const POSES = [
     { id: 'front', label: 'Frente' },
@@ -94,25 +95,25 @@ export default function NewEvolution() {
   const uploadPhoto = async (poseId: string, asset: ImagePicker.ImagePickerAsset) => {
       try {
           setUploading(poseId);
-          const fileExt = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
-          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-          const filePath = `${user?.id}/evolution/${fileName}`;
 
-          const formData = new FormData();
-          formData.append('file', {
-              uri: asset.uri,
-              name: fileName,
-              type: asset.mimeType || 'image/jpeg'
-          } as any);
+          // Normaliza para JPEG para evitar falhas com HEIC e tipos inconsistentes no iPhone.
+          const manipulated = await ImageManipulator.manipulateAsync(
+              asset.uri,
+              [],
+              { compress: 0.82, format: ImageManipulator.SaveFormat.JPEG }
+          );
+
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+          const filePath = `${user?.id}/evolution/${fileName}`;
+          const response = await fetch(manipulated.uri);
+          const fileBody = await response.arrayBuffer();
 
           const { error: uploadError } = await supabase.storage
-               .from('anamnesis-files') // Reusing same bucket or create 'evolution-files' if needed. Usually anamnesis-files is fine or 'photos'.
-               // Web uses 'anamnesis-files' in one place, let's check. 
-               // Actually the memory said 'protocols' with type='photos'. 
-               // The bucket name depends on Supabase config. I'll use 'anamnesis-files' as it is likely public/authenticated.
-               .upload(filePath, formData, {
+               .from('anamnesis-files')
+               .upload(filePath, fileBody, {
                    cacheControl: '3600',
-                   upsert: false
+                   upsert: false,
+                   contentType: 'image/jpeg'
                });
 
           if (uploadError) throw uploadError;
@@ -138,17 +139,17 @@ export default function NewEvolution() {
 
       try {
           setSubmitting(true);
-          
-          // Buscar personal_id de algum protocolo existente
-          const { data: protocolData } = await supabase
-              .from('protocols')
+
+          // Usa o vínculo oficial do aluno para evitar falhas quando ainda não existe protocolo anterior.
+          const { data: studentProfile, error: studentError } = await supabase
+              .from('profiles')
               .select('personal_id')
-              .eq('student_id', user?.id)
-              .not('personal_id', 'is', null)
-              .limit(1)
-              .maybeSingle();
-              
-          const personalId = protocolData?.personal_id;
+              .eq('id', user?.id)
+              .single();
+
+          if (studentError) throw studentError;
+
+          const personalId = studentProfile?.personal_id;
           
           if (!personalId) {
               Alert.alert('Erro', 'Não foi possível identificar seu Personal Trainer.');
@@ -166,10 +167,6 @@ export default function NewEvolution() {
               },
               starts_at: new Date().toISOString()
           });
-
-          // If personal_id constraint fails, I need to find the personal.
-          // But I'll try passing user.id if it allows nullable or self-reference, 
-          // OR I should fetch the personal_id first.
           
           if (error) throw error;
 
@@ -300,8 +297,14 @@ const styles = StyleSheet.create({
   actions: { backgroundColor: '#f8fafc', borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1', overflow: 'hidden' },
   buttonsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 16 },
   
-  exampleContainer: { height: 120, position: 'relative', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  exampleImage: { width: '100%', height: '100%', resizeMode: 'cover', opacity: 0.8 },
+  exampleContainer: {
+      height: 220,
+      position: 'relative',
+      borderBottomWidth: 1,
+      borderBottomColor: '#e2e8f0',
+      backgroundColor: '#e5e7eb'
+  },
+  exampleImage: { width: '100%', height: '100%', resizeMode: 'contain', opacity: 0.96 },
   exampleOverlay: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
   exampleText: { color: '#fff', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
   
