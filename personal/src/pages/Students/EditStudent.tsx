@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Camera, CheckCircle2, LoaderCircle, Save } from 'lucide-react'
+import { Camera, CheckCircle2, LoaderCircle, Save, Search } from 'lucide-react'
 import { listStudentsByPersonal, updateStudent, getStudent, toggleStudentActive, type StudentRecord } from '../../store/students'
 import { listActiveDiets, type DietRecord, listStudentDiets, duplicateDiet, updateDiet, deleteDietIfPersonalized } from '../../store/diets'
 import { listActiveWorkouts, duplicateWorkout, updateWorkout, setWorkoutStatus, type WorkoutRecord } from '../../store/workouts'
@@ -16,6 +16,103 @@ import { generateDietPdf } from '../../lib/pdf'
 import { updateStudentAuthCredentials } from '../../lib/studentAuth'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+
+type SearchablePickerOption = {
+  id: string
+  label: string
+}
+
+function SearchablePicker({
+  value,
+  onChange,
+  search,
+  onSearchChange,
+  options,
+  searchPlaceholder,
+  emptyText,
+  selectedLabel,
+}: {
+  value: string
+  onChange: (value: string) => void
+  search: string
+  onSearchChange: (value: string) => void
+  options: SearchablePickerOption[]
+  searchPlaceholder: string
+  emptyText: string
+  selectedLabel?: string
+}) {
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          background: '#fff',
+          border: '1px solid #cbd5e1',
+          borderRadius: 10,
+          padding: '0 12px',
+        }}
+      >
+        <Search size={16} color="#64748b" />
+        <input
+          className="input"
+          type="text"
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder={searchPlaceholder}
+          style={{ border: 'none', boxShadow: 'none', padding: '10px 0', background: 'transparent' }}
+        />
+      </div>
+
+      <div
+        style={{
+          border: '1px solid #dbe2ea',
+          borderRadius: 10,
+          background: '#fff',
+          maxHeight: 190,
+          overflowY: 'auto',
+          padding: 6,
+          display: 'grid',
+          gap: 6,
+        }}
+      >
+        {options.length === 0 ? (
+          <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '0.9em' }}>{emptyText}</div>
+        ) : (
+          options.map((option) => {
+            const active = option.id === value
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => onChange(option.id)}
+                style={{
+                  textAlign: 'left',
+                  border: active ? '1px solid #93c5fd' : '1px solid #e2e8f0',
+                  background: active ? '#eff6ff' : '#fff',
+                  color: '#0f172a',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  cursor: 'pointer',
+                  fontSize: '0.9em',
+                  lineHeight: 1.5,
+                }}
+              >
+                {option.label}
+              </button>
+            )
+          })
+        )}
+      </div>
+
+      <div style={{ fontSize: '0.8em', color: '#64748b', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+        <span>{options.length} opcao(oes) encontrada(s)</span>
+        <span>{selectedLabel ? `Selecionado: ${selectedLabel}` : 'Nenhum item selecionado'}</span>
+      </div>
+    </div>
+  )
+}
 
 export default function EditStudent() {
   const navigate = useNavigate()
@@ -63,6 +160,9 @@ export default function EditStudent() {
   // Controle de Treinos e Dietas
   const [libraryWorkoutId, setLibraryWorkoutId] = useState('')
   const [libraryDietId, setLibraryDietId] = useState('')
+  const [workoutOptionSearch, setWorkoutOptionSearch] = useState('')
+  const [dietOptionSearch, setDietOptionSearch] = useState('')
+  const [anamnesisOptionSearch, setAnamnesisOptionSearch] = useState('')
   
   // Estado para Modal de Confirmação de Vínculo Inteligente
   const [smartLinkState, setSmartLinkState] = useState<{
@@ -153,6 +253,12 @@ export default function EditStudent() {
       return activeOptions.sort((a, b) => a.label.localeCompare(b.label))
   }, [allWorkouts, selectedId, studentMap])
 
+  const filteredWorkoutOptions = useMemo(() => {
+      const term = workoutOptionSearch.trim().toLowerCase()
+      if (!term) return workoutOptions
+      return workoutOptions.filter(option => option.label.toLowerCase().includes(term))
+  }, [workoutOptions, workoutOptionSearch])
+
   const dietOptions = useMemo(() => {
       const activeOptions = (diets || [])
         .filter(d => d && d.studentId !== selectedId)
@@ -164,6 +270,12 @@ export default function EditStudent() {
 
       return activeOptions.sort((a, b) => a.label.localeCompare(b.label))
   }, [diets, selectedId, studentMap])
+
+  const filteredDietOptions = useMemo(() => {
+      const term = dietOptionSearch.trim().toLowerCase()
+      if (!term) return dietOptions
+      return dietOptions.filter(option => option.label.toLowerCase().includes(term))
+  }, [dietOptions, dietOptionSearch])
   
   const anamnesisOptions = useMemo(() => {
       return (libraryAnamnesis || [])
@@ -171,6 +283,23 @@ export default function EditStudent() {
           .sort((a, b) => a.label.localeCompare(b.label))
   }, [libraryAnamnesis])
 
+  const filteredAnamnesisOptions = useMemo(() => {
+      const term = anamnesisOptionSearch.trim().toLowerCase()
+      if (!term) return anamnesisOptions
+      return anamnesisOptions.filter(option => option.label.toLowerCase().includes(term))
+  }, [anamnesisOptions, anamnesisOptionSearch])
+
+  const selectedWorkoutOption = useMemo(() => {
+      return workoutOptions.find(option => option.id === libraryWorkoutId) || null
+  }, [workoutOptions, libraryWorkoutId])
+
+  const selectedDietOption = useMemo(() => {
+      return dietOptions.find(option => option.id === libraryDietId) || null
+  }, [dietOptions, libraryDietId])
+
+  const selectedAnamnesisOption = useMemo(() => {
+      return anamnesisOptions.find(option => option.id === selectedAnamnesisId) || null
+  }, [anamnesisOptions, selectedAnamnesisId])
   const selectedStudent = useMemo(() => {
       return students.find(student => student.id === selectedId) || null
   }, [students, selectedId])
@@ -419,6 +548,7 @@ export default function EditStudent() {
       }
       
       setLibraryDietId('')
+      setDietOptionSearch('')
       setLoading(false)
   }
 
@@ -623,6 +753,7 @@ export default function EditStudent() {
           await persistWorkoutOrder(nextIds)
       }
       setLibraryWorkoutId('')
+      setWorkoutOptionSearch('')
       setLoading(false)
   }
 
@@ -705,6 +836,7 @@ export default function EditStudent() {
         await reloadAnamnesis()
         await reloadLibraryList()
         setSelectedAnamnesisId('')
+        setAnamnesisOptionSearch('')
       } catch (error) {
         console.error('Erro:', error)
         alert('Erro ao adicionar. Tente novamente.')
@@ -1256,13 +1388,19 @@ export default function EditStudent() {
                         </button>
                     </div>
                     
-                    <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8 }}>
-                        <select className="select" style={{ fontSize: '0.9em' }} value={libraryWorkoutId} onChange={e => setLibraryWorkoutId(e.target.value)}>
-                            <option value="">Adicionar modelo ou copiar de aluno...</option>
-                            {workoutOptions.map(o => (
-                                <option key={o.id} value={o.id}>{o.label}</option>
-                            ))}
-                        </select>
+                    <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 260, display: 'grid', gap: 8 }}>
+                            <SearchablePicker
+                                value={libraryWorkoutId}
+                                onChange={setLibraryWorkoutId}
+                                search={workoutOptionSearch}
+                                onSearchChange={setWorkoutOptionSearch}
+                                options={filteredWorkoutOptions}
+                                searchPlaceholder="Pesquisar treino ou aluno..."
+                                emptyText="Nenhum treino encontrado na busca"
+                                selectedLabel={selectedWorkoutOption?.label}
+                            />
+                        </div>
                         <button className="btn" onClick={handleAddWorkout} disabled={!libraryWorkoutId} style={{ background: '#0f172a', whiteSpace: 'nowrap' }}>+ Add</button>
                     </div>
 
@@ -1361,13 +1499,19 @@ export default function EditStudent() {
                         <span>🥗 Dietas</span>
                     </div>
 
-                    <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8 }}>
-                        <select className="select" style={{ fontSize: '0.9em' }} value={libraryDietId} onChange={e => setLibraryDietId(e.target.value)}>
-                            <option value="">Adicionar modelo ou copiar de aluno...</option>
-                            {dietOptions.map(o => (
-                                <option key={o.id} value={o.id}>{o.label}</option>
-                            ))}
-                        </select>
+                    <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 260, display: 'grid', gap: 8 }}>
+                            <SearchablePicker
+                                value={libraryDietId}
+                                onChange={setLibraryDietId}
+                                search={dietOptionSearch}
+                                onSearchChange={setDietOptionSearch}
+                                options={filteredDietOptions}
+                                searchPlaceholder="Pesquisar dieta ou aluno..."
+                                emptyText="Nenhuma dieta encontrada na busca"
+                                selectedLabel={selectedDietOption?.label}
+                            />
+                        </div>
                         <button className="btn" onClick={handleAddDiet} disabled={!libraryDietId} style={{ background: '#0f172a', whiteSpace: 'nowrap' }}>+ Add</button>
                     </div>
 
@@ -1413,10 +1557,16 @@ export default function EditStudent() {
                     <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                         <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
                             <span style={{ fontSize: '0.85em', fontWeight: 600, color: '#475569' }}>Modelo de Anamnese</span>
-                            <select className="select" style={{ fontSize: '0.9em', width: '100%' }} value={selectedAnamnesisId} onChange={e => setSelectedAnamnesisId(e.target.value)}>
-                                <option value="">Selecione...</option>
-                                {libraryAnamnesis.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                            </select>
+                            <SearchablePicker
+                                value={selectedAnamnesisId}
+                                onChange={setSelectedAnamnesisId}
+                                search={anamnesisOptionSearch}
+                                onSearchChange={setAnamnesisOptionSearch}
+                                options={filteredAnamnesisOptions}
+                                searchPlaceholder="Pesquisar modelo de anamnese..."
+                                emptyText="Nenhuma anamnese encontrada na busca"
+                                selectedLabel={selectedAnamnesisOption?.label}
+                            />
                         </label>
                         <label style={{ width: 100, display: 'flex', flexDirection: 'column', gap: 4 }}>
                             <span style={{ fontSize: '0.85em', fontWeight: 600, color: '#475569' }}>Validade (dias)</span>
