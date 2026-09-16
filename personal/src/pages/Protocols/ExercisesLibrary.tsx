@@ -5,10 +5,32 @@ import { listExercises, createExercise, updateExercise, deleteExercise, type Exe
 import { listAllWorkouts } from '../../store/workouts'
 import Modal from '../../components/Modal'
 
+const ALLOWED_VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'm4v', 'webm'])
+const ALLOWED_VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/x-m4v', 'video/webm'])
+
 function getYouTubeId(url: string) {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/)([^#&?]*).*/
     const match = url.match(regExp)
     return (match && match[2].length === 11) ? match[2] : null
+}
+
+function getVideoFileExtension(file: File) {
+    return file.name.split('.').pop()?.toLowerCase() || ''
+}
+
+function isSupportedVideoFile(file: File) {
+    const fileExt = getVideoFileExtension(file)
+    return ALLOWED_VIDEO_EXTENSIONS.has(fileExt) || ALLOWED_VIDEO_MIME_TYPES.has(file.type)
+}
+
+function getVideoContentType(file: File) {
+    if (ALLOWED_VIDEO_MIME_TYPES.has(file.type)) return file.type
+
+    const fileExt = getVideoFileExtension(file)
+    if (fileExt === 'mov') return 'video/quicktime'
+    if (fileExt === 'm4v') return 'video/x-m4v'
+    if (fileExt === 'webm') return 'video/webm'
+    return 'video/mp4'
 }
 
 export default function ExercisesLibrary() {
@@ -117,6 +139,11 @@ export default function ExercisesLibrary() {
 
     const handleUpload = async (file?: File) => {
         if (!file) return
+
+        if (!isSupportedVideoFile(file)) {
+            alert('Formato de vídeo não suportado. Use MP4, MOV, M4V ou WEBM.')
+            return
+        }
         
         if (file.size > 50 * 1024 * 1024) {
             alert('O vídeo deve ter no máximo 50MB.')
@@ -125,13 +152,15 @@ export default function ExercisesLibrary() {
 
         try {
             setUploading(true)
-            const fileExt = file.name.split('.').pop()
+            const fileExt = getVideoFileExtension(file) || 'mp4'
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
             const filePath = `library/${fileName}`
 
             const { error: uploadError } = await supabase.storage
                 .from('videos')
-                .upload(filePath, file)
+                .upload(filePath, file, {
+                    contentType: getVideoContentType(file),
+                })
 
             if (uploadError) throw uploadError
 
@@ -237,7 +266,7 @@ export default function ExercisesLibrary() {
                                                 allowFullScreen
                                                 style={{ border: 'none' }}
                                             />
-                                        ) : ex.video_url.match(/\.(mp4|mov|webm)$/i) || ex.video_url.includes('supabase.co') ? (
+                                        ) : ex.video_url.match(/\.(mp4|mov|m4v|webm)$/i) || ex.video_url.includes('supabase.co') ? (
                                             <video 
                                                 src={ex.video_url} 
                                                 controls 
@@ -311,7 +340,7 @@ export default function ExercisesLibrary() {
                                 {uploading ? 'Enviando...' : '📁 Upload'}
                                 <input 
                                     type="file" 
-                                    accept="video/*" 
+                                    accept=".mp4,.mov,.m4v,.webm,video/mp4,video/quicktime,video/x-m4v,video/webm" 
                                     style={{ display: 'none' }} 
                                     onChange={(e) => handleUpload(e.target.files?.[0])}
                                     disabled={uploading}
@@ -329,7 +358,7 @@ export default function ExercisesLibrary() {
                                         allowFullScreen
                                         style={{ border: 'none' }}
                                     />
-                                ) : formData.video_url.match(/\.(mp4|mov|webm)$/i) || formData.video_url.includes('supabase.co') ? (
+                                ) : formData.video_url.match(/\.(mp4|mov|m4v|webm)$/i) || formData.video_url.includes('supabase.co') ? (
                                     <video 
                                         src={formData.video_url} 
                                         controls 
