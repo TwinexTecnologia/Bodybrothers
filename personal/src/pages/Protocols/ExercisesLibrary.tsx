@@ -34,6 +34,8 @@ function getVideoContentType(file: File) {
 }
 
 export default function ExercisesLibrary() {
+    const MAX_VIDEO_SIZE_MB = 200
+    const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024
     const [exercises, setExercises] = useState<Exercise[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
@@ -44,6 +46,7 @@ export default function ExercisesLibrary() {
     const [formData, setFormData] = useState({ name: '', muscle_group: '', video_url: '' })
     const [saving, setSaving] = useState(false)
     const [uploading, setUploading] = useState(false)
+    const [uploadNotice, setUploadNotice] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
 
     useEffect(() => {
         load()
@@ -141,17 +144,18 @@ export default function ExercisesLibrary() {
         if (!file) return
 
         if (!isSupportedVideoFile(file)) {
-            alert('Formato de vídeo não suportado. Use MP4, MOV, M4V ou WEBM.')
+            setUploadNotice({ type: 'error', text: 'Formato não suportado. Use MP4, MOV, M4V ou WEBM.' })
             return
         }
         
-        if (file.size > 50 * 1024 * 1024) {
-            alert('O vídeo deve ter no máximo 50MB.')
+        if (file.size > MAX_VIDEO_SIZE_BYTES) {
+            setUploadNotice({ type: 'error', text: `O vídeo deve ter no máximo ${MAX_VIDEO_SIZE_MB}MB.` })
             return
         }
 
         try {
             setUploading(true)
+            setUploadNotice(null)
             const fileExt = getVideoFileExtension(file) || 'mp4'
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
             const filePath = `library/${fileName}`
@@ -166,9 +170,10 @@ export default function ExercisesLibrary() {
 
             const { data } = supabase.storage.from('videos').getPublicUrl(filePath)
             setFormData(prev => ({ ...prev, video_url: data.publicUrl }))
+            setUploadNotice({ type: 'success', text: 'Vídeo enviado com sucesso. Você já pode salvar o exercício.' })
         } catch (error: any) {
             console.error('Erro no upload:', error)
-            alert('Erro ao fazer upload. Verifique se o bucket "videos" existe.')
+            setUploadNotice({ type: 'error', text: 'Não foi possível enviar o vídeo agora. Verifique o bucket "videos" e tente novamente.' })
         } finally {
             setUploading(false)
         }
@@ -203,6 +208,7 @@ export default function ExercisesLibrary() {
         setIsModalOpen(false)
         setEditingId(null)
         setFormData({ name: '', muscle_group: '', video_url: '' })
+        setUploadNotice(null)
     }
 
     const filtered = exercises.filter(e => 
@@ -347,6 +353,25 @@ export default function ExercisesLibrary() {
                                 />
                             </label>
                         </div>
+                        <div style={{ marginTop: 8, fontSize: '0.82rem', color: '#64748b' }}>
+                            Aceita MP4, MOV, M4V e WEBM com até 200MB.
+                        </div>
+                        {uploadNotice && (
+                            <div
+                                style={{
+                                    marginTop: 10,
+                                    padding: '12px 14px',
+                                    borderRadius: 10,
+                                    border: uploadNotice.type === 'error' ? '1px solid #fecaca' : '1px solid #bbf7d0',
+                                    background: uploadNotice.type === 'error' ? '#fef2f2' : '#f0fdf4',
+                                    color: uploadNotice.type === 'error' ? '#b91c1c' : '#166534',
+                                    fontSize: '0.88rem',
+                                    lineHeight: 1.45,
+                                }}
+                            >
+                                {uploadNotice.text}
+                            </div>
+                        )}
                         {formData.video_url && (
                             <div style={{ marginTop: 12, borderRadius: 8, overflow: 'hidden', background: '#000', height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {getYouTubeId(formData.video_url) ? (

@@ -97,6 +97,8 @@ const addDays = (dateStr: string, days: number) => {
 };
 
 export default function WorkoutCreate() {
+  const MAX_VIDEO_SIZE_MB = 200
+  const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -117,6 +119,7 @@ export default function WorkoutCreate() {
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(true)
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null)
+  const [uploadNotice, setUploadNotice] = useState<{ idx: number; type: 'error' | 'success'; text: string } | null>(null)
   const [library, setLibrary] = useState<LibraryExercise[]>([])
   
   // Seletor de Exercícios (Modal)
@@ -309,17 +312,18 @@ export default function WorkoutCreate() {
     if (!file) return
 
     if (!isSupportedVideoFile(file)) {
-        alert('Formato de vídeo não suportado. Use MP4, MOV, M4V ou WEBM.')
+        setUploadNotice({ idx, type: 'error', text: 'Formato não suportado. Use MP4, MOV, M4V ou WEBM.' })
         return
     }
     
-    if (file.size > 50 * 1024 * 1024) {
-        alert('O vídeo deve ter no máximo 50MB.')
+    if (file.size > MAX_VIDEO_SIZE_BYTES) {
+        setUploadNotice({ idx, type: 'error', text: `O vídeo deve ter no máximo ${MAX_VIDEO_SIZE_MB}MB.` })
         return
     }
 
     try {
         setUploadingIdx(idx)
+        setUploadNotice(null)
         const fileExt = getVideoFileExtension(file) || 'mp4'
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
         const filePath = `exercises/${fileName}`
@@ -334,9 +338,14 @@ export default function WorkoutCreate() {
 
         const { data } = supabase.storage.from('videos').getPublicUrl(filePath)
         updateExercise(idx, { videoUrl: data.publicUrl })
+        setUploadNotice({ idx, type: 'success', text: 'Vídeo enviado com sucesso. Agora é só salvar o treino.' })
     } catch (error: any) {
         console.error('Erro no upload:', error)
-        alert('Erro ao fazer upload. Verifique se existe um bucket chamado "videos" no Storage do Supabase configurado como público.')
+        setUploadNotice({
+            idx,
+            type: 'error',
+            text: 'Não foi possível enviar o vídeo agora. Verifique o bucket "videos" no Supabase e tente novamente.'
+        })
     } finally {
         setUploadingIdx(null)
     }
@@ -746,6 +755,24 @@ export default function WorkoutCreate() {
                                                     />
                                                 </label>
                                             </div>
+                                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                                Aceita MP4, MOV, M4V e WEBM com até 200MB.
+                                            </div>
+                                            {uploadNotice?.idx === idx && (
+                                                <div
+                                                    style={{
+                                                        padding: '12px 14px',
+                                                        borderRadius: 10,
+                                                        border: uploadNotice.type === 'error' ? '1px solid #fecaca' : '1px solid #bbf7d0',
+                                                        background: uploadNotice.type === 'error' ? '#fef2f2' : '#f0fdf4',
+                                                        color: uploadNotice.type === 'error' ? '#b91c1c' : '#166534',
+                                                        fontSize: '0.86rem',
+                                                        lineHeight: 1.45,
+                                                    }}
+                                                >
+                                                    {uploadNotice.text}
+                                                </div>
+                                            )}
                                             
                                             {/* Preview do Vídeo (Expansível) */}
                                             {ex.videoUrl && (
