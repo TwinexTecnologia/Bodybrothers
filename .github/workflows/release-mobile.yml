@@ -1,0 +1,77 @@
+name: Release Mobile App
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to release
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - ios
+          - android
+      version_bump:
+        description: Semantic version bump
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release:
+    name: Build and Submit Mobile Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: ./student-mobile
+    steps:
+      - name: Check for EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "You must provide an EXPO_TOKEN secret linked to this project's Expo account in this repo's secrets."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+          cache-dependency-path: student-mobile/package-lock.json
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bump app version
+        run: npm version ${{ github.event.inputs.version_bump }} --no-git-tag-version
+
+      - name: Commit release version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add student-mobile/package.json student-mobile/package-lock.json
+          git commit -m "chore(student-mobile): release v${VERSION}"
+          git push origin HEAD:${{ github.ref_name }}
+
+      - name: Build and submit release
+        run: eas build --platform ${{ github.event.inputs.platform }} --profile production --auto-submit --non-interactive
