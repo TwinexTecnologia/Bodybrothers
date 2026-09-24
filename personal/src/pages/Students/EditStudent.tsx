@@ -14,6 +14,7 @@ import Modal from '../../components/Modal'
 import { supabase } from '../../lib/supabase'
 import { generateDietPdf } from '../../lib/pdf'
 import { updateStudentAuthCredentials } from '../../lib/studentAuth'
+import { getCurrentPersonalAccountId } from '../../lib/currentPersonalAccount'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -313,8 +314,9 @@ export default function EditStudent() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
+            const personalAccountId = (await getCurrentPersonalAccountId()) || user.id
             // Carrega Logo
-            const { data: config } = await supabase.from('personal_config').select('logo_url').eq('personal_id', user.id).single()
+            const { data: config } = await supabase.from('personal_config').select('logo_url').eq('personal_id', personalAccountId).single()
             if (config?.logo_url) setBrandLogoUrl(config.logo_url)
 
             // 1. Carrega Alunos PRIMEIRO
@@ -329,7 +331,7 @@ export default function EditStudent() {
 
             // 2. Carrega o resto em segundo plano
             Promise.all([
-                listPlans(user.id),
+                listPlans(personalAccountId),
                 listActiveWorkouts(user.id),
                 listActiveDiets(user.id),
                 listLibraryModels(user.id)

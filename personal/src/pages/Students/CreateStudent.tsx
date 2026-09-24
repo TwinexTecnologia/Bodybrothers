@@ -5,6 +5,7 @@ import { listPlans, type PlanRecord } from '../../store/plans'
 import { supabase } from '../../lib/supabase'
 import { createStudentAuthUser } from '../../lib/studentAuth'
 import { getPlanBillingLabel } from '../../lib/planBilling'
+import { getCurrentPersonalAccountId } from '../../lib/currentPersonalAccount'
 
 export default function CreateStudent() {
   const [searchParams] = useSearchParams()
@@ -29,8 +30,10 @@ export default function CreateStudent() {
     // Carrega Personal e Planos
     supabase.auth.getUser().then(async ({ data: { user } }) => {
         if (user) {
-            setPersonalId(user.id)
-            const p = await listPlans(user.id)
+            const resolvedPersonalId = await getCurrentPersonalAccountId()
+            const accountId = resolvedPersonalId || user.id
+            setPersonalId(accountId)
+            const p = await listPlans(accountId)
             setPlans(p)
         }
     })

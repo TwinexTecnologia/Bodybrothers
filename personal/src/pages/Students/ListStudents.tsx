@@ -7,6 +7,7 @@ import { MessageSquare, ClipboardList } from 'lucide-react'
 import StudentFeedbackModal from '../../components/StudentFeedbackModal'
 import StudentAnamnesisModal from '../../components/StudentAnamnesisModal'
 import { getCurrentBillingDueDate, normalizeDate } from '../../lib/planBilling'
+import { getCurrentPersonalAccountId } from '../../lib/currentPersonalAccount'
 
 type StudentListViewRow = {
   id: string
@@ -274,8 +275,9 @@ export default function ListStudents() {
         setLoading(false) // Libera a tela
 
         // 2. Carrega detalhes em segundo plano
+        const personalAccountId = (await getCurrentPersonalAccountId()) || user.id
         Promise.all([
-            listPlans(user.id),
+            listPlans(personalAccountId),
             supabase
               .from('protocols')
               .select('id, student_id, title')
