@@ -5,6 +5,7 @@ import type { StudentRecord } from '../../store/students'
 import type { PlanRecord } from '../../store/plans'
 import type { DebitRecord } from '../../store/financial'
 import { getCurrentBillingDueDate, getMonthsToDistribute, normalizeDate } from '../../lib/planBilling'
+import { getCurrentPersonalAccountId } from '../../lib/currentPersonalAccount'
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts'
 
@@ -162,6 +163,7 @@ export default function Overview() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
+        const personalAccountId = (await getCurrentPersonalAccountId()) || user.id
 
         const primaryQueriesStartedAt = performance.now()
         const [
@@ -179,7 +181,7 @@ export default function Overview() {
         ] = await Promise.all([
             trackOverviewQuery('A', 'students-total', supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('role', 'aluno')),
             trackOverviewQuery('A', 'students-active', supabase.from('personal_active_students_dashboard').select('id, personal_id, created_at, plan_id, plan_start_date').eq('personal_id', user.id)),
-            trackOverviewQuery('A', 'plans', supabase.from('plans').select('id, frequency, billing_cycle_days').eq('personal_id', user.id)),
+            trackOverviewQuery('A', 'plans', supabase.from('plans').select('id, frequency, billing_cycle_days').eq('personal_id', personalAccountId)),
             trackOverviewQuery('A', 'payments', supabase.from('debits').select('id, payer_id, amount, due_date, paid_at').eq('receiver_id', user.id).eq('status', 'paid')),
             trackOverviewQuery('A', 'diets-active', supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').eq('status', 'active')),
             trackOverviewQuery('A', 'diets-inactive', supabase.from('protocols').select('id', { count: 'exact', head: true }).eq('personal_id', user.id).eq('type', 'diet').neq('status', 'active')),

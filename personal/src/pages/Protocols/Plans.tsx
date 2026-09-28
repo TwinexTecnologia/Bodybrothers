@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { listPlans, deletePlan, type PlanRecord } from '../../store/plans'
-import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { getPlanBillingLabel, getPlanPriceSuffix } from '../../lib/planBilling'
+import { getCurrentPersonalAccountId } from '../../lib/currentPersonalAccount'
 
 export default function Plans() {
   const navigate = useNavigate()
@@ -11,10 +11,14 @@ export default function Plans() {
 
   async function load() {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-        const list = await listPlans(user.id)
+    try {
+      const personalAccountId = await getCurrentPersonalAccountId()
+      if (personalAccountId) {
+        const list = await listPlans(personalAccountId)
         setPlans(list)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar planos da conta principal do personal:', error)
     }
     setLoading(false)
   }

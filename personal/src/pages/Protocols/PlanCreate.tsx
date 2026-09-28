@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { addPlan } from '../../store/plans'
-import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { getCurrentPersonalAccountId } from '../../lib/currentPersonalAccount'
 
 export default function PlanCreate() {
   const navigate = useNavigate()
@@ -14,13 +14,21 @@ export default function PlanCreate() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user) setPersonalId(user.id)
-    })
+    getCurrentPersonalAccountId()
+      .then((id) => {
+        if (id) setPersonalId(id)
+      })
+      .catch((error) => {
+        console.error('Erro ao resolver conta principal do personal:', error)
+        setMsg('Não foi possível identificar a conta do personal.')
+      })
   }, [])
 
   const save = async () => {
-    if (!personalId) return
+    if (!personalId) {
+      setMsg('Não foi possível identificar a conta do personal.')
+      return
+    }
     const n = name.trim()
     const v = Number(price)
     const cycleDays = Number(billingCycleDays)

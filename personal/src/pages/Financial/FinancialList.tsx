@@ -28,6 +28,7 @@ import { listStudentsByPersonal, type StudentRecord } from '../../store/students
 import { listPlans, type PlanRecord } from '../../store/plans'
 import { listMonthPayments, registerPayment, undoPayment, listPaymentHistory, type DebitRecord } from '../../store/financial'
 import { supabase } from '../../lib/supabase'
+import { getCurrentPersonalAccountId } from '../../lib/currentPersonalAccount'
 import Modal from '../../components/Modal'
 import { generateExpectedCharges } from '../../lib/finance_utils'
 import { getPlanBillingDays, normalizeDate } from '../../lib/planBilling'
@@ -79,9 +80,10 @@ function FinancialListContent() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
+        const personalAccountId = (await getCurrentPersonalAccountId()) || user.id
         const [s, p, pay] = await Promise.all([
             listStudentsByPersonal(user.id),
-            listPlans(user.id),
+            listPlans(personalAccountId),
             listMonthPayments(user.id, currentDate)
         ])
         setStudents(s)
