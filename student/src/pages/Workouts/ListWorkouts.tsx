@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/useAuth'
 import { Dumbbell, ChevronRight, PlayCircle, Clock, X, StopCircle, CheckCircle, Calendar, MessageSquare, History, TrendingUp, ChevronLeft, Play, ArrowRight, Flame, BarChart2, FileText } from 'lucide-react'
-import { startSession, finishSession, getWeeklyFrequency, getWeeklyActivity } from '../../store/history'
+import { startSession, finishSession, getWeeklyFrequency, getWeeklyActivity, saveSessionExerciseLogs, getSessionExerciseLogs, getLatestExerciseLogs } from '../../store/history'
 import { ErrorBoundary } from '../../components/ErrorBoundary'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -63,6 +63,13 @@ type SessionState = {
     elapsedSeconds: number
 }
 
+type SessionSetDraft = {
+    load: string
+    performedReps: string
+    completed: boolean
+    lastLoad?: string
+}
+
 const DAYS_MAP: Record<string, string> = {
     'seg': 'Segunda-feira',
     'ter': 'Terça-feira',
@@ -74,6 +81,7 @@ const DAYS_MAP: Record<string, string> = {
 }
 
 const DAYS_ORDER = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom']
+const SESSION_LOG_STORAGE_PREFIX = 'student-workout-session-logs:'
 
 function orderWorkoutsByIds<T extends { id: string }>(list: T[], orderedIds: string[]) {
     if (!orderedIds.length) return list
@@ -91,6 +99,66 @@ function normalizeWorkoutDays(days: string[] | undefined) {
     return DAYS_ORDER.filter(dayKey =>
         days.map(day => String(day).toLowerCase()).includes(dayKey)
     )
+}
+
+function buildSessionSetKey(exerciseIndex: number, setIndex: number) {
+    return `${exerciseIndex}-${setIndex}`
+}
+
+function normalizeExerciseSets(exercise: Exercise): ExerciseSet[] {
+    const setsToRender: ExerciseSet[] = Array.isArray(exercise.sets) ? [...exercise.sets] : []
+
+    if (setsToRender.length === 0) {
+        if (exercise.warmupSeries || exercise.warmupReps) {
+            setsToRender.push({ type: 'warmup', series: exercise.warmupSeries || '', reps: exercise.warmupReps || '', load: exercise.warmupLoad || '', rest: exercise.warmupRest || '' })
+        }
+        if (exercise.feederSeries || exercise.feederReps) {
+            setsToRender.push({ type: 'feeder', series: exercise.feederSeries || '', reps: exercise.feederReps || '', load: exercise.feederLoad || '', rest: exercise.feederRest || '' })
+        }
+        if (exercise.series || exercise.reps) {
+            setsToRender.push({ type: 'working', series: exercise.series || '', reps: exercise.reps || '', load: exercise.load || '', rest: exercise.rest || '' })
+        }
+    }
+
+    return setsToRender
+}
+
+function getSetVisuals(set: ExerciseSet) {
+    if (set.type === 'warmup') {
+        return { color: '#ea580c', bg: '#fff7ed', label: 'Aquecimento' }
+    }
+    if (set.type === 'feeder') {
+        return { color: '#0284c7', bg: '#f0f9ff', label: 'Preparação' }
+    }
+    if (set.type === 'working') {
+        return { color: '#16a34a', bg: '#f0fdf4', label: 'Trabalho' }
+    }
+    if (set.type === 'custom') {
+        return { color: '#7c3aed', bg: '#f5f3ff', label: set.customLabel || 'Específico' }
+    }
+    return { color: '#475569', bg: '#f1f5f9', label: set.customLabel || 'Outro' }
+}
+
+function parseDecimalInput(value: string) {
+    if (!value.trim()) return null
+    const parsed = Number(value.replace(',', '.'))
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+function readSessionDraftStorage(sessionId: string) {
+    if (typeof window === 'undefined') return {}
+
+    try {
+        const raw = window.localStorage.getItem(`${SESSION_LOG_STORAGE_PREFIX}${sessionId}`)
+        return raw ? JSON.parse(raw) as Record<string, SessionSetDraft> : {}
+    } catch {
+        return {}
+    }
+}
+
+function clearSessionDraftStorage(sessionId?: string) {
+    if (!sessionId || typeof window === 'undefined') return
+    window.localStorage.removeItem(`${SESSION_LOG_STORAGE_PREFIX}${sessionId}`)
 }
 
 export default function ListWorkoutsWrapper() {
@@ -124,6 +192,8 @@ function ListWorkouts() {
   // const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null) // REMOVIDO: Não usa mais modal
   const [playingVideoIndex, setPlayingVideoIndex] = useState<number | null>(null) // NOVO: Controla qual vídeo está tocando inline
   const [isFinishing, setIsFinishing] = useState(false)
+  const [expandedExerciseIndex, setExpandedExerciseIndex] = useState<number | null>(0)
+  const [sessionSetDrafts, setSessionSetDrafts] = useState<Record<string, SessionSetDraft>>({})
   const timerRef = useRef<any>(null)
 
   useEffect(() => {
@@ -138,6 +208,110 @@ function ListWorkouts() {
     }
     return () => clearInterval(timerRef.current)
   }, [user])
+
+  async function initializeSessionDrafts(sessionId: string, workout: Workout, studentId: string) {
+      const exerciseNames = (workout.data.exercises || []).map(ex => ex.name).filter(Boolean)
+
+      const [savedLogs, latestLogs] = await Promise.all([
+          getSessionExerciseLogs(sessionId),
+          getLatestExerciseLogs(studentId, exerciseNames),
+      ])
+
+      const savedLogMap = new Map(savedLogs.map(log => [buildSessionSetKey(log.exerciseIndex, log.setIndex), log]))
+      const storageDrafts = readSessionDraftStorage(sessionId)
+      const nextDrafts: Record<string, SessionSetDraft> = {}
+
+      ;(workout.data.exercises || []).forEach((exercise, exerciseIndex) => {
+          const sets = normalizeExerciseSets(exercise)
+          const latestBySet = latestLogs[exercise.name] || {}
+
+          sets.forEach((set, setIndex) => {
+              const key = buildSessionSetKey(exerciseIndex, setIndex)
+              const savedLog = savedLogMap.get(key)
+              const draft = storageDrafts[key]
+              const latest = latestBySet[setIndex]
+
+              const latestLoad = latest?.load ?? null
+              const initialLoad = draft?.load ?? (savedLog?.load != null ? String(savedLog.load) : latestLoad != null ? String(latestLoad) : '')
+
+              nextDrafts[key] = {
+                  load: initialLoad,
+                  performedReps: draft?.performedReps ?? (savedLog?.performedReps != null ? String(savedLog.performedReps) : ''),
+                  completed: draft?.completed ?? savedLog?.completed ?? false,
+                  lastLoad: latestLoad != null ? String(latestLoad) : undefined,
+              }
+          })
+      })
+
+      setSessionSetDrafts(nextDrafts)
+  }
+
+  function updateSessionSetDraft(exerciseIndex: number, setIndex: number, patch: Partial<SessionSetDraft>) {
+      const key = buildSessionSetKey(exerciseIndex, setIndex)
+      setSessionSetDrafts(prev => ({
+          ...prev,
+          [key]: {
+              load: '',
+              performedReps: '',
+              completed: false,
+              ...prev[key],
+              ...patch,
+          },
+      }))
+  }
+
+  function getSessionSetDraft(exerciseIndex: number, setIndex: number) {
+      return sessionSetDrafts[buildSessionSetKey(exerciseIndex, setIndex)] || {
+          load: '',
+          performedReps: '',
+          completed: false,
+      }
+  }
+
+  function copyPreviousLoad(exerciseIndex: number, setIndex: number) {
+      if (setIndex <= 0) return
+      const previous = getSessionSetDraft(exerciseIndex, setIndex - 1)
+      if (!previous.load) return
+      updateSessionSetDraft(exerciseIndex, setIndex, { load: previous.load })
+  }
+
+  function buildSessionLogPayload() {
+      if (!session.sessionId || !session.workout || !user) return []
+
+      const payload: Parameters<typeof saveSessionExerciseLogs>[0] = []
+
+      ;(session.workout.data.exercises || []).forEach((exercise, exerciseIndex) => {
+          const sets = normalizeExerciseSets(exercise)
+
+          sets.forEach((set, setIndex) => {
+              const draft = getSessionSetDraft(exerciseIndex, setIndex)
+              const hasMeaningfulData = Boolean(draft.load || draft.performedReps || draft.completed)
+
+              if (!hasMeaningfulData) return
+
+              const visuals = getSetVisuals(set)
+
+              payload.push({
+                  workoutHistoryId: session.sessionId,
+                  studentId: user.id,
+                  workoutId: session.workout?.id,
+                  exerciseIndex,
+                  exerciseName: exercise.name,
+                  exerciseGroup: exercise.group,
+                  setIndex,
+                  setType: set.type,
+                  setLabel: visuals.label,
+                  targetReps: set.reps,
+                  prescribedLoad: set.load,
+                  performedReps: draft.performedReps ? Number(draft.performedReps) : null,
+                  load: parseDecimalInput(draft.load),
+                  completed: draft.completed,
+              })
+          })
+      })
+
+      return payload
+  }
 
   // Função para retomar sessão ativa (< 4h)
   async function resumeActiveSession() {
@@ -188,6 +362,8 @@ function ListWorkouts() {
                 startTime: start,
                 elapsedSeconds: Math.floor(diffMs / 1000)
             })
+            setExpandedExerciseIndex(0)
+            await initializeSessionDrafts(activeSession.id, workoutData, user.id)
         }
       } catch (err) {
           console.error('Erro ao retomar sessão:', err)
@@ -204,6 +380,11 @@ function ListWorkouts() {
     }
     return () => clearInterval(timerRef.current)
   }, [session.active])
+
+  useEffect(() => {
+      if (!session.active || !session.sessionId || typeof window === 'undefined') return
+      window.localStorage.setItem(`${SESSION_LOG_STORAGE_PREFIX}${session.sessionId}`, JSON.stringify(sessionSetDrafts))
+  }, [session.active, session.sessionId, sessionSetDrafts])
 
   // Função para fechar sessões esquecidas (mais de 4h)
   async function autoCloseStaleSessions() {
@@ -317,6 +498,8 @@ function ListWorkouts() {
               startTime: new Date(),
               elapsedSeconds: 0
           })
+          setExpandedExerciseIndex(0)
+          await initializeSessionDrafts(s.id, w, user.id)
           setSelectedWorkout(null)
           window.scrollTo(0,0)
       } catch (err) {
@@ -329,12 +512,18 @@ function ListWorkouts() {
       
       setIsFinishing(true)
       try {
+          const setLogs = buildSessionLogPayload()
+          if (setLogs.length > 0) {
+              await saveSessionExerciseLogs(setLogs)
+          }
           await finishSession(session.sessionId, session.elapsedSeconds, sessionNotes)
           
           // Ordem importante: fecha modal, reseta notas, mostra sucesso, encerra sessão
           setShowFinishModal(false)
           setSessionNotes('')
           setShowSuccessModal(true)
+          clearSessionDraftStorage(session.sessionId)
+          setSessionSetDrafts({})
           setSession({ active: false, elapsedSeconds: 0 })
           
           // Recarrega dados
@@ -592,165 +781,210 @@ function ListWorkouts() {
                       </div>
                   )}
                   
-                  {session.workout.data.exercises && Array.isArray(session.workout.data.exercises) && session.workout.data.exercises.map((ex, i) => (
-                      <div key={i} style={{ marginBottom: 16, borderRadius: 20, padding: 20, background: '#fff', border: '1px solid #f1f5f9', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'flex-start' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                  <span style={{ fontSize: '1rem', fontWeight: 800, color: '#94a3b8', background: '#f8fafc', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', flexShrink: 0 }}>{i + 1}</span>
-                                  <strong style={{ color: '#0f172a', fontSize: '1.2rem', lineHeight: 1.2 }}>{ex.name}</strong>
-                              </div>
-                          </div>
+                  {session.workout.data.exercises && Array.isArray(session.workout.data.exercises) && session.workout.data.exercises.map((ex, i) => {
+                      const setsToRender = normalizeExerciseSets(ex)
+                      const isExpanded = expandedExerciseIndex === i
+                      const completedCount = setsToRender.filter((_, setIdx) => getSessionSetDraft(i, setIdx).completed).length
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 0 }}>
-                              
-                              {(() => {
-                                  // Normaliza sets: usa o do banco se existir e for array, ou constrói a partir dos campos antigos
-                                  let setsToRender: ExerciseSet[] = Array.isArray(ex.sets) ? ex.sets : []
-                                  
-                                  if (setsToRender.length === 0) {
-                                      if (ex.warmupSeries || ex.warmupReps) {
-                                          setsToRender.push({ type: 'warmup', series: ex.warmupSeries || '', reps: ex.warmupReps || '', load: ex.warmupLoad || '', rest: ex.warmupRest || '' })
-                                      }
-                                      if (ex.feederSeries || ex.feederReps) {
-                                          setsToRender.push({ type: 'feeder', series: ex.feederSeries || '', reps: ex.feederReps || '', load: ex.feederLoad || '', rest: ex.feederRest || '' })
-                                      }
-                                      // Sempre tem trabalho (exceto se for vazio mesmo)
-                                      if (ex.series || ex.reps) {
-                                          setsToRender.push({ type: 'working', series: ex.series || '', reps: ex.reps || '', load: ex.load || '', rest: ex.rest || '' })
-                                      }
-                                  }
+                      return (
+                          <div key={i} style={{ marginBottom: 16, borderRadius: 20, padding: 20, background: '#fff', border: isExpanded ? '1px solid #bfdbfe' : '1px solid #f1f5f9', boxShadow: isExpanded ? '0 10px 25px -15px rgba(59,130,246,0.35)' : '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
+                              <button
+                                  type="button"
+                                  onClick={() => setExpandedExerciseIndex(prev => prev === i ? null : i)}
+                                  style={{ width: '100%', display: 'flex', justifyContent: 'space-between', marginBottom: isExpanded ? 16 : 0, alignItems: 'center', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                              >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                      <span style={{ fontSize: '1rem', fontWeight: 800, color: '#94a3b8', background: '#f8fafc', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', flexShrink: 0 }}>{i + 1}</span>
+                                      <div>
+                                          <strong style={{ color: '#0f172a', fontSize: '1.08rem', lineHeight: 1.2, display: 'block' }}>{ex.name}</strong>
+                                          <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                                              {setsToRender.length} série(s) · {completedCount} concluída(s)
+                                          </span>
+                                      </div>
+                                  </div>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#3b82f6' }}>
+                                      {isExpanded ? 'Fechar' : 'Abrir'}
+                                  </span>
+                              </button>
 
-                                  if (setsToRender.length > 0) {
-                                      return (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {isExpanded && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 0 }}>
+                                      {setsToRender.length > 0 ? (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                               {setsToRender.map((set, setIdx) => {
-                                                  let color = '#334155'
-                                                  let bg = 'transparent'
-                                                  let label = ''
-
-                                                  if (set.type === 'warmup') {
-                                                      color = '#ea580c'
-                                                      bg = '#fff7ed'
-                                                      label = 'Aquecimento'
-                                                  } else if (set.type === 'feeder') {
-                                                      color = '#0284c7'
-                                                      bg = '#f0f9ff'
-                                                      label = 'Preparação'
-                                                  } else if (set.type === 'working') {
-                                                      color = '#16a34a'
-                                                      bg = '#f0fdf4'
-                                                      label = 'Trabalho'
-                                                  } else if (set.type === 'custom') {
-                                                      color = '#7c3aed'
-                                                      bg = '#f5f3ff'
-                                                      label = set.customLabel || 'Específico'
-                                                  }
+                                                  const visuals = getSetVisuals(set)
+                                                  const draft = getSessionSetDraft(i, setIdx)
 
                                                   return (
-                                                      <div key={setIdx} style={{ display: 'flex', flexDirection: 'column', gap: 4, background: bg, padding: '8px 12px', borderRadius: 8, border: `1px solid ${color}20` }}>
-                                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                                                              <span style={{ fontWeight: 700, color: color, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>{label}</span>
-                                                              <span style={{ fontWeight: 600, color: '#334155' }}>{set.series} x {set.reps}</span>
-                                                              {set.load && <span style={{ color: '#64748b' }}>({set.load})</span>}
+                                                      <div key={setIdx} style={{ display: 'flex', flexDirection: 'column', gap: 10, background: visuals.bg, padding: '12px', borderRadius: 12, border: `1px solid ${visuals.color}20` }}>
+                                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                                                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                                                  <span style={{ fontWeight: 700, color: visuals.color, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>{visuals.label}</span>
+                                                                  <span style={{ fontWeight: 700, color: '#334155' }}>{set.series} x {set.reps}</span>
+                                                                  {set.load && <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Sugerido: {set.load}</span>}
+                                                              </div>
+                                                              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: '#0f172a', fontWeight: 600 }}>
+                                                                  <input
+                                                                      type="checkbox"
+                                                                      checked={draft.completed}
+                                                                      onChange={e => updateSessionSetDraft(i, setIdx, { completed: e.target.checked })}
+                                                                  />
+                                                                  Série concluída
+                                                              </label>
                                                           </div>
+
+                                                          {draft.lastLoad && (
+                                                              <div style={{ fontSize: '0.8rem', color: '#475569' }}>
+                                                                  Última carga usada: <strong>{draft.lastLoad}</strong>
+                                                              </div>
+                                                          )}
+
+                                                          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
+                                                              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                                  <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 700 }}>Carga usada</span>
+                                                                  <input
+                                                                      type="number"
+                                                                      inputMode="decimal"
+                                                                      step="0.5"
+                                                                      min="0"
+                                                                      value={draft.load}
+                                                                      onChange={e => updateSessionSetDraft(i, setIdx, { load: e.target.value })}
+                                                                      placeholder={set.load || '0'}
+                                                                      className="input"
+                                                                      style={{ background: '#fff', margin: 0 }}
+                                                                  />
+                                                              </label>
+
+                                                              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                                  <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 700 }}>Reps feitas</span>
+                                                                  <input
+                                                                      type="number"
+                                                                      inputMode="numeric"
+                                                                      step="1"
+                                                                      min="0"
+                                                                      value={draft.performedReps}
+                                                                      onChange={e => updateSessionSetDraft(i, setIdx, { performedReps: e.target.value })}
+                                                                      placeholder={set.reps || '0'}
+                                                                      className="input"
+                                                                      style={{ background: '#fff', margin: 0 }}
+                                                                  />
+                                                              </label>
+                                                          </div>
+
+                                                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                                              {setIdx > 0 && (
+                                                                  <button
+                                                                      type="button"
+                                                                      onClick={() => copyPreviousLoad(i, setIdx)}
+                                                                      style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 999, padding: '8px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                                                                  >
+                                                                      Copiar carga anterior
+                                                                  </button>
+                                                              )}
+                                                              {!draft.completed && (
+                                                                  <button
+                                                                      type="button"
+                                                                      onClick={() => updateSessionSetDraft(i, setIdx, { completed: true })}
+                                                                      style={{ border: 'none', background: '#0f172a', color: '#fff', borderRadius: 999, padding: '8px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                                                                  >
+                                                                      Marcar concluída
+                                                                  </button>
+                                                              )}
+                                                          </div>
+
                                                           {set.rest && (
-                                                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#64748b' }}>
-                                                                   <Clock size={12} />
-                                                                   <span>Descanso: {set.rest}</span>
-                                                               </div>
+                                                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#64748b' }}>
+                                                                  <Clock size={12} />
+                                                                  <span>Descanso: {set.rest}</span>
+                                                              </div>
                                                           )}
                                                       </div>
                                                   )
                                               })}
                                           </div>
-                                      )
-                                  } else {
-                                      // Fallback final se realmente não tiver nada
-                                      return <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>Sem séries definidas.</div>
-                                  }
-                              })()}
-                              
-                              {/* Notas (Comuns a ambos) */}
-                              {ex.notes && (
-                                  <div style={{ fontSize: '0.85rem', color: '#64748b', background: '#fff7ed', padding: '8px 12px', borderRadius: 8, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
-                                      <MessageSquare size={16} style={{ marginTop: 2, flexShrink: 0, color: '#f97316' }} /> 
-                                      <span style={{ color: '#c2410c' }}>{ex.notes}</span>
-                                  </div>
-                              )}
-
-                              {/* Video Player OTIMIZADO - Thumbnail com Play Inline */}
-                              {ex.videoUrl && (
-                                  <div style={{ 
-                                      width: '100%', 
-                                      maxWidth: '600px', 
-                                      aspectRatio: '16/9', // Fixo para evitar layout shift
-                                      borderRadius: 12, 
-                                      overflow: 'hidden', 
-                                      background: '#000', 
-                                      marginTop: 16, 
-                                      position: 'relative', 
-                                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)', 
-                                      alignSelf: 'center',
-                                      cursor: playingVideoIndex === i ? 'default' : 'pointer'
-                                  }}>
-                                      {playingVideoIndex === i ? (
-                                          /* PLAYER INLINE */
-                                          (() => {
-                                              const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
-                                              if (isYoutube) {
-                                                  const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
-                                                  return (
-                                                      <iframe 
-                                                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1&playsinline=1`} 
-                                                          title={ex.name}
-                                                          style={{ width: '100%', height: '100%', border: 'none' }}
-                                                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                                          allowFullScreen
-                                                      />
-                                                  );
-                                              } else {
-                                                  return (
-                                                      <video 
-                                                          src={ex.videoUrl} 
-                                                          controls 
-                                                          autoPlay
-                                                          playsInline
-                                                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                                      />
-                                                  );
-                                              }
-                                          })()
                                       ) : (
-                                          /* THUMBNAIL */
-                                          <div onClick={() => setPlayingVideoIndex(i)} style={{ width: '100%', height: '100%', position: 'relative' }}>
-                                              {(() => {
-                                                  const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
-                                                  let thumbUrl = '';
-                                                  if (isYoutube) {
-                                                      const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
-                                                      thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-                                                  }
-                                                  
-                                                  return (
-                                                      <>
-                                                          {thumbUrl ? (
-                                                              <img src={thumbUrl} alt={ex.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
-                                                          ) : (
-                                                              <video src={ex.videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
-                                                          )}
-                                                          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 16, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                              <Play size={32} fill="#fff" color="#fff" style={{ marginLeft: 4 }} />
-                                                          </div>
-                                                      </>
-                                                  );
-                                              })()}
+                                          <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>Sem séries definidas.</div>
+                                      )}
+                                      
+                                      {ex.notes && (
+                                          <div style={{ fontSize: '0.85rem', color: '#64748b', background: '#fff7ed', padding: '8px 12px', borderRadius: 8, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
+                                              <MessageSquare size={16} style={{ marginTop: 2, flexShrink: 0, color: '#f97316' }} />
+                                              <span style={{ color: '#c2410c' }}>{ex.notes}</span>
+                                          </div>
+                                      )}
+
+                                      {ex.videoUrl && (
+                                          <div style={{ 
+                                              width: '100%', 
+                                              maxWidth: '600px', 
+                                              aspectRatio: '16/9',
+                                              borderRadius: 12, 
+                                              overflow: 'hidden', 
+                                              background: '#000', 
+                                              marginTop: 8, 
+                                              position: 'relative', 
+                                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)', 
+                                              alignSelf: 'center',
+                                              cursor: playingVideoIndex === i ? 'default' : 'pointer'
+                                          }}>
+                                              {playingVideoIndex === i ? (
+                                                  (() => {
+                                                      const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'))
+                                                      if (isYoutube) {
+                                                          const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop()
+                                                          return (
+                                                              <iframe
+                                                                  src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1&playsinline=1`}
+                                                                  title={ex.name}
+                                                                  style={{ width: '100%', height: '100%', border: 'none' }}
+                                                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                                  allowFullScreen
+                                                              />
+                                                          )
+                                                      }
+
+                                                      return (
+                                                          <video
+                                                              src={ex.videoUrl}
+                                                              controls
+                                                              autoPlay
+                                                              playsInline
+                                                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                          />
+                                                      )
+                                                  })()
+                                              ) : (
+                                                  <div onClick={() => setPlayingVideoIndex(i)} style={{ width: '100%', height: '100%', position: 'relative' }}>
+                                                      {(() => {
+                                                          const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'))
+                                                          let thumbUrl = ''
+                                                          if (isYoutube) {
+                                                              const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop()
+                                                              thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+                                                          }
+
+                                                          return (
+                                                              <>
+                                                                  {thumbUrl ? (
+                                                                      <img src={thumbUrl} alt={ex.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                                                                  ) : (
+                                                                      <video src={ex.videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                                                                  )}
+                                                                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 16, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                      <Play size={32} fill="#fff" color="#fff" style={{ marginLeft: 4 }} />
+                                                                  </div>
+                                                              </>
+                                                          )
+                                                      })()}
+                                                  </div>
+                                              )}
                                           </div>
                                       )}
                                   </div>
                               )}
                           </div>
-                      </div>
-                  ))}
+                      )
+                  })}
               </div>
 
               <button 
