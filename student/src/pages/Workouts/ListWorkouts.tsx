@@ -843,127 +843,218 @@ function ListWorkouts() {
       }, 0)
       const progressPercent = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0
       const remainingSets = Math.max(totalSets - completedSets, 0)
+      const mobileMetricCardStyle = {
+          borderRadius: 14,
+          padding: '12px',
+          background: 'rgba(255,255,255,0.1)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          minWidth: 0,
+          boxSizing: 'border-box' as const,
+          display: 'flex',
+          flexDirection: 'column' as const,
+          justifyContent: 'space-between' as const,
+          gap: 8,
+      }
 
       return (
           <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif', background: 'linear-gradient(180deg, #f8fbff 0%, #f8fafc 24%, #eef5ff 100%)' }}>
-              <div style={{ width: '100%', maxWidth: 860, margin: '0 auto', padding: isMobile ? '12px 14px 24px' : '20px 24px 32px' }}>
-                  <header style={{ marginBottom: 24 }}>
-                      <div style={{ borderRadius: 26, padding: isMobile ? 14 : 20, background: 'linear-gradient(145deg, #081634 0%, #0d2a69 58%, #1d4ed8 100%)', color: '#fff', boxShadow: '0 26px 56px -38px rgba(37,99,235,0.55)', overflow: 'hidden', position: 'relative' }}>
-                          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 40%)' }} />
-                          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7, minWidth: 0, flex: 1 }}>
-                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 'fit-content', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#dbeafe', padding: '6px 11px', borderRadius: 999, fontSize: '0.66rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.85px' }}>
-                                          <Flame size={14} />
-                                          Treino em andamento
+              <div style={{ width: '100%', maxWidth: 860, margin: '0 auto', padding: isMobile ? '16px 16px calc(env(safe-area-inset-bottom, 0px) + 108px)' : '20px 24px 32px', boxSizing: 'border-box' }}>
+                  <header style={{ marginBottom: isMobile ? 16 : 24 }}>
+                      {isMobile ? (
+                          <div style={{ borderRadius: 20, padding: 16, background: 'linear-gradient(145deg, #081634 0%, #0d2a69 58%, #1d4ed8 100%)', color: '#fff', boxShadow: '0 26px 56px -38px rgba(37,99,235,0.55)', overflow: 'hidden', position: 'relative', boxSizing: 'border-box' }}>
+                              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 40%)' }} />
+                              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 10, alignItems: 'start', minWidth: 0 }}>
+                                      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 'fit-content', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#dbeafe', padding: '6px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', boxSizing: 'border-box' }}>
+                                              <Flame size={13} />
+                                              Treino em andamento
+                                          </div>
+                                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
+                                              <div style={{ minWidth: 0, flex: 1 }}>
+                                                  <h1 style={{ fontSize: '1.1rem', color: '#fff', margin: 0, letterSpacing: '-0.6px', lineHeight: 1.05, wordBreak: 'break-word' }}>
+                                                      {session.workout.title}
+                                                  </h1>
+                                                  <p style={{ margin: '6px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.78)', lineHeight: 1.35 }}>
+                                                      Preencha cargas e reps reais.
+                                                  </p>
+                                              </div>
+                                          </div>
                                       </div>
-                                      <h1 style={{ fontSize: isMobile ? '1.25rem' : '1.9rem', color: '#fff', margin: 0, letterSpacing: '-0.7px', lineHeight: 1.02 }}>
-                                          {session.workout.title}
-                                      </h1>
-                                      <p style={{ margin: 0, fontSize: isMobile ? '0.82rem' : '0.9rem', color: 'rgba(255,255,255,0.78)', lineHeight: 1.35, maxWidth: isMobile ? 220 : 440 }}>
-                                          Registre sua carga e repetições reais para acompanhar a evolução com o personal.
-                                      </p>
-                                  </div>
-                                  <div style={{ minWidth: isMobile ? 90 : 106, display: 'flex', justifyContent: 'flex-end' }}>
-                                      <div style={{ borderRadius: 18, padding: isMobile ? '10px 10px' : '12px 14px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
-                                          <div style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'rgba(255,255,255,0.68)', fontWeight: 800 }}>
+                                      <div style={{ minWidth: 0, boxSizing: 'border-box', borderRadius: 14, padding: '10px 12px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.7px', color: 'rgba(255,255,255,0.68)', fontWeight: 800 }}>
                                               Progresso
                                           </div>
-                                          <div style={{ fontSize: isMobile ? '1.55rem' : '1.8rem', fontWeight: 800, lineHeight: 1.05, marginTop: 2 }}>
+                                          <div style={{ fontSize: 'clamp(26px, 7vw, 34px)', fontWeight: 800, lineHeight: 1, marginTop: 4, whiteSpace: 'nowrap' }}>
                                               {progressPercent}%
                                           </div>
-                                          <div style={{ marginTop: 8, width: '100%', height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
-                                              <div style={{ width: `${progressPercent}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #60a5fa 0%, #2563eb 100%)' }} />
+                                      </div>
+                                  </div>
+
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, alignItems: 'stretch', minWidth: 0 }}>
+                                      <div style={mobileMetricCardStyle}>
+                                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700 }}>
+                                              Tempo ativo
+                                          </div>
+                                          <div className="timer-display" style={{ fontSize: 'clamp(28px, 8vw, 40px)', fontWeight: 800, color: '#fff', fontFamily: 'monospace', lineHeight: 1, letterSpacing: '-1px', whiteSpace: 'nowrap', minWidth: 0, overflow: 'hidden', textOverflow: 'clip', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }}>
+                                              {formatTime(session.elapsedSeconds)}
+                                          </div>
+                                      </div>
+                                      <div style={mobileMetricCardStyle}>
+                                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700 }}>
+                                              Exercícios
+                                          </div>
+                                          <div style={{ fontSize: 'clamp(26px, 7vw, 34px)', fontWeight: 800, color: '#fff', lineHeight: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                                              {sessionExercises.length}
+                                          </div>
+                                      </div>
+                                      <div style={mobileMetricCardStyle}>
+                                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700 }}>
+                                              Séries
+                                          </div>
+                                          <div style={{ fontSize: 'clamp(26px, 7vw, 34px)', fontWeight: 800, color: '#fff', lineHeight: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                                              {completedSets}/{totalSets}
+                                          </div>
+                                      </div>
+                                      <div style={mobileMetricCardStyle}>
+                                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700 }}>
+                                              Faltando
+                                          </div>
+                                          <div style={{ fontSize: 'clamp(26px, 7vw, 34px)', fontWeight: 800, color: '#fff', lineHeight: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                                              {remainingSets}
                                           </div>
                                       </div>
                                   </div>
-                              </div>
 
-                              <button
-                                  onClick={() => setShowFinishModal(true)}
-                                  style={{
-                                      padding: isMobile ? '12px 14px' : '14px 18px',
-                                      borderRadius: 18,
-                                      border: 'none',
-                                      background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
-                                      color: '#052e16',
-                                      fontSize: '0.95rem',
-                                      fontWeight: 800,
-                                      letterSpacing: '0.2px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      gap: 8,
-                                      cursor: 'pointer',
-                                      minHeight: 54,
-                                      boxShadow: '0 18px 30px -24px rgba(16,185,129,0.85)',
-                                  }}
-                              >
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                      <CheckCircle size={18} />
-                                      Finalizar treino
-                                  </span>
-                                  <ChevronRight size={18} />
-                              </button>
-
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
-                                  <div style={{ borderRadius: 16, padding: isMobile ? '10px 10px' : '14px 14px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)' }}>
-                                      <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
-                                          Tempo ativo
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderRadius: 14, background: 'rgba(8,22,52,0.35)', border: '1px solid rgba(255,255,255,0.08)', padding: 12, boxSizing: 'border-box' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: 'rgba(255,255,255,0.82)', fontWeight: 700, minWidth: 0 }}>
+                                          <span style={{ minWidth: 0 }}>Andamento do treino</span>
+                                          <span style={{ whiteSpace: 'nowrap' }}>{completedSets} de {totalSets} séries</span>
                                       </div>
-                                      <div className="timer-display" style={{ fontSize: isMobile ? '0.95rem' : '1.3rem', fontWeight: 800, color: '#fff', fontFamily: 'monospace', letterSpacing: '-0.7px', lineHeight: 1.1 }}>
-                                          {formatTime(session.elapsedSeconds)}
+                                      <div style={{ width: '100%', height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden', minWidth: 0 }}>
+                                          <div style={{ width: `${progressPercent}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #34d399 0%, #22c55e 100%)', boxShadow: '0 0 18px rgba(52,211,153,0.45)' }} />
                                       </div>
-                                  </div>
-                                  <div style={{ borderRadius: 16, padding: isMobile ? '10px 10px' : '14px 14px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                      <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
-                                          Exercícios
-                                      </div>
-                                      <div style={{ fontSize: isMobile ? '1.5rem' : '1.45rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
-                                          {sessionExercises.length}
-                                      </div>
-                                      <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
-                                          Abrir
-                                      </div>
-                                  </div>
-                                  <div style={{ borderRadius: 16, padding: isMobile ? '10px 10px' : '14px 14px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                      <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
-                                          Séries
-                                      </div>
-                                      <div style={{ fontSize: isMobile ? '1.5rem' : '1.45rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
-                                          {completedSets}/{totalSets}
-                                      </div>
-                                      <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
-                                          Feitas
-                                      </div>
-                                  </div>
-                                  <div style={{ borderRadius: 16, padding: isMobile ? '10px 10px' : '14px 14px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                      <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
-                                          Faltando
-                                      </div>
-                                      <div style={{ fontSize: isMobile ? '1.5rem' : '1.45rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
-                                          {remainingSets}
-                                      </div>
-                                      <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
-                                          Pendentes
-                                      </div>
-                                  </div>
-                              </div>
-
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderRadius: 18, background: 'rgba(8,22,52,0.35)', border: '1px solid rgba(255,255,255,0.08)', padding: isMobile ? '12px' : '14px 16px' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'rgba(255,255,255,0.82)', fontWeight: 700 }}>
-                                      <span>Andamento do treino</span>
-                                      <span>{completedSets} de {totalSets} séries</span>
-                                  </div>
-                                  <div style={{ width: '100%', height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
-                                      <div style={{ width: `${progressPercent}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #34d399 0%, #22c55e 100%)', boxShadow: '0 0 18px rgba(52,211,153,0.45)' }} />
-                                  </div>
-                                  <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.72)' }}>
-                                      Continue preenchendo ou finalize quando terminar.
                                   </div>
                               </div>
                           </div>
-                      </div>
+                      ) : (
+                          <div style={{ borderRadius: 26, padding: 20, background: 'linear-gradient(145deg, #081634 0%, #0d2a69 58%, #1d4ed8 100%)', color: '#fff', boxShadow: '0 26px 56px -38px rgba(37,99,235,0.55)', overflow: 'hidden', position: 'relative' }}>
+                              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 40%)' }} />
+                              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: 7, minWidth: 0, flex: 1 }}>
+                                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 'fit-content', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#dbeafe', padding: '6px 11px', borderRadius: 999, fontSize: '0.66rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.85px' }}>
+                                              <Flame size={14} />
+                                              Treino em andamento
+                                          </div>
+                                          <h1 style={{ fontSize: '1.9rem', color: '#fff', margin: 0, letterSpacing: '-0.7px', lineHeight: 1.02 }}>
+                                              {session.workout.title}
+                                          </h1>
+                                          <p style={{ margin: 0, fontSize: '0.9rem', color: 'rgba(255,255,255,0.78)', lineHeight: 1.35, maxWidth: 440 }}>
+                                              Registre sua carga e repetições reais para acompanhar a evolução com o personal.
+                                          </p>
+                                      </div>
+                                      <div style={{ minWidth: 106, display: 'flex', justifyContent: 'flex-end' }}>
+                                          <div style={{ borderRadius: 18, padding: '12px 14px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                                              <div style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'rgba(255,255,255,0.68)', fontWeight: 800 }}>
+                                                  Progresso
+                                              </div>
+                                              <div style={{ fontSize: '1.8rem', fontWeight: 800, lineHeight: 1.05, marginTop: 2 }}>
+                                                  {progressPercent}%
+                                              </div>
+                                              <div style={{ marginTop: 8, width: '100%', height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+                                                  <div style={{ width: `${progressPercent}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #60a5fa 0%, #2563eb 100%)' }} />
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  <button
+                                      onClick={() => setShowFinishModal(true)}
+                                      style={{
+                                          padding: '14px 18px',
+                                          borderRadius: 18,
+                                          border: 'none',
+                                          background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
+                                          color: '#052e16',
+                                          fontSize: '0.95rem',
+                                          fontWeight: 800,
+                                          letterSpacing: '0.2px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          gap: 8,
+                                          cursor: 'pointer',
+                                          minHeight: 54,
+                                          boxShadow: '0 18px 30px -24px rgba(16,185,129,0.85)',
+                                      }}
+                                  >
+                                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                          <CheckCircle size={18} />
+                                          Finalizar treino
+                                      </span>
+                                      <ChevronRight size={18} />
+                                  </button>
+
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
+                                      <div style={{ borderRadius: 16, padding: '14px 14px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)' }}>
+                                          <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                              Tempo ativo
+                                          </div>
+                                          <div className="timer-display" style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', fontFamily: 'monospace', letterSpacing: '-0.7px', lineHeight: 1.1 }}>
+                                              {formatTime(session.elapsedSeconds)}
+                                          </div>
+                                      </div>
+                                      <div style={{ borderRadius: 16, padding: '14px 14px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                          <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                              Exercícios
+                                          </div>
+                                          <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                                              {sessionExercises.length}
+                                          </div>
+                                          <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
+                                              Abrir
+                                          </div>
+                                      </div>
+                                      <div style={{ borderRadius: 16, padding: '14px 14px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                          <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                              Séries
+                                          </div>
+                                          <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                                              {completedSets}/{totalSets}
+                                          </div>
+                                          <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
+                                              Feitas
+                                          </div>
+                                      </div>
+                                      <div style={{ borderRadius: 16, padding: '14px 14px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                          <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                              Faltando
+                                          </div>
+                                          <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                                              {remainingSets}
+                                          </div>
+                                          <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
+                                              Pendentes
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderRadius: 18, background: 'rgba(8,22,52,0.35)', border: '1px solid rgba(255,255,255,0.08)', padding: '14px 16px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'rgba(255,255,255,0.82)', fontWeight: 700 }}>
+                                          <span>Andamento do treino</span>
+                                          <span>{completedSets} de {totalSets} séries</span>
+                                      </div>
+                                      <div style={{ width: '100%', height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+                                          <div style={{ width: `${progressPercent}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #34d399 0%, #22c55e 100%)', boxShadow: '0 0 18px rgba(52,211,153,0.45)' }} />
+                                      </div>
+                                      <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.72)' }}>
+                                          Continue preenchendo ou finalize quando terminar.
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
                   </header>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1246,6 +1337,28 @@ function ListWorkouts() {
                   })}
                   </div>
               </div>
+
+              {isMobile && (
+                  <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1200, padding: '0 16px calc(env(safe-area-inset-bottom, 0px) + 12px)', background: 'linear-gradient(180deg, rgba(248,250,252,0) 0%, rgba(248,250,252,0.92) 40%, rgba(248,250,252,1) 100%)', boxSizing: 'border-box' }}>
+                      <div style={{ width: '100%', maxWidth: 860, margin: '0 auto', background: 'rgba(15,23,42,0.96)', color: '#fff', borderRadius: 18, padding: '12px 14px', boxShadow: '0 24px 50px -30px rgba(15,23,42,0.65)', border: '1px solid rgba(148,163,184,0.18)', backdropFilter: 'blur(12px)', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'center', boxSizing: 'border-box' }}>
+                          <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.65px', color: 'rgba(255,255,255,0.64)', fontWeight: 800 }}>
+                                  Resumo do treino
+                              </div>
+                              <div style={{ fontSize: '0.92rem', fontWeight: 700, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {completedSets} de {totalSets} séries
+                              </div>
+                          </div>
+                          <button
+                              onClick={() => setShowFinishModal(true)}
+                              style={{ padding: '12px 14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)', color: '#052e16', fontSize: '0.9rem', fontWeight: 800, letterSpacing: '0.2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', boxShadow: '0 20px 30px -24px rgba(16,185,129,0.85)', minWidth: 0, boxSizing: 'border-box' }}
+                          >
+                              <CheckCircle size={17} />
+                              Finalizar
+                          </button>
+                      </div>
+                  </div>
+              )}
 
               {showSummaryModal && (
                   <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(8px)' }} onClick={() => setShowSummaryModal(false)}>
