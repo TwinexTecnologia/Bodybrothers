@@ -734,42 +734,111 @@ function ListWorkouts() {
   }, [])
 
   if (session.active && session.workout && session.workout.data) {
-      // Modo Sessão (Mantido com melhorias sutis)
-      return (
-          <div style={{ padding: 24, minHeight: '80vh', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif' }}>
-              <header style={{ textAlign: 'center', marginBottom: 24 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                      <div style={{ display: 'inline-block', background: '#dcfce7', color: '#166534', padding: '6px 16px', borderRadius: 30, fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
-                          Treino em Andamento
-                      </div>
-                      <button 
-                          onClick={() => setShowFinishModal(true)}
-                          style={{ 
-                              padding: '10px 20px', borderRadius: 20, border: 'none', 
-                              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#fff', 
-                              fontSize: '0.9rem', fontWeight: 700, letterSpacing: '0.5px',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer',
-                              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)', transition: 'transform 0.2s'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
-                          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-                      >
-                          <StopCircle size={18} /> FINALIZAR
-                      </button>
-                  </div>
-                  <h1 style={{ fontSize: '2rem', color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>{session.workout.title}</h1>
-                  <div className="timer-display" style={{ fontSize: '3.5rem', fontWeight: 800, color: '#3b82f6', fontFamily: 'monospace', letterSpacing: '-2px', lineHeight: 1 }}>
-                      {formatTime(session.elapsedSeconds)}
-                  </div>
-              </header>
+      const sessionExercises = session.workout.data.exercises || []
+      const totalSets = sessionExercises.reduce((total, exercise) => total + normalizeExerciseSets(exercise).length, 0)
+      const completedSets = sessionExercises.reduce((total, exercise, exerciseIndex) => {
+          return total + normalizeExerciseSets(exercise).filter((_, setIdx) => getSessionSetDraft(exerciseIndex, setIdx).completed).length
+      }, 0)
+      const progressPercent = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0
 
-              <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 24 }}>
+      return (
+          <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif', background: 'linear-gradient(180deg, #f8fbff 0%, #f8fafc 24%, #eef5ff 100%)' }}>
+              <div style={{ width: '100%', maxWidth: 860, margin: '0 auto', padding: isMobile ? '16px 14px 120px' : '24px 24px 132px' }}>
+                  <header style={{ marginBottom: 24 }}>
+                      <div style={{ borderRadius: 28, padding: isMobile ? 20 : 28, background: 'linear-gradient(145deg, #0f172a 0%, #1e3a8a 58%, #2563eb 100%)', color: '#fff', boxShadow: '0 30px 60px -34px rgba(37,99,235,0.55)', overflow: 'hidden', position: 'relative' }}>
+                          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at top right, rgba(255,255,255,0.22), transparent 32%)' }} />
+                          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 18 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 'fit-content', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.18)', color: '#dbeafe', padding: '8px 14px', borderRadius: 999, fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.9px' }}>
+                                          <Flame size={14} />
+                                          Treino em andamento
+                                      </div>
+                                      <h1 style={{ fontSize: isMobile ? '1.75rem' : '2.25rem', color: '#fff', margin: 0, letterSpacing: '-0.8px', lineHeight: 1.05 }}>
+                                          {session.workout.title}
+                                      </h1>
+                                      <p style={{ margin: 0, fontSize: '0.96rem', color: 'rgba(255,255,255,0.78)', lineHeight: 1.5 }}>
+                                          Registre sua carga e repetições reais para acompanhar a evolução com o personal.
+                                      </p>
+                                  </div>
+                                  <button
+                                      onClick={() => setShowFinishModal(true)}
+                                      style={{
+                                          padding: '12px 18px',
+                                          borderRadius: 16,
+                                          border: '1px solid rgba(255,255,255,0.18)',
+                                          background: 'rgba(15, 23, 42, 0.28)',
+                                          color: '#fff',
+                                          fontSize: '0.9rem',
+                                          fontWeight: 700,
+                                          letterSpacing: '0.3px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          gap: 8,
+                                          cursor: 'pointer',
+                                          backdropFilter: 'blur(8px)',
+                                      }}
+                                  >
+                                      <StopCircle size={18} /> Finalizar
+                                  </button>
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1.2fr 0.8fr 0.8fr', gap: 12 }}>
+                                  <div style={{ borderRadius: 20, padding: '16px 18px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)' }}>
+                                      <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                          Tempo ativo
+                                      </div>
+                                      <div className="timer-display" style={{ fontSize: isMobile ? '2rem' : '2.55rem', fontWeight: 800, color: '#fff', fontFamily: 'monospace', letterSpacing: '-1.5px', lineHeight: 1 }}>
+                                          {formatTime(session.elapsedSeconds)}
+                                      </div>
+                                  </div>
+                                  <div style={{ borderRadius: 20, padding: '16px 18px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                      <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                          Progresso
+                                      </div>
+                                      <div style={{ fontSize: '1.7rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                                          {progressPercent}%
+                                      </div>
+                                      <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
+                                          {completedSets} de {totalSets} séries
+                                      </div>
+                                  </div>
+                                  <div style={{ borderRadius: 20, padding: '16px 18px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                      <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                          Exercícios
+                                      </div>
+                                      <div style={{ fontSize: '1.7rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                                          {sessionExercises.length}
+                                      </div>
+                                      <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
+                                          Toque para abrir
+                                      </div>
+                                  </div>
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>
+                                      <span>Andamento do treino</span>
+                                      <span>{completedSets}/{totalSets} séries</span>
+                                  </div>
+                                  <div style={{ width: '100%', height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+                                      <div style={{ width: `${progressPercent}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #34d399 0%, #22c55e 100%)', boxShadow: '0 0 18px rgba(52,211,153,0.45)' }} />
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </header>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {/* Observações Gerais */}
                   {session.workout.data.notes && (
                       <div style={{ 
-                          marginBottom: 24, padding: 20, borderRadius: 16, 
-                          background: '#fff7ed', border: '1px solid #ffedd5',
-                          display: 'flex', flexDirection: 'column', gap: 8 
+                          padding: 18, borderRadius: 20, 
+                          background: 'rgba(255,255,255,0.92)', border: '1px solid #ffedd5',
+                          display: 'flex', flexDirection: 'column', gap: 8,
+                          boxShadow: '0 12px 24px -22px rgba(249,115,22,0.45)',
+                          backdropFilter: 'blur(8px)',
                       }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <MessageSquare size={18} color="#f97316" />
@@ -787,28 +856,38 @@ function ListWorkouts() {
                       const completedCount = setsToRender.filter((_, setIdx) => getSessionSetDraft(i, setIdx).completed).length
 
                       return (
-                          <div key={i} style={{ marginBottom: 16, borderRadius: 20, padding: 20, background: '#fff', border: isExpanded ? '1px solid #bfdbfe' : '1px solid #f1f5f9', boxShadow: isExpanded ? '0 10px 25px -15px rgba(59,130,246,0.35)' : '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
+                          <div key={i} style={{ borderRadius: 24, padding: isExpanded ? 18 : 16, background: 'rgba(255,255,255,0.94)', border: isExpanded ? '1px solid #bfdbfe' : '1px solid rgba(226,232,240,0.9)', boxShadow: isExpanded ? '0 24px 55px -34px rgba(59,130,246,0.4)' : '0 16px 32px -28px rgba(15,23,42,0.18)', backdropFilter: 'blur(12px)' }}>
                               <button
                                   type="button"
                                   onClick={() => setExpandedExerciseIndex(prev => prev === i ? null : i)}
-                                  style={{ width: '100%', display: 'flex', justifyContent: 'space-between', marginBottom: isExpanded ? 16 : 0, alignItems: 'center', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                                  style={{ width: '100%', display: 'flex', justifyContent: 'space-between', marginBottom: isExpanded ? 16 : 0, alignItems: 'center', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', gap: 12 }}
                               >
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                      <span style={{ fontSize: '1rem', fontWeight: 800, color: '#94a3b8', background: '#f8fafc', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', flexShrink: 0 }}>{i + 1}</span>
+                                      <span style={{ fontSize: '0.95rem', fontWeight: 800, color: isExpanded ? '#2563eb' : '#64748b', background: isExpanded ? '#eff6ff' : '#f8fafc', width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 14, flexShrink: 0, border: isExpanded ? '1px solid #bfdbfe' : '1px solid #e2e8f0' }}>{i + 1}</span>
                                       <div>
-                                          <strong style={{ color: '#0f172a', fontSize: '1.08rem', lineHeight: 1.2, display: 'block' }}>{ex.name}</strong>
-                                          <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                                              {setsToRender.length} série(s) · {completedCount} concluída(s)
-                                          </span>
+                                          <strong style={{ color: '#0f172a', fontSize: '1.08rem', lineHeight: 1.2, display: 'block', marginBottom: 4 }}>{ex.name}</strong>
+                                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                              <span style={{ fontSize: '0.74rem', color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 999, padding: '4px 8px', fontWeight: 700 }}>
+                                                  {setsToRender.length} série(s)
+                                              </span>
+                                              <span style={{ fontSize: '0.74rem', color: completedCount > 0 ? '#166534' : '#475569', background: completedCount > 0 ? '#ecfdf5' : '#f8fafc', border: completedCount > 0 ? '1px solid #bbf7d0' : '1px solid #e2e8f0', borderRadius: 999, padding: '4px 8px', fontWeight: 700 }}>
+                                                  {completedCount} concluída(s)
+                                              </span>
+                                          </div>
                                       </div>
                                   </div>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#3b82f6' }}>
-                                      {isExpanded ? 'Fechar' : 'Abrir'}
-                                  </span>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                          {isExpanded ? 'Aberto' : 'Toque para abrir'}
+                                      </span>
+                                      <span style={{ width: 30, height: 30, borderRadius: '50%', background: isExpanded ? '#eff6ff' : '#f8fafc', border: '1px solid #dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 700 }}>
+                                          {isExpanded ? '−' : '+'}
+                                      </span>
+                                  </div>
                               </button>
 
                               {isExpanded && (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 0 }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingLeft: 0 }}>
                                       {setsToRender.length > 0 ? (
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                               {setsToRender.map((set, setIdx) => {
@@ -816,14 +895,14 @@ function ListWorkouts() {
                                                   const draft = getSessionSetDraft(i, setIdx)
 
                                                   return (
-                                                      <div key={setIdx} style={{ display: 'flex', flexDirection: 'column', gap: 10, background: visuals.bg, padding: '12px', borderRadius: 12, border: `1px solid ${visuals.color}20` }}>
+                                                      <div key={setIdx} style={{ display: 'flex', flexDirection: 'column', gap: 12, background: `linear-gradient(180deg, ${visuals.bg} 0%, #ffffff 100%)`, padding: '14px', borderRadius: 18, border: `1px solid ${visuals.color}20`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65)' }}>
                                                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                                                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                                                  <span style={{ fontWeight: 700, color: visuals.color, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>{visuals.label}</span>
-                                                                  <span style={{ fontWeight: 700, color: '#334155' }}>{set.series} x {set.reps}</span>
-                                                                  {set.load && <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Sugerido: {set.load}</span>}
+                                                                  <span style={{ fontWeight: 800, color: visuals.color, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', background: '#fff', borderRadius: 999, padding: '5px 9px', border: `1px solid ${visuals.color}22` }}>{visuals.label}</span>
+                                                                  <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.94rem' }}>{set.series} x {set.reps}</span>
+                                                                  {set.load && <span style={{ color: '#64748b', fontSize: '0.8rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 999, padding: '5px 8px' }}>Sugerido: {set.load}</span>}
                                                               </div>
-                                                              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: '#0f172a', fontWeight: 600 }}>
+                                                              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', color: '#0f172a', fontWeight: 700, background: draft.completed ? '#ecfdf5' : '#fff', border: draft.completed ? '1px solid #bbf7d0' : '1px solid #e2e8f0', borderRadius: 999, padding: '6px 10px' }}>
                                                                   <input
                                                                       type="checkbox"
                                                                       checked={draft.completed}
@@ -834,14 +913,14 @@ function ListWorkouts() {
                                                           </div>
 
                                                           {draft.lastLoad && (
-                                                              <div style={{ fontSize: '0.8rem', color: '#475569' }}>
+                                                              <div style={{ fontSize: '0.8rem', color: '#475569', background: 'rgba(255,255,255,0.72)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(226,232,240,0.9)' }}>
                                                                   Última carga usada: <strong>{draft.lastLoad}</strong>
                                                               </div>
                                                           )}
 
                                                           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
                                                               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                                                  <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 700 }}>Carga usada</span>
+                                                                  <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Carga usada</span>
                                                                   <input
                                                                       type="number"
                                                                       inputMode="decimal"
@@ -851,12 +930,12 @@ function ListWorkouts() {
                                                                       onChange={e => updateSessionSetDraft(i, setIdx, { load: e.target.value })}
                                                                       placeholder={set.load || '0'}
                                                                       className="input"
-                                                                      style={{ background: '#fff', margin: 0 }}
+                                                                      style={{ background: '#fff', margin: 0, borderRadius: 14, border: '1px solid #dbeafe', boxShadow: '0 8px 20px -18px rgba(59,130,246,0.35)' }}
                                                                   />
                                                               </label>
 
                                                               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                                                  <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 700 }}>Reps feitas</span>
+                                                                  <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Reps feitas</span>
                                                                   <input
                                                                       type="number"
                                                                       inputMode="numeric"
@@ -866,7 +945,7 @@ function ListWorkouts() {
                                                                       onChange={e => updateSessionSetDraft(i, setIdx, { performedReps: e.target.value })}
                                                                       placeholder={set.reps || '0'}
                                                                       className="input"
-                                                                      style={{ background: '#fff', margin: 0 }}
+                                                                      style={{ background: '#fff', margin: 0, borderRadius: 14, border: '1px solid #dbeafe', boxShadow: '0 8px 20px -18px rgba(59,130,246,0.35)' }}
                                                                   />
                                                               </label>
                                                           </div>
@@ -876,7 +955,7 @@ function ListWorkouts() {
                                                                   <button
                                                                       type="button"
                                                                       onClick={() => copyPreviousLoad(i, setIdx)}
-                                                                      style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 999, padding: '8px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                                                                      style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 999, padding: '9px 13px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                                                                   >
                                                                       Copiar carga anterior
                                                                   </button>
@@ -885,7 +964,7 @@ function ListWorkouts() {
                                                                   <button
                                                                       type="button"
                                                                       onClick={() => updateSessionSetDraft(i, setIdx, { completed: true })}
-                                                                      style={{ border: 'none', background: '#0f172a', color: '#fff', borderRadius: 999, padding: '8px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                                                                      style={{ border: 'none', background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)', color: '#fff', borderRadius: 999, padding: '9px 13px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 12px 24px -18px rgba(15,23,42,0.65)' }}
                                                                   >
                                                                       Marcar concluída
                                                                   </button>
@@ -985,22 +1064,31 @@ function ListWorkouts() {
                           </div>
                       )
                   })}
+                  </div>
               </div>
 
-              <button 
-                  onClick={() => setShowFinishModal(true)}
-                  style={{ 
-                      marginTop: 16, padding: 20, borderRadius: 20, border: 'none', 
-                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#fff', 
-                      fontSize: '1.1rem', fontWeight: 700, letterSpacing: '0.5px',
-                      display: 'none', alignItems: 'center', justifyContent: 'center', gap: 12, cursor: 'pointer',
-                      boxShadow: '0 10px 20px -5px rgba(239, 68, 68, 0.4)', transition: 'transform 0.2s'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
-                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-              >
-                  <StopCircle size={24} /> FINALIZAR TREINO
-              </button>
+              <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1200, padding: isMobile ? '12px 14px 18px' : '16px 24px 22px', background: 'linear-gradient(180deg, rgba(248,250,252,0) 0%, rgba(248,250,252,0.94) 26%, rgba(248,250,252,1) 100%)' }}>
+                  <div style={{ width: '100%', maxWidth: 860, margin: '0 auto', background: 'rgba(15,23,42,0.94)', color: '#fff', borderRadius: 24, padding: isMobile ? '14px' : '16px 18px', boxShadow: '0 24px 50px -30px rgba(15,23,42,0.65)', border: '1px solid rgba(148,163,184,0.18)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', flexDirection: isMobile ? 'column' : 'row', gap: 14 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.65px', color: 'rgba(255,255,255,0.64)', fontWeight: 800 }}>
+                              Resumo do treino
+                          </div>
+                          <div style={{ fontSize: '1rem', fontWeight: 700 }}>
+                              {completedSets} de {totalSets} séries registradas
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.72)' }}>
+                              Continue preenchendo ou finalize quando terminar.
+                          </div>
+                      </div>
+                      <button
+                          onClick={() => setShowFinishModal(true)}
+                          style={{ padding: isMobile ? '14px 16px' : '14px 20px', borderRadius: 18, border: 'none', background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)', color: '#052e16', fontSize: '0.95rem', fontWeight: 800, letterSpacing: '0.2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', boxShadow: '0 20px 30px -24px rgba(16,185,129,0.85)' }}
+                      >
+                          <CheckCircle size={18} />
+                          Finalizar treino
+                      </button>
+                  </div>
+              </div>
 
               {showSummaryModal && (
                   <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(8px)' }} onClick={() => setShowSummaryModal(false)}>
