@@ -842,89 +842,130 @@ function ListWorkouts() {
           return total + normalizeExerciseSets(exercise).filter((_, setIdx) => getSessionSetDraft(exerciseIndex, setIdx).completed).length
       }, 0)
       const progressPercent = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0
+      const remainingSets = Math.max(totalSets - completedSets, 0)
 
       return (
           <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif', background: 'linear-gradient(180deg, #f8fbff 0%, #f8fafc 24%, #eef5ff 100%)' }}>
-              <div style={{ width: '100%', maxWidth: 860, margin: '0 auto', padding: isMobile ? '16px 14px 120px' : '24px 24px 132px' }}>
+              <div style={{ width: '100%', maxWidth: 860, margin: '0 auto', padding: isMobile ? '12px 14px 98px' : '20px 24px 112px' }}>
                   <header style={{ marginBottom: 24 }}>
-                      <div style={{ borderRadius: 28, padding: isMobile ? 20 : 28, background: 'linear-gradient(145deg, #0f172a 0%, #1e3a8a 58%, #2563eb 100%)', color: '#fff', boxShadow: '0 30px 60px -34px rgba(37,99,235,0.55)', overflow: 'hidden', position: 'relative' }}>
-                          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at top right, rgba(255,255,255,0.22), transparent 32%)' }} />
-                          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 18 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 'fit-content', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.18)', color: '#dbeafe', padding: '8px 14px', borderRadius: 999, fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.9px' }}>
+                      <div style={{ borderRadius: 26, padding: isMobile ? 16 : 20, background: 'linear-gradient(145deg, #0f172a 0%, #142c6e 56%, #1d4ed8 100%)', color: '#fff', boxShadow: '0 26px 56px -38px rgba(37,99,235,0.55)', overflow: 'hidden', position: 'relative' }}>
+                          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 42%)' }} />
+                          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7, minWidth: 0 }}>
+                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 'fit-content', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.14)', color: '#dbeafe', padding: '7px 12px', borderRadius: 999, fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.85px' }}>
                                           <Flame size={14} />
                                           Treino em andamento
                                       </div>
-                                      <h1 style={{ fontSize: isMobile ? '1.75rem' : '2.25rem', color: '#fff', margin: 0, letterSpacing: '-0.8px', lineHeight: 1.05 }}>
+                                      <h1 style={{ fontSize: isMobile ? '1.45rem' : '1.9rem', color: '#fff', margin: 0, letterSpacing: '-0.7px', lineHeight: 1.02 }}>
                                           {session.workout.title}
                                       </h1>
-                                      <p style={{ margin: 0, fontSize: '0.96rem', color: 'rgba(255,255,255,0.78)', lineHeight: 1.5 }}>
+                                      <p style={{ margin: 0, fontSize: '0.9rem', color: 'rgba(255,255,255,0.78)', lineHeight: 1.4, maxWidth: 440 }}>
                                           Registre sua carga e repetições reais para acompanhar a evolução com o personal.
                                       </p>
                                   </div>
+                                  <div style={{ minWidth: isMobile ? 'auto' : 88, display: 'flex', justifyContent: 'flex-end' }}>
+                                      <div style={{ borderRadius: 16, padding: '10px 12px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', textAlign: 'right' }}>
+                                          <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'rgba(255,255,255,0.68)', fontWeight: 800 }}>
+                                              Progresso
+                                          </div>
+                                          <div style={{ fontSize: '1.15rem', fontWeight: 800, lineHeight: 1.1 }}>
+                                              {progressPercent}%
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.1fr 0.9fr', gap: 12, alignItems: 'stretch' }}>
                                   <button
                                       onClick={() => setShowFinishModal(true)}
                                       style={{
-                                          padding: '12px 18px',
-                                          borderRadius: 16,
+                                          padding: isMobile ? '12px 16px' : '14px 18px',
+                                          borderRadius: 18,
                                           border: '1px solid rgba(255,255,255,0.18)',
-                                          background: 'rgba(15, 23, 42, 0.28)',
+                                          background: 'rgba(15, 23, 42, 0.24)',
                                           color: '#fff',
                                           fontSize: '0.9rem',
                                           fontWeight: 700,
                                           letterSpacing: '0.3px',
                                           display: 'flex',
                                           alignItems: 'center',
-                                          justifyContent: 'center',
+                                          justifyContent: 'space-between',
                                           gap: 8,
                                           cursor: 'pointer',
                                           backdropFilter: 'blur(8px)',
+                                          minHeight: 58,
                                       }}
                                   >
-                                      <StopCircle size={18} /> Finalizar
+                                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                          <StopCircle size={18} />
+                                          Finalizar treino
+                                      </span>
+                                      <ChevronRight size={18} />
                                   </button>
+                                  <div style={{ borderRadius: 18, padding: isMobile ? '12px 14px' : '14px 16px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
+                                      <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'rgba(255,255,255,0.68)', fontWeight: 800 }}>
+                                          Andamento
+                                      </div>
+                                      <div style={{ fontSize: '0.92rem', color: '#fff', fontWeight: 700 }}>
+                                          {completedSets} de {totalSets} séries
+                                      </div>
+                                      <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.72)' }}>
+                                          Faltam {remainingSets} para concluir
+                                      </div>
+                                  </div>
                               </div>
 
-                              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1.2fr 0.8fr 0.8fr', gap: 12 }}>
-                                  <div style={{ borderRadius: 20, padding: '16px 18px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)' }}>
-                                      <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
+                                  <div style={{ borderRadius: 18, padding: '14px 14px', background: 'rgba(255,255,255,0.11)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)' }}>
+                                      <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
                                           Tempo ativo
                                       </div>
-                                      <div className="timer-display" style={{ fontSize: isMobile ? '2rem' : '2.55rem', fontWeight: 800, color: '#fff', fontFamily: 'monospace', letterSpacing: '-1.5px', lineHeight: 1 }}>
+                                      <div className="timer-display" style={{ fontSize: isMobile ? '1.7rem' : '1.95rem', fontWeight: 800, color: '#fff', fontFamily: 'monospace', letterSpacing: '-1px', lineHeight: 1 }}>
                                           {formatTime(session.elapsedSeconds)}
                                       </div>
                                   </div>
-                                  <div style={{ borderRadius: 20, padding: '16px 18px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                      <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
-                                          Progresso
-                                      </div>
-                                      <div style={{ fontSize: '1.7rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
-                                          {progressPercent}%
-                                      </div>
-                                      <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
-                                          {completedSets} de {totalSets} séries
-                                      </div>
-                                  </div>
-                                  <div style={{ borderRadius: 20, padding: '16px 18px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                      <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                  <div style={{ borderRadius: 18, padding: '14px 14px', background: 'rgba(255,255,255,0.11)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                      <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
                                           Exercícios
                                       </div>
-                                      <div style={{ fontSize: '1.7rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                                      <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
                                           {sessionExercises.length}
                                       </div>
-                                      <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
+                                      <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
                                           Toque para abrir
+                                      </div>
+                                  </div>
+                                  <div style={{ borderRadius: 18, padding: '14px 14px', background: 'rgba(255,255,255,0.11)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                      <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                          Séries
+                                      </div>
+                                      <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                                          {completedSets}/{totalSets}
+                                      </div>
+                                      <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
+                                          Registradas
+                                      </div>
+                                  </div>
+                                  <div style={{ borderRadius: 18, padding: '14px 14px', background: 'rgba(255,255,255,0.11)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                      <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                          Faltando
+                                      </div>
+                                      <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                                          {remainingSets}
+                                      </div>
+                                      <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
+                                          Séries pendentes
                                       </div>
                                   </div>
                               </div>
 
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>
                                       <span>Andamento do treino</span>
-                                      <span>{completedSets}/{totalSets} séries</span>
+                                      <span>{completedSets}/{totalSets}</span>
                                   </div>
-                                  <div style={{ width: '100%', height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+                                  <div style={{ width: '100%', height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
                                       <div style={{ width: `${progressPercent}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #34d399 0%, #22c55e 100%)', boxShadow: '0 0 18px rgba(52,211,153,0.45)' }} />
                                   </div>
                               </div>
@@ -1213,22 +1254,22 @@ function ListWorkouts() {
                   </div>
               </div>
 
-              <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1200, padding: isMobile ? '12px 14px 18px' : '16px 24px 22px', background: 'linear-gradient(180deg, rgba(248,250,252,0) 0%, rgba(248,250,252,0.94) 26%, rgba(248,250,252,1) 100%)' }}>
-                  <div style={{ width: '100%', maxWidth: 860, margin: '0 auto', background: 'rgba(15,23,42,0.94)', color: '#fff', borderRadius: 24, padding: isMobile ? '14px' : '16px 18px', boxShadow: '0 24px 50px -30px rgba(15,23,42,0.65)', border: '1px solid rgba(148,163,184,0.18)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', flexDirection: isMobile ? 'column' : 'row', gap: 14 }}>
+              <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1200, padding: isMobile ? '10px 14px 14px' : '14px 24px 18px', background: 'linear-gradient(180deg, rgba(248,250,252,0) 0%, rgba(248,250,252,0.9) 36%, rgba(248,250,252,1) 100%)' }}>
+                  <div style={{ width: '100%', maxWidth: 860, margin: '0 auto', background: 'rgba(15,23,42,0.96)', color: '#fff', borderRadius: 20, padding: isMobile ? '12px' : '14px 16px', boxShadow: '0 24px 50px -30px rgba(15,23,42,0.65)', border: '1px solid rgba(148,163,184,0.18)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', flexDirection: isMobile ? 'column' : 'row', gap: 12 }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.65px', color: 'rgba(255,255,255,0.64)', fontWeight: 800 }}>
+                          <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.65px', color: 'rgba(255,255,255,0.64)', fontWeight: 800 }}>
                               Resumo do treino
                           </div>
-                          <div style={{ fontSize: '1rem', fontWeight: 700 }}>
+                          <div style={{ fontSize: '0.96rem', fontWeight: 700 }}>
                               {completedSets} de {totalSets} séries registradas
                           </div>
-                          <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.72)' }}>
-                              Continue preenchendo ou finalize quando terminar.
+                          <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.72)' }}>
+                              Faltam {remainingSets} séries para concluir.
                           </div>
                       </div>
                       <button
                           onClick={() => setShowFinishModal(true)}
-                          style={{ padding: isMobile ? '14px 16px' : '14px 20px', borderRadius: 18, border: 'none', background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)', color: '#052e16', fontSize: '0.95rem', fontWeight: 800, letterSpacing: '0.2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', boxShadow: '0 20px 30px -24px rgba(16,185,129,0.85)' }}
+                          style={{ padding: isMobile ? '13px 16px' : '13px 18px', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)', color: '#052e16', fontSize: '0.92rem', fontWeight: 800, letterSpacing: '0.2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', boxShadow: '0 20px 30px -24px rgba(16,185,129,0.85)', minWidth: isMobile ? '100%' : 210 }}
                       >
                           <CheckCircle size={18} />
                           Finalizar treino
