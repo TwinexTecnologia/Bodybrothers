@@ -1115,6 +1115,81 @@ function ListWorkouts() {
 
                               {isExpanded && (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingLeft: 0 }}>
+                                      {ex.notes && (
+                                          <div style={{ fontSize: '0.85rem', color: '#64748b', background: '#fff7ed', padding: '8px 12px', borderRadius: 8, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
+                                              <MessageSquare size={16} style={{ marginTop: 2, flexShrink: 0, color: '#f97316' }} />
+                                              <span style={{ color: '#c2410c' }}>{ex.notes}</span>
+                                          </div>
+                                      )}
+
+                                      {ex.videoUrl && (
+                                          <div style={{ 
+                                              width: '100%', 
+                                              maxWidth: '600px', 
+                                              aspectRatio: '16/9',
+                                              borderRadius: 12, 
+                                              overflow: 'hidden', 
+                                              background: '#000', 
+                                              marginTop: 4, 
+                                              position: 'relative', 
+                                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)', 
+                                              alignSelf: 'center',
+                                              cursor: playingVideoIndex === i ? 'default' : 'pointer'
+                                          }}>
+                                              {playingVideoIndex === i ? (
+                                                  (() => {
+                                                      const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'))
+                                                      if (isYoutube) {
+                                                          const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop()
+                                                          return (
+                                                              <iframe
+                                                                  src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1&playsinline=1`}
+                                                                  title={ex.name}
+                                                                  style={{ width: '100%', height: '100%', border: 'none' }}
+                                                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                                  allowFullScreen
+                                                              />
+                                                          )
+                                                      }
+
+                                                      return (
+                                                          <video
+                                                              src={ex.videoUrl}
+                                                              controls
+                                                              autoPlay
+                                                              playsInline
+                                                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                          />
+                                                      )
+                                                  })()
+                                              ) : (
+                                                  <div onClick={() => setPlayingVideoIndex(i)} style={{ width: '100%', height: '100%', position: 'relative' }}>
+                                                      {(() => {
+                                                          const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'))
+                                                          let thumbUrl = ''
+                                                          if (isYoutube) {
+                                                              const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop()
+                                                              thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+                                                          }
+
+                                                          return (
+                                                              <>
+                                                                  {thumbUrl ? (
+                                                                      <img src={thumbUrl} alt={ex.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                                                                  ) : (
+                                                                      <video src={ex.videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                                                                  )}
+                                                                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 16, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                      <Play size={32} fill="#fff" color="#fff" style={{ marginLeft: 4 }} />
+                                                                  </div>
+                                                              </>
+                                                          )
+                                                      })()}
+                                                  </div>
+                                              )}
+                                          </div>
+                                      )}
+
                                       {setsToRender.length > 0 ? (
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                               {setsToRender.map((set, setIdx) => {
@@ -1254,81 +1329,6 @@ function ListWorkouts() {
                                           </div>
                                       ) : (
                                           <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>Sem séries definidas.</div>
-                                      )}
-                                      
-                                      {ex.notes && (
-                                          <div style={{ fontSize: '0.85rem', color: '#64748b', background: '#fff7ed', padding: '8px 12px', borderRadius: 8, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
-                                              <MessageSquare size={16} style={{ marginTop: 2, flexShrink: 0, color: '#f97316' }} />
-                                              <span style={{ color: '#c2410c' }}>{ex.notes}</span>
-                                          </div>
-                                      )}
-
-                                      {ex.videoUrl && (
-                                          <div style={{ 
-                                              width: '100%', 
-                                              maxWidth: '600px', 
-                                              aspectRatio: '16/9',
-                                              borderRadius: 12, 
-                                              overflow: 'hidden', 
-                                              background: '#000', 
-                                              marginTop: 8, 
-                                              position: 'relative', 
-                                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)', 
-                                              alignSelf: 'center',
-                                              cursor: playingVideoIndex === i ? 'default' : 'pointer'
-                                          }}>
-                                              {playingVideoIndex === i ? (
-                                                  (() => {
-                                                      const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'))
-                                                      if (isYoutube) {
-                                                          const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop()
-                                                          return (
-                                                              <iframe
-                                                                  src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1&playsinline=1`}
-                                                                  title={ex.name}
-                                                                  style={{ width: '100%', height: '100%', border: 'none' }}
-                                                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                                  allowFullScreen
-                                                              />
-                                                          )
-                                                      }
-
-                                                      return (
-                                                          <video
-                                                              src={ex.videoUrl}
-                                                              controls
-                                                              autoPlay
-                                                              playsInline
-                                                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                                          />
-                                                      )
-                                                  })()
-                                              ) : (
-                                                  <div onClick={() => setPlayingVideoIndex(i)} style={{ width: '100%', height: '100%', position: 'relative' }}>
-                                                      {(() => {
-                                                          const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'))
-                                                          let thumbUrl = ''
-                                                          if (isYoutube) {
-                                                              const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop()
-                                                              thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-                                                          }
-
-                                                          return (
-                                                              <>
-                                                                  {thumbUrl ? (
-                                                                      <img src={thumbUrl} alt={ex.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
-                                                                  ) : (
-                                                                      <video src={ex.videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
-                                                                  )}
-                                                                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 16, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                      <Play size={32} fill="#fff" color="#fff" style={{ marginLeft: 4 }} />
-                                                                  </div>
-                                                              </>
-                                                          )
-                                                      })()}
-                                                  </div>
-                                              )}
-                                          </div>
                                       )}
                                   </div>
                               )}
