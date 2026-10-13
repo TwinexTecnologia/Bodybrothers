@@ -145,6 +145,11 @@ function parseDecimalInput(value: string) {
     return Number.isFinite(parsed) ? parsed : null
 }
 
+function formatLoadLabel(value?: string | number | null) {
+    if (value === undefined || value === null || value === '') return ''
+    return `${String(value).replace('.', ',')} kg`
+}
+
 function readSessionDraftStorage(sessionId: string) {
     if (typeof window === 'undefined') return {}
 
@@ -273,6 +278,14 @@ function ListWorkouts() {
       const previous = getSessionSetDraft(exerciseIndex, setIndex - 1)
       if (!previous.load) return
       updateSessionSetDraft(exerciseIndex, setIndex, { load: previous.load })
+  }
+
+  function adjustLoad(exerciseIndex: number, setIndex: number, delta: number) {
+      const current = parseDecimalInput(getSessionSetDraft(exerciseIndex, setIndex).load || '')
+      const nextValue = Math.max(0, Number(((current || 0) + delta).toFixed(2)))
+      updateSessionSetDraft(exerciseIndex, setIndex, {
+          load: Number.isInteger(nextValue) ? String(nextValue) : String(nextValue).replace('.', ','),
+      })
   }
 
   function buildSessionLogPayload() {
@@ -900,7 +913,7 @@ function ListWorkouts() {
                                                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                                                   <span style={{ fontWeight: 800, color: visuals.color, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', background: '#fff', borderRadius: 999, padding: '5px 9px', border: `1px solid ${visuals.color}22` }}>{visuals.label}</span>
                                                                   <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.94rem' }}>{set.series} x {set.reps}</span>
-                                                                  {set.load && <span style={{ color: '#64748b', fontSize: '0.8rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 999, padding: '5px 8px' }}>Sugerido: {set.load}</span>}
+                                                                  {set.load && <span style={{ color: '#64748b', fontSize: '0.8rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 999, padding: '5px 8px' }}>Sugerido: {formatLoadLabel(set.load)}</span>}
                                                               </div>
                                                               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', color: '#0f172a', fontWeight: 700, background: draft.completed ? '#ecfdf5' : '#fff', border: draft.completed ? '1px solid #bbf7d0' : '1px solid #e2e8f0', borderRadius: 999, padding: '6px 10px' }}>
                                                                   <input
@@ -914,24 +927,42 @@ function ListWorkouts() {
 
                                                           {draft.lastLoad && (
                                                               <div style={{ fontSize: '0.8rem', color: '#475569', background: 'rgba(255,255,255,0.72)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(226,232,240,0.9)' }}>
-                                                                  Última carga usada: <strong>{draft.lastLoad}</strong>
+                                                                  Última carga usada: <strong>{formatLoadLabel(draft.lastLoad)}</strong>
                                                               </div>
                                                           )}
 
                                                           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
                                                               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                                                   <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Carga usada</span>
-                                                                  <input
-                                                                      type="number"
-                                                                      inputMode="decimal"
-                                                                      step="0.5"
-                                                                      min="0"
-                                                                      value={draft.load}
-                                                                      onChange={e => updateSessionSetDraft(i, setIdx, { load: e.target.value })}
-                                                                      placeholder={set.load || '0'}
-                                                                      className="input"
-                                                                      style={{ background: '#fff', margin: 0, borderRadius: 14, border: '1px solid #dbeafe', boxShadow: '0 8px 20px -18px rgba(59,130,246,0.35)' }}
-                                                                  />
+                                                                  <div style={{ display: 'flex', alignItems: 'stretch', borderRadius: 16, border: '1px solid #dbeafe', background: '#fff', boxShadow: '0 8px 20px -18px rgba(59,130,246,0.35)', overflow: 'hidden' }}>
+                                                                      <div style={{ padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#eff6ff', color: '#1d4ed8', fontSize: '0.86rem', fontWeight: 800, borderRight: '1px solid #dbeafe' }}>
+                                                                          KG
+                                                                      </div>
+                                                                      <input
+                                                                          type="text"
+                                                                          inputMode="decimal"
+                                                                          value={draft.load}
+                                                                          onChange={e => updateSessionSetDraft(i, setIdx, { load: e.target.value.replace(/[^0-9,.\-]/g, '') })}
+                                                                          placeholder={set.load ? String(set.load).replace('.', ',') : '0,0'}
+                                                                          className="input"
+                                                                          style={{ background: '#fff', margin: 0, borderRadius: 0, border: 'none', boxShadow: 'none', flex: 1, minWidth: 0 }}
+                                                                      />
+                                                                      <div style={{ padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', color: '#64748b', fontSize: '0.82rem', fontWeight: 700, borderLeft: '1px solid #e2e8f0' }}>
+                                                                          kg
+                                                                      </div>
+                                                                  </div>
+                                                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                                      {[-2.5, 2.5, 5].map((delta) => (
+                                                                          <button
+                                                                              key={delta}
+                                                                              type="button"
+                                                                              onClick={() => adjustLoad(i, setIdx, delta)}
+                                                                              style={{ border: '1px solid #dbeafe', background: delta > 0 ? '#eff6ff' : '#fff', color: '#1d4ed8', borderRadius: 999, padding: '6px 10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                                                                          >
+                                                                              {delta > 0 ? `+${String(delta).replace('.', ',')}` : String(delta).replace('.', ',')} kg
+                                                                          </button>
+                                                                      ))}
+                                                                  </div>
                                                               </label>
 
                                                               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
