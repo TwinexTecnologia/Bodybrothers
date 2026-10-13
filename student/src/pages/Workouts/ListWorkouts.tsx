@@ -82,6 +82,11 @@ const DAYS_MAP: Record<string, string> = {
 
 const DAYS_ORDER = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom']
 const SESSION_LOG_STORAGE_PREFIX = 'student-workout-session-logs:'
+const LOAD_SUGGESTION_OPTIONS = Array.from({ length: 2001 }, (_, index) => {
+    const value = index / 2
+    return Number.isInteger(value) ? String(value) : String(value).replace('.', ',')
+})
+const REP_SUGGESTION_OPTIONS = Array.from({ length: 101 }, (_, index) => String(index))
 
 function orderWorkoutsByIds<T extends { id: string }>(list: T[], orderedIds: string[]) {
     if (!orderedIds.length) return list
@@ -148,6 +153,17 @@ function parseDecimalInput(value: string) {
 function formatLoadLabel(value?: string | number | null) {
     if (value === undefined || value === null || value === '') return ''
     return `${String(value).replace('.', ',')} kg`
+}
+
+function formatLoadInputValue(value: number) {
+    return Number.isInteger(value) ? String(value) : String(value).replace('.', ',')
+}
+
+function normalizeLoadDraftValue(value: string) {
+    const parsed = parseDecimalInput(value)
+    if (parsed === null) return ''
+    const normalized = Math.max(0, Math.min(1000, Number(parsed.toFixed(2))))
+    return formatLoadInputValue(normalized)
 }
 
 function readSessionDraftStorage(sessionId: string) {
@@ -284,7 +300,7 @@ function ListWorkouts() {
       const current = parseDecimalInput(getSessionSetDraft(exerciseIndex, setIndex).load || '')
       const nextValue = Math.max(0, Number(((current || 0) + delta).toFixed(2)))
       updateSessionSetDraft(exerciseIndex, setIndex, {
-          load: Number.isInteger(nextValue) ? String(nextValue) : String(nextValue).replace('.', ','),
+          load: normalizeLoadDraftValue(String(nextValue)),
       })
   }
 
@@ -316,7 +332,7 @@ function ListWorkouts() {
                   setLabel: visuals.label,
                   targetReps: set.reps,
                   prescribedLoad: set.load,
-                  performedReps: draft.performedReps ? Number(draft.performedReps) : null,
+                  performedReps: draft.performedReps !== '' ? Number(draft.performedReps) : null,
                   load: parseDecimalInput(draft.load),
                   completed: draft.completed,
               })
@@ -933,17 +949,19 @@ function ListWorkouts() {
 
                                                           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
                                                               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                                                  <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Carga usada</span>
+                                                                  <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Carga (kg)</span>
                                                                   <div style={{ display: 'flex', alignItems: 'stretch', borderRadius: 16, border: '1px solid #dbeafe', background: '#fff', boxShadow: '0 8px 20px -18px rgba(59,130,246,0.35)', overflow: 'hidden' }}>
-                                                                      <div style={{ padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#eff6ff', color: '#1d4ed8', fontSize: '0.86rem', fontWeight: 800, borderRight: '1px solid #dbeafe' }}>
-                                                                          KG
+                                                                      <div style={{ padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#eff6ff', color: '#1d4ed8', fontSize: '0.8rem', fontWeight: 800, borderRight: '1px solid #dbeafe', whiteSpace: 'nowrap' }}>
+                                                                          Peso
                                                                       </div>
                                                                       <input
-                                                                          type="text"
+                                                                          type="search"
+                                                                          list="workout-load-options"
                                                                           inputMode="decimal"
                                                                           value={draft.load}
                                                                           onChange={e => updateSessionSetDraft(i, setIdx, { load: e.target.value.replace(/[^0-9,.\-]/g, '') })}
-                                                                          placeholder={set.load ? String(set.load).replace('.', ',') : '0,0'}
+                                                                          onBlur={e => updateSessionSetDraft(i, setIdx, { load: normalizeLoadDraftValue(e.target.value) })}
+                                                                          placeholder={set.load ? String(set.load).replace('.', ',') : '20'}
                                                                           className="input"
                                                                           style={{ background: '#fff', margin: 0, borderRadius: 0, border: 'none', boxShadow: 'none', flex: 1, minWidth: 0 }}
                                                                       />
@@ -967,17 +985,19 @@ function ListWorkouts() {
 
                                                               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                                                   <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Reps feitas</span>
-                                                                  <input
-                                                                      type="number"
-                                                                      inputMode="numeric"
-                                                                      step="1"
-                                                                      min="0"
+                                                                  <select
                                                                       value={draft.performedReps}
                                                                       onChange={e => updateSessionSetDraft(i, setIdx, { performedReps: e.target.value })}
-                                                                      placeholder={set.reps || '0'}
                                                                       className="input"
-                                                                      style={{ background: '#fff', margin: 0, borderRadius: 14, border: '1px solid #dbeafe', boxShadow: '0 8px 20px -18px rgba(59,130,246,0.35)' }}
-                                                                  />
+                                                                      style={{ background: '#fff', margin: 0, borderRadius: 14, border: '1px solid #dbeafe', boxShadow: '0 8px 20px -18px rgba(59,130,246,0.35)', appearance: 'none' }}
+                                                                  >
+                                                                      <option value="">{set.reps ? `Meta: ${set.reps}` : 'Selecionar reps'}</option>
+                                                                      {REP_SUGGESTION_OPTIONS.map(option => (
+                                                                          <option key={option} value={option}>
+                                                                              {option}
+                                                                          </option>
+                                                                      ))}
+                                                                  </select>
                                                               </label>
                                                           </div>
 
@@ -1120,6 +1140,12 @@ function ListWorkouts() {
                       </button>
                   </div>
               </div>
+
+              <datalist id="workout-load-options">
+                  {LOAD_SUGGESTION_OPTIONS.map(option => (
+                      <option key={option} value={option} />
+                  ))}
+              </datalist>
 
               {showSummaryModal && (
                   <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(8px)' }} onClick={() => setShowSummaryModal(false)}>
