@@ -11,6 +11,32 @@ export type WorkoutSession = {
   notes?: string
 }
 
+export type WorkoutSetLog = {
+  workoutHistoryId: string
+  studentId: string
+  workoutId?: string
+  exerciseIndex: number
+  exerciseName: string
+  exerciseGroup?: string
+  setIndex: number
+  setType: string
+  setLabel: string
+  targetReps?: string
+  prescribedLoad?: string
+  performedReps?: number | null
+  load?: number | null
+  completed: boolean
+  performedAt?: string
+}
+
+export type LatestExerciseSetLog = {
+  load?: number | null
+  performedReps?: number | null
+  performedAt?: string
+}
+
+export type LatestExerciseLogMap = Record<string, Record<number, LatestExerciseSetLog>>
+
 export async function startSession(workoutId: string, workoutTitle: string, studentId: string) {
     const { data, error } = await supabase
         .from('workout_history')
@@ -80,6 +106,107 @@ export async function finishSession(id: string, durationSeconds: number, notes?:
     }
 
     return mapFromDb(data)
+}
+
+export async function saveSessionExerciseLogs(logs: WorkoutSetLog[]) {
+    if (!logs.length) return
+
+    const payload = logs.map(log => ({
+        workout_history_id: log.workoutHistoryId,
+        student_id: log.studentId,
+        workout_id: log.workoutId || null,
+        exercise_index: log.exerciseIndex,
+        exercise_name: log.exerciseName,
+        exercise_group: log.exerciseGroup || null,
+        set_index: log.setIndex,
+        set_type: log.setType,
+        set_label: log.setLabel,
+        target_reps: log.targetReps || null,
+        prescribed_load: log.prescribedLoad || null,
+        performed_reps: log.performedReps ?? null,
+        load: log.load ?? null,
+        completed: log.completed,
+        performed_at: log.performedAt || new Date().toISOString(),
+    }))
+
+    const { error } = await supabase
+        .from('workout_history_exercise_logs')
+        .upsert(payload, {
+            onConflict: 'workout_history_id,exercise_index,set_index',
+        })
+
+    if (error) throw error
+}
+
+export async function getSessionExerciseLogs(sessionId: string): Promise<WorkoutSetLog[]> {
+    const { data, error } = await supabase
+        .from('workout_history_exercise_logs')
+        .select('*')
+        .eq('workout_history_id', sessionId)
+        .order('exercise_index', { ascending: true })
+        .order('set_index', { ascending: true })
+
+    if (error) {
+        console.warn('Erro ao carregar logs da sessão atual:', error)
+        return []
+    }
+
+    return (data || []).map((row: any) => ({
+        workoutHistoryId: row.workout_history_id,
+        studentId: row.student_id,
+        workoutId: row.workout_id,
+        exerciseIndex: row.exercise_index,
+        exerciseName: row.exercise_name,
+        exerciseGroup: row.exercise_group,
+        setIndex: row.set_index,
+        setType: row.set_type,
+        setLabel: row.set_label,
+        targetReps: row.target_reps,
+        prescribedLoad: row.prescribed_load,
+        performedReps: row.performed_reps,
+        load: row.load,
+        completed: row.completed,
+        performedAt: row.performed_at,
+    }))
+}
+
+export async function getLatestExerciseLogs(studentId: string, exerciseNames: string[]): Promise<LatestExerciseLogMap> {
+    const names = [...new Set(exerciseNames.map(name => name.trim()).filter(Boolean))]
+    if (!names.length) return {}
+
+    const { data, error } = await supabase
+        .from('workout_history_exercise_logs')
+        .select('exercise_name, set_index, load, performed_reps, performed_at')
+        .eq('student_id', studentId)
+        .in('exercise_name', names)
+        .eq('completed', true)
+        .order('performed_at', { ascending: false })
+
+    if (error) {
+        console.warn('Erro ao buscar último histórico por exercício:', error)
+        return {}
+    }
+
+    const latestMap: LatestExerciseLogMap = {}
+
+    for (const row of data || []) {
+        const exerciseName = String(row.exercise_name || '').trim()
+        if (!exerciseName) continue
+
+        if (!latestMap[exerciseName]) {
+            latestMap[exerciseName] = {}
+        }
+
+        if (latestMap[exerciseName][row.set_index] !== undefined) continue
+
+        latestMap[exerciseName][row.set_index] = {
+            load: row.load,
+            performedReps: row.performed_reps,
+            performedAt: row.performed_at,
+        }
+    }
+
+    return latestMap
 }
 
 export async function getWeeklyFrequency(studentId: string): Promise<number> {

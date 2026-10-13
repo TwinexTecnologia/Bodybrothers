@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/useAuth'
 import { Dumbbell, ChevronRight, PlayCircle, Clock, X, StopCircle, CheckCircle, Calendar, MessageSquare, History, TrendingUp, ChevronLeft, Play, ArrowRight, Flame, BarChart2, FileText } from 'lucide-react'
-import { startSession, finishSession, getWeeklyFrequency, getWeeklyActivity } from '../../store/history'
+import { startSession, finishSession, getWeeklyFrequency, getWeeklyActivity, saveSessionExerciseLogs, getSessionExerciseLogs, getLatestExerciseLogs } from '../../store/history'
 import { ErrorBoundary } from '../../components/ErrorBoundary'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -63,6 +63,13 @@ type SessionState = {
     elapsedSeconds: number
 }
 
+type SessionSetDraft = {
+    load: string
+    performedReps: string
+    completed: boolean
+    lastLoad?: string
+}
+
 const DAYS_MAP: Record<string, string> = {
     'seg': 'Segunda-feira',
     'ter': 'Terça-feira',
@@ -74,6 +81,7 @@ const DAYS_MAP: Record<string, string> = {
 }
 
 const DAYS_ORDER = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom']
+const SESSION_LOG_STORAGE_PREFIX = 'student-workout-session-logs:'
 
 function orderWorkoutsByIds<T extends { id: string }>(list: T[], orderedIds: string[]) {
     if (!orderedIds.length) return list
@@ -91,6 +99,145 @@ function normalizeWorkoutDays(days: string[] | undefined) {
     return DAYS_ORDER.filter(dayKey =>
         days.map(day => String(day).toLowerCase()).includes(dayKey)
     )
+}
+
+function buildSessionSetKey(exerciseIndex: number, setIndex: number) {
+    return `${exerciseIndex}-${setIndex}`
+}
+
+function normalizeExerciseSets(exercise: Exercise): ExerciseSet[] {
+    const setsToRender: ExerciseSet[] = Array.isArray(exercise.sets) ? [...exercise.sets] : []
+
+    if (setsToRender.length === 0) {
+        if (exercise.warmupSeries || exercise.warmupReps) {
+            setsToRender.push({ type: 'warmup', series: exercise.warmupSeries || '', reps: exercise.warmupReps || '', load: exercise.warmupLoad || '', rest: exercise.warmupRest || '' })
+        }
+        if (exercise.feederSeries || exercise.feederReps) {
+            setsToRender.push({ type: 'feeder', series: exercise.feederSeries || '', reps: exercise.feederReps || '', load: exercise.feederLoad || '', rest: exercise.feederRest || '' })
+        }
+        if (exercise.series || exercise.reps) {
+            setsToRender.push({ type: 'working', series: exercise.series || '', reps: exercise.reps || '', load: exercise.load || '', rest: exercise.rest || '' })
+        }
+    }
+
+    return setsToRender
+}
+
+function getSetVisuals(set: ExerciseSet) {
+    if (set.type === 'warmup') {
+        return { color: '#ea580c', bg: '#fff7ed', label: 'Aquecimento' }
+    }
+    if (set.type === 'feeder') {
+        return { color: '#0284c7', bg: '#f0f9ff', label: 'Preparação' }
+    }
+    if (set.type === 'working') {
+        return { color: '#16a34a', bg: '#f0fdf4', label: 'Trabalho' }
+    }
+    if (set.type === 'custom') {
+        return { color: '#7c3aed', bg: '#f5f3ff', label: set.customLabel || 'Específico' }
+    }
+    return { color: '#475569', bg: '#f1f5f9', label: set.customLabel || 'Outro' }
+}
+
+function parseDecimalInput(value: string) {
+    if (!value.trim()) return null
+    const parsed = Number(value.replace(',', '.'))
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatLoadLabel(value?: string | number | null) {
+    if (value === undefined || value === null || value === '') return ''
+    return `${String(value).replace('.', ',')} kg`
+}
+
+function formatLoadInputValue(value: number) {
+    return Number.isInteger(value) ? String(value) : String(value).replace('.', ',')
+}
+
+function normalizeLoadDraftValue(value: string) {
+    const parsed = parseDecimalInput(value)
+    if (parsed === null) return ''
+    const normalized = Math.max(0, Math.min(1000, Number(parsed.toFixed(2))))
+    return formatLoadInputValue(normalized)
+}
+
+function sanitizeDecimalDraftValue(value: string) {
+    const sanitized = value.replace(/[^0-9.,]/g, '')
+    const separatorIndex = sanitized.search(/[.,]/)
+
+    if (separatorIndex === -1) return sanitized
+
+    const integerPart = sanitized.slice(0, separatorIndex + 1)
+    const decimalPart = sanitized.slice(separatorIndex + 1).replace(/[.,]/g, '')
+
+    return `${integerPart}${decimalPart}`
+}
+
+function normalizePerformedRepsDraftValue(value: string) {
+    if (!value.trim()) return ''
+
+    const parsed = Number.parseInt(value, 10)
+    if (!Number.isFinite(parsed)) return ''
+
+    return String(Math.max(0, Math.min(100, parsed)))
+}
+
+function canCompleteSessionSet(draft: Pick<SessionSetDraft, 'load' | 'performedReps'>) {
+    return parseDecimalInput(draft.load) !== null && draft.performedReps.trim() !== ''
+}
+
+function isInputNavigationKey(key: string) {
+    return ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'].includes(key)
+}
+
+function handleLoadInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+    if (isInputNavigationKey(event.key)) return
+    if (/^\d$/.test(event.key)) return
+
+    if ((event.key === '.' || event.key === ',') && !/[.,]/.test(event.currentTarget.value)) {
+        return
+    }
+
+    event.preventDefault()
+}
+
+function handleIntegerInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+    if (isInputNavigationKey(event.key)) return
+    if (/^\d$/.test(event.key)) return
+
+    event.preventDefault()
+}
+
+function handleLoadInputPaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    const pastedValue = event.clipboardData.getData('text')
+    if (!/^\d+([.,]\d+)?$/.test(pastedValue.trim())) {
+        event.preventDefault()
+    }
+}
+
+function handleIntegerInputPaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    const pastedValue = event.clipboardData.getData('text')
+    if (!/^\d+$/.test(pastedValue.trim())) {
+        event.preventDefault()
+    }
+}
+
+function readSessionDraftStorage(sessionId: string) {
+    if (typeof window === 'undefined') return {}
+
+    try {
+        const raw = window.localStorage.getItem(`${SESSION_LOG_STORAGE_PREFIX}${sessionId}`)
+        return raw ? JSON.parse(raw) as Record<string, SessionSetDraft> : {}
+    } catch {
+        return {}
+    }
+}
+
+function clearSessionDraftStorage(sessionId?: string) {
+    if (!sessionId || typeof window === 'undefined') return
+    window.localStorage.removeItem(`${SESSION_LOG_STORAGE_PREFIX}${sessionId}`)
 }
 
 export default function ListWorkoutsWrapper() {
@@ -124,6 +271,8 @@ function ListWorkouts() {
   // const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null) // REMOVIDO: Não usa mais modal
   const [playingVideoIndex, setPlayingVideoIndex] = useState<number | null>(null) // NOVO: Controla qual vídeo está tocando inline
   const [isFinishing, setIsFinishing] = useState(false)
+  const [expandedExerciseIndex, setExpandedExerciseIndex] = useState<number | null>(0)
+  const [sessionSetDrafts, setSessionSetDrafts] = useState<Record<string, SessionSetDraft>>({})
   const timerRef = useRef<any>(null)
 
   useEffect(() => {
@@ -138,6 +287,133 @@ function ListWorkouts() {
     }
     return () => clearInterval(timerRef.current)
   }, [user])
+
+  async function initializeSessionDrafts(sessionId: string, workout: Workout, studentId: string) {
+      const exerciseNames = (workout.data.exercises || []).map(ex => ex.name).filter(Boolean)
+
+      const [savedLogs, latestLogs] = await Promise.all([
+          getSessionExerciseLogs(sessionId),
+          getLatestExerciseLogs(studentId, exerciseNames),
+      ])
+
+      const savedLogMap = new Map(savedLogs.map(log => [buildSessionSetKey(log.exerciseIndex, log.setIndex), log]))
+      const storageDrafts = readSessionDraftStorage(sessionId)
+      const nextDrafts: Record<string, SessionSetDraft> = {}
+
+      ;(workout.data.exercises || []).forEach((exercise, exerciseIndex) => {
+          const sets = normalizeExerciseSets(exercise)
+          const latestBySet = latestLogs[exercise.name] || {}
+
+          sets.forEach((set, setIndex) => {
+              const key = buildSessionSetKey(exerciseIndex, setIndex)
+              const savedLog = savedLogMap.get(key)
+              const draft = storageDrafts[key]
+              const latest = latestBySet[setIndex]
+
+              const latestLoad = latest?.load ?? null
+              const initialLoad = draft?.load ?? (savedLog?.load != null ? String(savedLog.load) : latestLoad != null ? String(latestLoad) : '')
+
+              nextDrafts[key] = {
+                  load: initialLoad,
+                  performedReps: draft?.performedReps ?? (savedLog?.performedReps != null ? String(savedLog.performedReps) : ''),
+                  completed: draft?.completed ?? savedLog?.completed ?? false,
+                  lastLoad: latestLoad != null ? String(latestLoad) : undefined,
+              }
+          })
+      })
+
+      setSessionSetDrafts(nextDrafts)
+  }
+
+  function updateSessionSetDraft(exerciseIndex: number, setIndex: number, patch: Partial<SessionSetDraft>) {
+      const key = buildSessionSetKey(exerciseIndex, setIndex)
+      setSessionSetDrafts(prev => ({
+          ...prev,
+          [key]: (() => {
+              const nextDraft = {
+              load: '',
+              performedReps: '',
+              completed: false,
+              ...prev[key],
+              ...patch,
+              }
+
+              if (!canCompleteSessionSet(nextDraft)) {
+                  nextDraft.completed = false
+              }
+
+              return nextDraft
+          })(),
+      }))
+  }
+
+  function getSessionSetDraft(exerciseIndex: number, setIndex: number) {
+      return sessionSetDrafts[buildSessionSetKey(exerciseIndex, setIndex)] || {
+          load: '',
+          performedReps: '',
+          completed: false,
+      }
+  }
+
+  function copyPreviousLoad(exerciseIndex: number, setIndex: number) {
+      if (setIndex <= 0) return
+      const previous = getSessionSetDraft(exerciseIndex, setIndex - 1)
+      if (!previous.load) return
+      updateSessionSetDraft(exerciseIndex, setIndex, { load: previous.load })
+  }
+
+  function copyPreviousReps(exerciseIndex: number, setIndex: number) {
+      if (setIndex <= 0) return
+      const previous = getSessionSetDraft(exerciseIndex, setIndex - 1)
+      if (!previous.performedReps) return
+      updateSessionSetDraft(exerciseIndex, setIndex, { performedReps: previous.performedReps })
+  }
+
+  function adjustLoad(exerciseIndex: number, setIndex: number, delta: number) {
+      const current = parseDecimalInput(getSessionSetDraft(exerciseIndex, setIndex).load || '')
+      const nextValue = Math.max(0, Number(((current || 0) + delta).toFixed(2)))
+      updateSessionSetDraft(exerciseIndex, setIndex, {
+          load: normalizeLoadDraftValue(String(nextValue)),
+      })
+  }
+
+  function buildSessionLogPayload() {
+      if (!session.sessionId || !session.workout || !user) return []
+
+      const payload: Parameters<typeof saveSessionExerciseLogs>[0] = []
+
+      ;(session.workout.data.exercises || []).forEach((exercise, exerciseIndex) => {
+          const sets = normalizeExerciseSets(exercise)
+
+          sets.forEach((set, setIndex) => {
+              const draft = getSessionSetDraft(exerciseIndex, setIndex)
+              const hasMeaningfulData = Boolean(draft.load || draft.performedReps || draft.completed)
+
+              if (!hasMeaningfulData) return
+
+              const visuals = getSetVisuals(set)
+
+              payload.push({
+                  workoutHistoryId: session.sessionId,
+                  studentId: user.id,
+                  workoutId: session.workout?.id,
+                  exerciseIndex,
+                  exerciseName: exercise.name,
+                  exerciseGroup: exercise.group,
+                  setIndex,
+                  setType: set.type,
+                  setLabel: visuals.label,
+                  targetReps: set.reps,
+                  prescribedLoad: set.load,
+                  performedReps: draft.performedReps !== '' ? Number(draft.performedReps) : null,
+                  load: parseDecimalInput(draft.load),
+                  completed: draft.completed,
+              })
+          })
+      })
+
+      return payload
+  }
 
   // Função para retomar sessão ativa (< 4h)
   async function resumeActiveSession() {
@@ -188,6 +464,8 @@ function ListWorkouts() {
                 startTime: start,
                 elapsedSeconds: Math.floor(diffMs / 1000)
             })
+            setExpandedExerciseIndex(0)
+            await initializeSessionDrafts(activeSession.id, workoutData, user.id)
         }
       } catch (err) {
           console.error('Erro ao retomar sessão:', err)
@@ -204,6 +482,11 @@ function ListWorkouts() {
     }
     return () => clearInterval(timerRef.current)
   }, [session.active])
+
+  useEffect(() => {
+      if (!session.active || !session.sessionId || typeof window === 'undefined') return
+      window.localStorage.setItem(`${SESSION_LOG_STORAGE_PREFIX}${session.sessionId}`, JSON.stringify(sessionSetDrafts))
+  }, [session.active, session.sessionId, sessionSetDrafts])
 
   // Função para fechar sessões esquecidas (mais de 4h)
   async function autoCloseStaleSessions() {
@@ -317,6 +600,8 @@ function ListWorkouts() {
               startTime: new Date(),
               elapsedSeconds: 0
           })
+          setExpandedExerciseIndex(0)
+          await initializeSessionDrafts(s.id, w, user.id)
           setSelectedWorkout(null)
           window.scrollTo(0,0)
       } catch (err) {
@@ -329,12 +614,18 @@ function ListWorkouts() {
       
       setIsFinishing(true)
       try {
+          const setLogs = buildSessionLogPayload()
+          if (setLogs.length > 0) {
+              await saveSessionExerciseLogs(setLogs)
+          }
           await finishSession(session.sessionId, session.elapsedSeconds, sessionNotes)
           
           // Ordem importante: fecha modal, reseta notas, mostra sucesso, encerra sessão
           setShowFinishModal(false)
           setSessionNotes('')
           setShowSuccessModal(true)
+          clearSessionDraftStorage(session.sessionId)
+          setSessionSetDrafts({})
           setSession({ active: false, elapsedSeconds: 0 })
           
           // Recarrega dados
@@ -545,42 +836,111 @@ function ListWorkouts() {
   }, [])
 
   if (session.active && session.workout && session.workout.data) {
-      // Modo Sessão (Mantido com melhorias sutis)
-      return (
-          <div style={{ padding: 24, minHeight: '80vh', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif' }}>
-              <header style={{ textAlign: 'center', marginBottom: 24 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                      <div style={{ display: 'inline-block', background: '#dcfce7', color: '#166534', padding: '6px 16px', borderRadius: 30, fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
-                          Treino em Andamento
-                      </div>
-                      <button 
-                          onClick={() => setShowFinishModal(true)}
-                          style={{ 
-                              padding: '10px 20px', borderRadius: 20, border: 'none', 
-                              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#fff', 
-                              fontSize: '0.9rem', fontWeight: 700, letterSpacing: '0.5px',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer',
-                              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)', transition: 'transform 0.2s'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
-                          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-                      >
-                          <StopCircle size={18} /> FINALIZAR
-                      </button>
-                  </div>
-                  <h1 style={{ fontSize: '2rem', color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>{session.workout.title}</h1>
-                  <div className="timer-display" style={{ fontSize: '3.5rem', fontWeight: 800, color: '#3b82f6', fontFamily: 'monospace', letterSpacing: '-2px', lineHeight: 1 }}>
-                      {formatTime(session.elapsedSeconds)}
-                  </div>
-              </header>
+      const sessionExercises = session.workout.data.exercises || []
+      const totalSets = sessionExercises.reduce((total, exercise) => total + normalizeExerciseSets(exercise).length, 0)
+      const completedSets = sessionExercises.reduce((total, exercise, exerciseIndex) => {
+          return total + normalizeExerciseSets(exercise).filter((_, setIdx) => getSessionSetDraft(exerciseIndex, setIdx).completed).length
+      }, 0)
+      const progressPercent = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0
 
-              <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 24 }}>
+      return (
+          <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif', background: 'linear-gradient(180deg, #f8fbff 0%, #f8fafc 24%, #eef5ff 100%)' }}>
+              <div style={{ width: '100%', maxWidth: 860, margin: '0 auto', padding: isMobile ? '16px 14px 120px' : '24px 24px 132px' }}>
+                  <header style={{ marginBottom: 24 }}>
+                      <div style={{ borderRadius: 28, padding: isMobile ? 20 : 28, background: 'linear-gradient(145deg, #0f172a 0%, #1e3a8a 58%, #2563eb 100%)', color: '#fff', boxShadow: '0 30px 60px -34px rgba(37,99,235,0.55)', overflow: 'hidden', position: 'relative' }}>
+                          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at top right, rgba(255,255,255,0.22), transparent 32%)' }} />
+                          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 18 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 'fit-content', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.18)', color: '#dbeafe', padding: '8px 14px', borderRadius: 999, fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.9px' }}>
+                                          <Flame size={14} />
+                                          Treino em andamento
+                                      </div>
+                                      <h1 style={{ fontSize: isMobile ? '1.75rem' : '2.25rem', color: '#fff', margin: 0, letterSpacing: '-0.8px', lineHeight: 1.05 }}>
+                                          {session.workout.title}
+                                      </h1>
+                                      <p style={{ margin: 0, fontSize: '0.96rem', color: 'rgba(255,255,255,0.78)', lineHeight: 1.5 }}>
+                                          Registre sua carga e repetições reais para acompanhar a evolução com o personal.
+                                      </p>
+                                  </div>
+                                  <button
+                                      onClick={() => setShowFinishModal(true)}
+                                      style={{
+                                          padding: '12px 18px',
+                                          borderRadius: 16,
+                                          border: '1px solid rgba(255,255,255,0.18)',
+                                          background: 'rgba(15, 23, 42, 0.28)',
+                                          color: '#fff',
+                                          fontSize: '0.9rem',
+                                          fontWeight: 700,
+                                          letterSpacing: '0.3px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          gap: 8,
+                                          cursor: 'pointer',
+                                          backdropFilter: 'blur(8px)',
+                                      }}
+                                  >
+                                      <StopCircle size={18} /> Finalizar
+                                  </button>
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1.2fr 0.8fr 0.8fr', gap: 12 }}>
+                                  <div style={{ borderRadius: 20, padding: '16px 18px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)' }}>
+                                      <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                          Tempo ativo
+                                      </div>
+                                      <div className="timer-display" style={{ fontSize: isMobile ? '2rem' : '2.55rem', fontWeight: 800, color: '#fff', fontFamily: 'monospace', letterSpacing: '-1.5px', lineHeight: 1 }}>
+                                          {formatTime(session.elapsedSeconds)}
+                                      </div>
+                                  </div>
+                                  <div style={{ borderRadius: 20, padding: '16px 18px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                      <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                          Progresso
+                                      </div>
+                                      <div style={{ fontSize: '1.7rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                                          {progressPercent}%
+                                      </div>
+                                      <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
+                                          {completedSets} de {totalSets} séries
+                                      </div>
+                                  </div>
+                                  <div style={{ borderRadius: 20, padding: '16px 18px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                      <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 700, marginBottom: 6 }}>
+                                          Exercícios
+                                      </div>
+                                      <div style={{ fontSize: '1.7rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                                          {sessionExercises.length}
+                                      </div>
+                                      <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
+                                          Toque para abrir
+                                      </div>
+                                  </div>
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>
+                                      <span>Andamento do treino</span>
+                                      <span>{completedSets}/{totalSets} séries</span>
+                                  </div>
+                                  <div style={{ width: '100%', height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+                                      <div style={{ width: `${progressPercent}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #34d399 0%, #22c55e 100%)', boxShadow: '0 0 18px rgba(52,211,153,0.45)' }} />
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </header>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {/* Observações Gerais */}
                   {session.workout.data.notes && (
                       <div style={{ 
-                          marginBottom: 24, padding: 20, borderRadius: 16, 
-                          background: '#fff7ed', border: '1px solid #ffedd5',
-                          display: 'flex', flexDirection: 'column', gap: 8 
+                          padding: 18, borderRadius: 20, 
+                          background: 'rgba(255,255,255,0.92)', border: '1px solid #ffedd5',
+                          display: 'flex', flexDirection: 'column', gap: 8,
+                          boxShadow: '0 12px 24px -22px rgba(249,115,22,0.45)',
+                          backdropFilter: 'blur(8px)',
                       }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <MessageSquare size={18} color="#f97316" />
@@ -592,181 +952,289 @@ function ListWorkouts() {
                       </div>
                   )}
                   
-                  {session.workout.data.exercises && Array.isArray(session.workout.data.exercises) && session.workout.data.exercises.map((ex, i) => (
-                      <div key={i} style={{ marginBottom: 16, borderRadius: 20, padding: 20, background: '#fff', border: '1px solid #f1f5f9', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'flex-start' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                  <span style={{ fontSize: '1rem', fontWeight: 800, color: '#94a3b8', background: '#f8fafc', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', flexShrink: 0 }}>{i + 1}</span>
-                                  <strong style={{ color: '#0f172a', fontSize: '1.2rem', lineHeight: 1.2 }}>{ex.name}</strong>
-                              </div>
-                          </div>
+                  {session.workout.data.exercises && Array.isArray(session.workout.data.exercises) && session.workout.data.exercises.map((ex, i) => {
+                      const setsToRender = normalizeExerciseSets(ex)
+                      const isExpanded = expandedExerciseIndex === i
+                      const completedCount = setsToRender.filter((_, setIdx) => getSessionSetDraft(i, setIdx).completed).length
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 0 }}>
-                              
-                              {(() => {
-                                  // Normaliza sets: usa o do banco se existir e for array, ou constrói a partir dos campos antigos
-                                  let setsToRender: ExerciseSet[] = Array.isArray(ex.sets) ? ex.sets : []
-                                  
-                                  if (setsToRender.length === 0) {
-                                      if (ex.warmupSeries || ex.warmupReps) {
-                                          setsToRender.push({ type: 'warmup', series: ex.warmupSeries || '', reps: ex.warmupReps || '', load: ex.warmupLoad || '', rest: ex.warmupRest || '' })
-                                      }
-                                      if (ex.feederSeries || ex.feederReps) {
-                                          setsToRender.push({ type: 'feeder', series: ex.feederSeries || '', reps: ex.feederReps || '', load: ex.feederLoad || '', rest: ex.feederRest || '' })
-                                      }
-                                      // Sempre tem trabalho (exceto se for vazio mesmo)
-                                      if (ex.series || ex.reps) {
-                                          setsToRender.push({ type: 'working', series: ex.series || '', reps: ex.reps || '', load: ex.load || '', rest: ex.rest || '' })
-                                      }
-                                  }
+                      return (
+                          <div key={i} style={{ borderRadius: 24, padding: isExpanded ? 18 : 16, background: 'rgba(255,255,255,0.94)', border: isExpanded ? '1px solid #bfdbfe' : '1px solid rgba(226,232,240,0.9)', boxShadow: isExpanded ? '0 24px 55px -34px rgba(59,130,246,0.4)' : '0 16px 32px -28px rgba(15,23,42,0.18)', backdropFilter: 'blur(12px)' }}>
+                              <button
+                                  type="button"
+                                  onClick={() => setExpandedExerciseIndex(prev => prev === i ? null : i)}
+                                  style={{ width: '100%', display: 'flex', justifyContent: 'space-between', marginBottom: isExpanded ? 16 : 0, alignItems: 'center', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', gap: 12 }}
+                              >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                      <span style={{ fontSize: '0.95rem', fontWeight: 800, color: isExpanded ? '#2563eb' : '#64748b', background: isExpanded ? '#eff6ff' : '#f8fafc', width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 14, flexShrink: 0, border: isExpanded ? '1px solid #bfdbfe' : '1px solid #e2e8f0' }}>{i + 1}</span>
+                                      <div>
+                                          <strong style={{ color: '#0f172a', fontSize: '1.08rem', lineHeight: 1.2, display: 'block', marginBottom: 4 }}>{ex.name}</strong>
+                                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                              <span style={{ fontSize: '0.74rem', color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 999, padding: '4px 8px', fontWeight: 700 }}>
+                                                  {setsToRender.length} série(s)
+                                              </span>
+                                              <span style={{ fontSize: '0.74rem', color: completedCount > 0 ? '#166534' : '#475569', background: completedCount > 0 ? '#ecfdf5' : '#f8fafc', border: completedCount > 0 ? '1px solid #bbf7d0' : '1px solid #e2e8f0', borderRadius: 999, padding: '4px 8px', fontWeight: 700 }}>
+                                                  {completedCount} concluída(s)
+                                              </span>
+                                          </div>
+                                      </div>
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                          {isExpanded ? 'Aberto' : 'Toque para abrir'}
+                                      </span>
+                                      <span style={{ width: 30, height: 30, borderRadius: '50%', background: isExpanded ? '#eff6ff' : '#f8fafc', border: '1px solid #dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 700 }}>
+                                          {isExpanded ? '−' : '+'}
+                                      </span>
+                                  </div>
+                              </button>
 
-                                  if (setsToRender.length > 0) {
-                                      return (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {isExpanded && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingLeft: 0 }}>
+                                      {setsToRender.length > 0 ? (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                               {setsToRender.map((set, setIdx) => {
-                                                  let color = '#334155'
-                                                  let bg = 'transparent'
-                                                  let label = ''
-
-                                                  if (set.type === 'warmup') {
-                                                      color = '#ea580c'
-                                                      bg = '#fff7ed'
-                                                      label = 'Aquecimento'
-                                                  } else if (set.type === 'feeder') {
-                                                      color = '#0284c7'
-                                                      bg = '#f0f9ff'
-                                                      label = 'Preparação'
-                                                  } else if (set.type === 'working') {
-                                                      color = '#16a34a'
-                                                      bg = '#f0fdf4'
-                                                      label = 'Trabalho'
-                                                  } else if (set.type === 'custom') {
-                                                      color = '#7c3aed'
-                                                      bg = '#f5f3ff'
-                                                      label = set.customLabel || 'Específico'
-                                                  }
+                                                  const visuals = getSetVisuals(set)
+                                                  const draft = getSessionSetDraft(i, setIdx)
+                                                  const canCompleteSet = canCompleteSessionSet(draft)
 
                                                   return (
-                                                      <div key={setIdx} style={{ display: 'flex', flexDirection: 'column', gap: 4, background: bg, padding: '8px 12px', borderRadius: 8, border: `1px solid ${color}20` }}>
-                                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                                                              <span style={{ fontWeight: 700, color: color, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>{label}</span>
-                                                              <span style={{ fontWeight: 600, color: '#334155' }}>{set.series} x {set.reps}</span>
-                                                              {set.load && <span style={{ color: '#64748b' }}>({set.load})</span>}
+                                                      <div key={setIdx} style={{ display: 'flex', flexDirection: 'column', gap: 12, background: `linear-gradient(180deg, ${visuals.bg} 0%, #ffffff 100%)`, padding: '14px', borderRadius: 18, border: `1px solid ${visuals.color}20`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65)' }}>
+                                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                                                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                                                  <span style={{ fontWeight: 800, color: visuals.color, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', background: '#fff', borderRadius: 999, padding: '5px 9px', border: `1px solid ${visuals.color}22` }}>{visuals.label}</span>
+                                                                  <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.94rem' }}>{set.series} x {set.reps}</span>
+                                                                  {set.load && <span style={{ color: '#64748b', fontSize: '0.8rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 999, padding: '5px 8px' }}>Sugerido: {formatLoadLabel(set.load)}</span>}
+                                                              </div>
+                                                              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', color: '#0f172a', fontWeight: 700, background: draft.completed ? '#ecfdf5' : '#fff', border: draft.completed ? '1px solid #bbf7d0' : '1px solid #e2e8f0', borderRadius: 999, padding: '6px 10px' }}>
+                                                                  <input
+                                                                      type="checkbox"
+                                                                      checked={draft.completed}
+                                                                      disabled={!draft.completed && !canCompleteSet}
+                                                                      onChange={e => updateSessionSetDraft(i, setIdx, { completed: e.target.checked })}
+                                                                  />
+                                                                  Série concluída
+                                                              </label>
                                                           </div>
+
+                                                          {draft.lastLoad && (
+                                                              <div style={{ fontSize: '0.8rem', color: '#475569', background: 'rgba(255,255,255,0.72)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(226,232,240,0.9)' }}>
+                                                                  Última carga usada: <strong>{formatLoadLabel(draft.lastLoad)}</strong>
+                                                              </div>
+                                                          )}
+
+                                                          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
+                                                              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                                  <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Carga (kg)</span>
+                                                                  <div style={{ display: 'flex', alignItems: 'stretch', borderRadius: 16, border: '1px solid #dbeafe', background: '#fff', boxShadow: '0 8px 20px -18px rgba(59,130,246,0.35)', overflow: 'hidden' }}>
+                                                                      <div style={{ padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#eff6ff', color: '#1d4ed8', fontSize: '0.8rem', fontWeight: 800, borderRight: '1px solid #dbeafe', whiteSpace: 'nowrap' }}>
+                                                                          Peso
+                                                                      </div>
+                                                                      <input
+                                                                          type="text"
+                                                                          inputMode="decimal"
+                                                                          value={draft.load}
+                                                                          autoComplete="off"
+                                                                          spellCheck={false}
+                                                                          onKeyDown={handleLoadInputKeyDown}
+                                                                          onPaste={handleLoadInputPaste}
+                                                                          onChange={e => updateSessionSetDraft(i, setIdx, { load: sanitizeDecimalDraftValue(e.target.value) })}
+                                                                          onBlur={e => updateSessionSetDraft(i, setIdx, { load: normalizeLoadDraftValue(e.target.value) })}
+                                                                          placeholder={set.load ? String(set.load).replace('.', ',') : '20'}
+                                                                          className="input"
+                                                                          style={{ background: '#fff', margin: 0, borderRadius: 0, border: 'none', boxShadow: 'none', flex: 1, minWidth: 0, color: '#0f172a', caretColor: '#0f172a', WebkitTextFillColor: '#0f172a' }}
+                                                                      />
+                                                                      <div style={{ padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', color: '#64748b', fontSize: '0.82rem', fontWeight: 700, borderLeft: '1px solid #e2e8f0' }}>
+                                                                          kg
+                                                                      </div>
+                                                                  </div>
+                                                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                                      {[-2.5, 2.5, 5].map((delta) => (
+                                                                          <button
+                                                                              key={delta}
+                                                                              type="button"
+                                                                              onClick={() => adjustLoad(i, setIdx, delta)}
+                                                                              style={{ border: '1px solid #dbeafe', background: delta > 0 ? '#eff6ff' : '#fff', color: '#1d4ed8', borderRadius: 999, padding: '6px 10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                                                                          >
+                                                                              {delta > 0 ? `+${String(delta).replace('.', ',')}` : String(delta).replace('.', ',')} kg
+                                                                          </button>
+                                                                      ))}
+                                                                  </div>
+                                                              </label>
+
+                                                              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                                  <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Reps feitas</span>
+                                                                  <input
+                                                                      type="text"
+                                                                      inputMode="numeric"
+                                                                      value={draft.performedReps}
+                                                                      autoComplete="off"
+                                                                      spellCheck={false}
+                                                                      onKeyDown={handleIntegerInputKeyDown}
+                                                                      onPaste={handleIntegerInputPaste}
+                                                                      onChange={e => updateSessionSetDraft(i, setIdx, { performedReps: e.target.value.replace(/\D/g, '') })}
+                                                                      onBlur={e => updateSessionSetDraft(i, setIdx, { performedReps: normalizePerformedRepsDraftValue(e.target.value) })}
+                                                                      placeholder={set.reps ? `Meta: ${set.reps}` : 'Ex: 12'}
+                                                                      className="input"
+                                                                      style={{ background: '#fff', margin: 0, borderRadius: 14, border: '1px solid #dbeafe', boxShadow: '0 8px 20px -18px rgba(59,130,246,0.35)', color: '#0f172a', caretColor: '#0f172a', WebkitTextFillColor: '#0f172a' }}
+                                                                  />
+                                                              </label>
+                                                          </div>
+
+                                                          {!canCompleteSet && (
+                                                              <div style={{ fontSize: '0.78rem', color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '8px 10px' }}>
+                                                                  Preencha carga e reps para concluir a série.
+                                                              </div>
+                                                          )}
+
+                                                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                                              {setIdx > 0 && (
+                                                                  <>
+                                                                      <button
+                                                                          type="button"
+                                                                          onClick={() => copyPreviousLoad(i, setIdx)}
+                                                                          style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 999, padding: '9px 13px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                                                                      >
+                                                                          Copiar carga anterior
+                                                                      </button>
+                                                                      <button
+                                                                          type="button"
+                                                                          onClick={() => copyPreviousReps(i, setIdx)}
+                                                                          style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 999, padding: '9px 13px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                                                                      >
+                                                                          Copiar reps anterior
+                                                                      </button>
+                                                                  </>
+                                                              )}
+                                                              {!draft.completed && (
+                                                                  <button
+                                                                      type="button"
+                                                                      disabled={!canCompleteSet}
+                                                                      onClick={() => updateSessionSetDraft(i, setIdx, { completed: true })}
+                                                                      style={{ border: 'none', background: canCompleteSet ? 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)' : '#cbd5e1', color: canCompleteSet ? '#fff' : '#64748b', borderRadius: 999, padding: '9px 13px', fontSize: '0.8rem', fontWeight: 700, cursor: canCompleteSet ? 'pointer' : 'not-allowed', boxShadow: canCompleteSet ? '0 12px 24px -18px rgba(15,23,42,0.65)' : 'none' }}
+                                                                  >
+                                                                      Marcar concluída
+                                                                  </button>
+                                                              )}
+                                                          </div>
+
                                                           {set.rest && (
-                                                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#64748b' }}>
-                                                                   <Clock size={12} />
-                                                                   <span>Descanso: {set.rest}</span>
-                                                               </div>
+                                                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#64748b' }}>
+                                                                  <Clock size={12} />
+                                                                  <span>Descanso: {set.rest}</span>
+                                                              </div>
                                                           )}
                                                       </div>
                                                   )
                                               })}
                                           </div>
-                                      )
-                                  } else {
-                                      // Fallback final se realmente não tiver nada
-                                      return <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>Sem séries definidas.</div>
-                                  }
-                              })()}
-                              
-                              {/* Notas (Comuns a ambos) */}
-                              {ex.notes && (
-                                  <div style={{ fontSize: '0.85rem', color: '#64748b', background: '#fff7ed', padding: '8px 12px', borderRadius: 8, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
-                                      <MessageSquare size={16} style={{ marginTop: 2, flexShrink: 0, color: '#f97316' }} /> 
-                                      <span style={{ color: '#c2410c' }}>{ex.notes}</span>
-                                  </div>
-                              )}
-
-                              {/* Video Player OTIMIZADO - Thumbnail com Play Inline */}
-                              {ex.videoUrl && (
-                                  <div style={{ 
-                                      width: '100%', 
-                                      maxWidth: '600px', 
-                                      aspectRatio: '16/9', // Fixo para evitar layout shift
-                                      borderRadius: 12, 
-                                      overflow: 'hidden', 
-                                      background: '#000', 
-                                      marginTop: 16, 
-                                      position: 'relative', 
-                                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)', 
-                                      alignSelf: 'center',
-                                      cursor: playingVideoIndex === i ? 'default' : 'pointer'
-                                  }}>
-                                      {playingVideoIndex === i ? (
-                                          /* PLAYER INLINE */
-                                          (() => {
-                                              const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
-                                              if (isYoutube) {
-                                                  const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
-                                                  return (
-                                                      <iframe 
-                                                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1&playsinline=1`} 
-                                                          title={ex.name}
-                                                          style={{ width: '100%', height: '100%', border: 'none' }}
-                                                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                                          allowFullScreen
-                                                      />
-                                                  );
-                                              } else {
-                                                  return (
-                                                      <video 
-                                                          src={ex.videoUrl} 
-                                                          controls 
-                                                          autoPlay
-                                                          playsInline
-                                                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                                      />
-                                                  );
-                                              }
-                                          })()
                                       ) : (
-                                          /* THUMBNAIL */
-                                          <div onClick={() => setPlayingVideoIndex(i)} style={{ width: '100%', height: '100%', position: 'relative' }}>
-                                              {(() => {
-                                                  const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'));
-                                                  let thumbUrl = '';
-                                                  if (isYoutube) {
-                                                      const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop();
-                                                      thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-                                                  }
-                                                  
-                                                  return (
-                                                      <>
-                                                          {thumbUrl ? (
-                                                              <img src={thumbUrl} alt={ex.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
-                                                          ) : (
-                                                              <video src={ex.videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
-                                                          )}
-                                                          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 16, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                              <Play size={32} fill="#fff" color="#fff" style={{ marginLeft: 4 }} />
-                                                          </div>
-                                                      </>
-                                                  );
-                                              })()}
+                                          <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>Sem séries definidas.</div>
+                                      )}
+                                      
+                                      {ex.notes && (
+                                          <div style={{ fontSize: '0.85rem', color: '#64748b', background: '#fff7ed', padding: '8px 12px', borderRadius: 8, border: '1px solid #ffedd5', display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
+                                              <MessageSquare size={16} style={{ marginTop: 2, flexShrink: 0, color: '#f97316' }} />
+                                              <span style={{ color: '#c2410c' }}>{ex.notes}</span>
+                                          </div>
+                                      )}
+
+                                      {ex.videoUrl && (
+                                          <div style={{ 
+                                              width: '100%', 
+                                              maxWidth: '600px', 
+                                              aspectRatio: '16/9',
+                                              borderRadius: 12, 
+                                              overflow: 'hidden', 
+                                              background: '#000', 
+                                              marginTop: 8, 
+                                              position: 'relative', 
+                                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)', 
+                                              alignSelf: 'center',
+                                              cursor: playingVideoIndex === i ? 'default' : 'pointer'
+                                          }}>
+                                              {playingVideoIndex === i ? (
+                                                  (() => {
+                                                      const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'))
+                                                      if (isYoutube) {
+                                                          const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop()
+                                                          return (
+                                                              <iframe
+                                                                  src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1&playsinline=1`}
+                                                                  title={ex.name}
+                                                                  style={{ width: '100%', height: '100%', border: 'none' }}
+                                                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                                  allowFullScreen
+                                                              />
+                                                          )
+                                                      }
+
+                                                      return (
+                                                          <video
+                                                              src={ex.videoUrl}
+                                                              controls
+                                                              autoPlay
+                                                              playsInline
+                                                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                          />
+                                                      )
+                                                  })()
+                                              ) : (
+                                                  <div onClick={() => setPlayingVideoIndex(i)} style={{ width: '100%', height: '100%', position: 'relative' }}>
+                                                      {(() => {
+                                                          const isYoutube = ex.videoUrl && (typeof ex.videoUrl === 'string') && (ex.videoUrl.includes('youtube.com') || ex.videoUrl.includes('youtu.be'))
+                                                          let thumbUrl = ''
+                                                          if (isYoutube) {
+                                                              const videoId = ex.videoUrl?.split('v=')[1]?.split('&')[0] || ex.videoUrl?.split('/').pop()
+                                                              thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+                                                          }
+
+                                                          return (
+                                                              <>
+                                                                  {thumbUrl ? (
+                                                                      <img src={thumbUrl} alt={ex.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                                                                  ) : (
+                                                                      <video src={ex.videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                                                                  )}
+                                                                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 16, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                      <Play size={32} fill="#fff" color="#fff" style={{ marginLeft: 4 }} />
+                                                                  </div>
+                                                              </>
+                                                          )
+                                                      })()}
+                                                  </div>
+                                              )}
                                           </div>
                                       )}
                                   </div>
                               )}
                           </div>
-                      </div>
-                  ))}
+                      )
+                  })}
+                  </div>
               </div>
 
-              <button 
-                  onClick={() => setShowFinishModal(true)}
-                  style={{ 
-                      marginTop: 16, padding: 20, borderRadius: 20, border: 'none', 
-                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#fff', 
-                      fontSize: '1.1rem', fontWeight: 700, letterSpacing: '0.5px',
-                      display: 'none', alignItems: 'center', justifyContent: 'center', gap: 12, cursor: 'pointer',
-                      boxShadow: '0 10px 20px -5px rgba(239, 68, 68, 0.4)', transition: 'transform 0.2s'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
-                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-              >
-                  <StopCircle size={24} /> FINALIZAR TREINO
-              </button>
+              <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1200, padding: isMobile ? '12px 14px 18px' : '16px 24px 22px', background: 'linear-gradient(180deg, rgba(248,250,252,0) 0%, rgba(248,250,252,0.94) 26%, rgba(248,250,252,1) 100%)' }}>
+                  <div style={{ width: '100%', maxWidth: 860, margin: '0 auto', background: 'rgba(15,23,42,0.94)', color: '#fff', borderRadius: 24, padding: isMobile ? '14px' : '16px 18px', boxShadow: '0 24px 50px -30px rgba(15,23,42,0.65)', border: '1px solid rgba(148,163,184,0.18)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', flexDirection: isMobile ? 'column' : 'row', gap: 14 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.65px', color: 'rgba(255,255,255,0.64)', fontWeight: 800 }}>
+                              Resumo do treino
+                          </div>
+                          <div style={{ fontSize: '1rem', fontWeight: 700 }}>
+                              {completedSets} de {totalSets} séries registradas
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.72)' }}>
+                              Continue preenchendo ou finalize quando terminar.
+                          </div>
+                      </div>
+                      <button
+                          onClick={() => setShowFinishModal(true)}
+                          style={{ padding: isMobile ? '14px 16px' : '14px 20px', borderRadius: 18, border: 'none', background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)', color: '#052e16', fontSize: '0.95rem', fontWeight: 800, letterSpacing: '0.2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', boxShadow: '0 20px 30px -24px rgba(16,185,129,0.85)' }}
+                      >
+                          <CheckCircle size={18} />
+                          Finalizar treino
+                      </button>
+                  </div>
+              </div>
 
               {showSummaryModal && (
                   <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(8px)' }} onClick={() => setShowSummaryModal(false)}>
