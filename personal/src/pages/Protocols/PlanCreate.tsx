@@ -37,14 +37,20 @@ export default function PlanCreate() {
     if (!Number.isInteger(cycleDays) || cycleDays <= 0) { setMsg('Informe uma quantidade de dias válida'); return }
     
     setLoading(true)
-    const rec = await addPlan({ personalId, name: n, price: v, dueDay: 10, billingCycleDays: cycleDays, frequency: null })
-    setLoading(false)
-    
-    if (rec) {
-        setMsg(`Plano criado com sucesso!`)
-        setTimeout(() => navigate('/protocols/plans'), 1500)
-    } else {
-        setMsg('Erro ao criar plano')
+    try {
+      await addPlan({ personalId, name: n, price: v, dueDay: 10, billingCycleDays: cycleDays, frequency: null })
+      setMsg('Plano criado com sucesso!')
+      setTimeout(() => navigate('/protocols/plans'), 1500)
+    } catch (error: any) {
+      console.error('Erro ao criar plano na tela:', error)
+      const details = typeof error?.message === 'string' ? error.message : ''
+      if (details.toLowerCase().includes('row-level security')) {
+        setMsg('Erro ao criar plano: permissão do banco bloqueou este personal.')
+      } else {
+        setMsg(details ? `Erro ao criar plano: ${details}` : 'Erro ao criar plano')
+      }
+    } finally {
+      setLoading(false)
     }
   }
 

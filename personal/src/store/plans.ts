@@ -44,7 +44,7 @@ export async function listPlans(personalId: string): Promise<PlanRecord[]> {
   return (data || []).map(mapFromDb)
 }
 
-export async function addPlan(p: Omit<PlanRecord, 'id' | 'createdAt'>): Promise<PlanRecord | null> {
+export async function addPlan(p: Omit<PlanRecord, 'id' | 'createdAt'>): Promise<PlanRecord> {
   const { data, error } = await supabase
     .from('plans')
     .insert({
@@ -61,7 +61,7 @@ export async function addPlan(p: Omit<PlanRecord, 'id' | 'createdAt'>): Promise<
 
   if (error) {
     console.error('Erro ao criar plano:', error)
-    return null
+    throw error
   }
   return mapFromDb(data)
 }
