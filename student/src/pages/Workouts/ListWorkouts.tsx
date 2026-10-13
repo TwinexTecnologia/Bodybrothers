@@ -82,11 +82,6 @@ const DAYS_MAP: Record<string, string> = {
 
 const DAYS_ORDER = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom']
 const SESSION_LOG_STORAGE_PREFIX = 'student-workout-session-logs:'
-const LOAD_SUGGESTION_OPTIONS = Array.from({ length: 2001 }, (_, index) => {
-    const value = index / 2
-    return Number.isInteger(value) ? String(value) : String(value).replace('.', ',')
-})
-const REP_SUGGESTION_OPTIONS = Array.from({ length: 101 }, (_, index) => String(index))
 
 function orderWorkoutsByIds<T extends { id: string }>(list: T[], orderedIds: string[]) {
     if (!orderedIds.length) return list
@@ -164,6 +159,69 @@ function normalizeLoadDraftValue(value: string) {
     if (parsed === null) return ''
     const normalized = Math.max(0, Math.min(1000, Number(parsed.toFixed(2))))
     return formatLoadInputValue(normalized)
+}
+
+function sanitizeDecimalDraftValue(value: string) {
+    const sanitized = value.replace(/[^0-9.,]/g, '')
+    const separatorIndex = sanitized.search(/[.,]/)
+
+    if (separatorIndex === -1) return sanitized
+
+    const integerPart = sanitized.slice(0, separatorIndex + 1)
+    const decimalPart = sanitized.slice(separatorIndex + 1).replace(/[.,]/g, '')
+
+    return `${integerPart}${decimalPart}`
+}
+
+function normalizePerformedRepsDraftValue(value: string) {
+    if (!value.trim()) return ''
+
+    const parsed = Number.parseInt(value, 10)
+    if (!Number.isFinite(parsed)) return ''
+
+    return String(Math.max(0, Math.min(100, parsed)))
+}
+
+function canCompleteSessionSet(draft: Pick<SessionSetDraft, 'load' | 'performedReps'>) {
+    return parseDecimalInput(draft.load) !== null && draft.performedReps.trim() !== ''
+}
+
+function isInputNavigationKey(key: string) {
+    return ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'].includes(key)
+}
+
+function handleLoadInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+    if (isInputNavigationKey(event.key)) return
+    if (/^\d$/.test(event.key)) return
+
+    if ((event.key === '.' || event.key === ',') && !/[.,]/.test(event.currentTarget.value)) {
+        return
+    }
+
+    event.preventDefault()
+}
+
+function handleIntegerInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+    if (isInputNavigationKey(event.key)) return
+    if (/^\d$/.test(event.key)) return
+
+    event.preventDefault()
+}
+
+function handleLoadInputPaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    const pastedValue = event.clipboardData.getData('text')
+    if (!/^\d+([.,]\d+)?$/.test(pastedValue.trim())) {
+        event.preventDefault()
+    }
+}
+
+function handleIntegerInputPaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    const pastedValue = event.clipboardData.getData('text')
+    if (!/^\d+$/.test(pastedValue.trim())) {
+        event.preventDefault()
+    }
 }
 
 function readSessionDraftStorage(sessionId: string) {
@@ -271,13 +329,21 @@ function ListWorkouts() {
       const key = buildSessionSetKey(exerciseIndex, setIndex)
       setSessionSetDrafts(prev => ({
           ...prev,
-          [key]: {
+          [key]: (() => {
+              const nextDraft = {
               load: '',
               performedReps: '',
               completed: false,
               ...prev[key],
               ...patch,
-          },
+              }
+
+              if (!canCompleteSessionSet(nextDraft)) {
+                  nextDraft.completed = false
+              }
+
+              return nextDraft
+          })(),
       }))
   }
 
@@ -294,6 +360,13 @@ function ListWorkouts() {
       const previous = getSessionSetDraft(exerciseIndex, setIndex - 1)
       if (!previous.load) return
       updateSessionSetDraft(exerciseIndex, setIndex, { load: previous.load })
+  }
+
+  function copyPreviousReps(exerciseIndex: number, setIndex: number) {
+      if (setIndex <= 0) return
+      const previous = getSessionSetDraft(exerciseIndex, setIndex - 1)
+      if (!previous.performedReps) return
+      updateSessionSetDraft(exerciseIndex, setIndex, { performedReps: previous.performedReps })
   }
 
   function adjustLoad(exerciseIndex: number, setIndex: number, delta: number) {
@@ -922,6 +995,7 @@ function ListWorkouts() {
                                               {setsToRender.map((set, setIdx) => {
                                                   const visuals = getSetVisuals(set)
                                                   const draft = getSessionSetDraft(i, setIdx)
+                                                  const canCompleteSet = canCompleteSessionSet(draft)
 
                                                   return (
                                                       <div key={setIdx} style={{ display: 'flex', flexDirection: 'column', gap: 12, background: `linear-gradient(180deg, ${visuals.bg} 0%, #ffffff 100%)`, padding: '14px', borderRadius: 18, border: `1px solid ${visuals.color}20`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65)' }}>
@@ -935,6 +1009,7 @@ function ListWorkouts() {
                                                                   <input
                                                                       type="checkbox"
                                                                       checked={draft.completed}
+                                                                      disabled={!draft.completed && !canCompleteSet}
                                                                       onChange={e => updateSessionSetDraft(i, setIdx, { completed: e.target.checked })}
                                                                   />
                                                                   Série concluída
@@ -955,15 +1030,18 @@ function ListWorkouts() {
                                                                           Peso
                                                                       </div>
                                                                       <input
-                                                                          type="search"
-                                                                          list="workout-load-options"
+                                                                          type="text"
                                                                           inputMode="decimal"
                                                                           value={draft.load}
-                                                                          onChange={e => updateSessionSetDraft(i, setIdx, { load: e.target.value.replace(/[^0-9,.\-]/g, '') })}
+                                                                          autoComplete="off"
+                                                                          spellCheck={false}
+                                                                          onKeyDown={handleLoadInputKeyDown}
+                                                                          onPaste={handleLoadInputPaste}
+                                                                          onChange={e => updateSessionSetDraft(i, setIdx, { load: sanitizeDecimalDraftValue(e.target.value) })}
                                                                           onBlur={e => updateSessionSetDraft(i, setIdx, { load: normalizeLoadDraftValue(e.target.value) })}
                                                                           placeholder={set.load ? String(set.load).replace('.', ',') : '20'}
                                                                           className="input"
-                                                                          style={{ background: '#fff', margin: 0, borderRadius: 0, border: 'none', boxShadow: 'none', flex: 1, minWidth: 0 }}
+                                                                          style={{ background: '#fff', margin: 0, borderRadius: 0, border: 'none', boxShadow: 'none', flex: 1, minWidth: 0, color: '#0f172a', caretColor: '#0f172a', WebkitTextFillColor: '#0f172a' }}
                                                                       />
                                                                       <div style={{ padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', color: '#64748b', fontSize: '0.82rem', fontWeight: 700, borderLeft: '1px solid #e2e8f0' }}>
                                                                           kg
@@ -985,37 +1063,54 @@ function ListWorkouts() {
 
                                                               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                                                   <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Reps feitas</span>
-                                                                  <select
+                                                                  <input
+                                                                      type="text"
+                                                                      inputMode="numeric"
                                                                       value={draft.performedReps}
-                                                                      onChange={e => updateSessionSetDraft(i, setIdx, { performedReps: e.target.value })}
+                                                                      autoComplete="off"
+                                                                      spellCheck={false}
+                                                                      onKeyDown={handleIntegerInputKeyDown}
+                                                                      onPaste={handleIntegerInputPaste}
+                                                                      onChange={e => updateSessionSetDraft(i, setIdx, { performedReps: e.target.value.replace(/\D/g, '') })}
+                                                                      onBlur={e => updateSessionSetDraft(i, setIdx, { performedReps: normalizePerformedRepsDraftValue(e.target.value) })}
+                                                                      placeholder={set.reps ? `Meta: ${set.reps}` : 'Ex: 12'}
                                                                       className="input"
-                                                                      style={{ background: '#fff', margin: 0, borderRadius: 14, border: '1px solid #dbeafe', boxShadow: '0 8px 20px -18px rgba(59,130,246,0.35)', appearance: 'none' }}
-                                                                  >
-                                                                      <option value="">{set.reps ? `Meta: ${set.reps}` : 'Selecionar reps'}</option>
-                                                                      {REP_SUGGESTION_OPTIONS.map(option => (
-                                                                          <option key={option} value={option}>
-                                                                              {option}
-                                                                          </option>
-                                                                      ))}
-                                                                  </select>
+                                                                      style={{ background: '#fff', margin: 0, borderRadius: 14, border: '1px solid #dbeafe', boxShadow: '0 8px 20px -18px rgba(59,130,246,0.35)', color: '#0f172a', caretColor: '#0f172a', WebkitTextFillColor: '#0f172a' }}
+                                                                  />
                                                               </label>
                                                           </div>
 
+                                                          {!canCompleteSet && (
+                                                              <div style={{ fontSize: '0.78rem', color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '8px 10px' }}>
+                                                                  Preencha carga e reps para concluir a série.
+                                                              </div>
+                                                          )}
+
                                                           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                                               {setIdx > 0 && (
-                                                                  <button
-                                                                      type="button"
-                                                                      onClick={() => copyPreviousLoad(i, setIdx)}
-                                                                      style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 999, padding: '9px 13px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
-                                                                  >
-                                                                      Copiar carga anterior
-                                                                  </button>
+                                                                  <>
+                                                                      <button
+                                                                          type="button"
+                                                                          onClick={() => copyPreviousLoad(i, setIdx)}
+                                                                          style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 999, padding: '9px 13px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                                                                      >
+                                                                          Copiar carga anterior
+                                                                      </button>
+                                                                      <button
+                                                                          type="button"
+                                                                          onClick={() => copyPreviousReps(i, setIdx)}
+                                                                          style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 999, padding: '9px 13px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                                                                      >
+                                                                          Copiar reps anterior
+                                                                      </button>
+                                                                  </>
                                                               )}
                                                               {!draft.completed && (
                                                                   <button
                                                                       type="button"
+                                                                      disabled={!canCompleteSet}
                                                                       onClick={() => updateSessionSetDraft(i, setIdx, { completed: true })}
-                                                                      style={{ border: 'none', background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)', color: '#fff', borderRadius: 999, padding: '9px 13px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 12px 24px -18px rgba(15,23,42,0.65)' }}
+                                                                      style={{ border: 'none', background: canCompleteSet ? 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)' : '#cbd5e1', color: canCompleteSet ? '#fff' : '#64748b', borderRadius: 999, padding: '9px 13px', fontSize: '0.8rem', fontWeight: 700, cursor: canCompleteSet ? 'pointer' : 'not-allowed', boxShadow: canCompleteSet ? '0 12px 24px -18px rgba(15,23,42,0.65)' : 'none' }}
                                                                   >
                                                                       Marcar concluída
                                                                   </button>
@@ -1140,12 +1235,6 @@ function ListWorkouts() {
                       </button>
                   </div>
               </div>
-
-              <datalist id="workout-load-options">
-                  {LOAD_SUGGESTION_OPTIONS.map(option => (
-                      <option key={option} value={option} />
-                  ))}
-              </datalist>
 
               {showSummaryModal && (
                   <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, backdropFilter: 'blur(8px)' }} onClick={() => setShowSummaryModal(false)}>
