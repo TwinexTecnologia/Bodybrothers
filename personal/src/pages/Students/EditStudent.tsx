@@ -579,15 +579,15 @@ export default function EditStudent() {
 
           const payments = await listAllStudentPayments(selectedId)
           const sortedPayments = [...payments].sort((a, b) => {
-              const dateA = new Date(a.paidAt || a.dueDate).getTime()
-              const dateB = new Date(b.paidAt || b.dueDate).getTime()
+              const dateA = new Date(a.dueDate || a.paidAt || 0).getTime()
+              const dateB = new Date(b.dueDate || b.paidAt || 0).getTime()
               return dateA - dateB
           })
           const lastPayment = sortedPayments[sortedPayments.length - 1]
           const currentDueDate = getCurrentBillingDueDate(
               planStartDate,
               selectedPlan,
-              lastPayment ? (lastPayment.paidAt || lastPayment.dueDate) : null,
+              lastPayment ? (lastPayment.dueDate || lastPayment.paidAt) : null,
           )
 
           if (!currentDueDate) {
