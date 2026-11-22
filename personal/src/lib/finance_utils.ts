@@ -37,7 +37,7 @@ export function isStudentOverdue(
     const dueDate = getCurrentBillingDueDate(
       student.planStartDate,
       plan,
-      lastPayment ? (lastPayment.paidAt || lastPayment.dueDate) : null,
+      lastPayment ? (lastPayment.dueDate || lastPayment.paidAt) : null,
     )
 
     if (!dueDate) return false
@@ -48,8 +48,8 @@ export function isStudentOverdue(
 
 function paymentsToChronological(payments: DebitRecord[]) {
   return [...payments].sort((a, b) => {
-    const aTime = new Date(a.paidAt || a.dueDate).getTime()
-    const bTime = new Date(b.paidAt || b.dueDate).getTime()
+    const aTime = new Date(a.dueDate || a.paidAt || 0).getTime()
+    const bTime = new Date(b.dueDate || b.paidAt || 0).getTime()
     return aTime - bTime
   })
 }

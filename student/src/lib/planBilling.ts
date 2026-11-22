@@ -43,7 +43,20 @@ export function getPlanPriceSuffix(plan?: BillingPlanLike | null) {
   return `/${getPlanBillingLabel(plan)}`
 }
 
+function parseDateOnly(dateValue: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue.trim())
+  if (!match) return null
+
+  const [, year, month, day] = match
+  return new Date(Number(year), Number(month) - 1, Number(day))
+}
+
 export function normalizeDate(dateValue: string | Date) {
+  if (typeof dateValue === 'string') {
+    const parsedDate = parseDateOnly(dateValue)
+    if (parsedDate) return parsedDate
+  }
+
   const date = new Date(dateValue)
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
@@ -51,15 +64,15 @@ export function normalizeDate(dateValue: string | Date) {
 export function getCurrentBillingDueDate(
   planStartDate?: string | null,
   plan?: BillingPlanLike | null,
-  lastPaymentDate?: string | null,
+  lastChargeDueDate?: string | null,
 ) {
   if (!planStartDate) return null
 
-  if (!lastPaymentDate) {
+  if (!lastChargeDueDate) {
     return normalizeDate(planStartDate)
   }
 
-  const dueDate = normalizeDate(lastPaymentDate)
+  const dueDate = normalizeDate(lastChargeDueDate)
   dueDate.setDate(dueDate.getDate() + getPlanBillingDays(plan))
   return dueDate
 }

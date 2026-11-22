@@ -50,13 +50,13 @@ function getFinancialReminder(
     const today = normalizeDate(new Date())
     const studentPayments = payments
         .filter((payment) => payment.payerId === student.id)
-        .sort((a, b) => new Date(b.paidAt || b.dueDate).getTime() - new Date(a.paidAt || a.dueDate).getTime())
+        .sort((a, b) => new Date(b.dueDate || b.paidAt || 0).getTime() - new Date(a.dueDate || a.paidAt || 0).getTime())
 
     const lastPayment = studentPayments[0]
     const dueDate = getCurrentBillingDueDate(
         student.planStartDate,
         plan,
-        lastPayment ? (lastPayment.paidAt || lastPayment.dueDate) : null,
+        lastPayment ? (lastPayment.dueDate || lastPayment.paidAt) : null,
     )
     if (!dueDate) return null
 
