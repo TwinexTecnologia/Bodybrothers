@@ -6,6 +6,9 @@ import { supabase } from '../../lib/supabase'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 import { X, BookOpen, Search, Video, GripVertical, Copy, ArrowLeft } from 'lucide-react'
 
+const ALLOWED_VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'm4v', 'webm'])
+const ALLOWED_VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/x-m4v', 'video/webm'])
+
 type ExerciseSetType = 'warmup' | 'feeder' | 'working' | 'custom';
 
 type ExerciseSet = {
@@ -56,6 +59,25 @@ function getYouTubeId(url: string) {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/)([^#&?]*).*/
     const match = url.match(regExp)
     return (match && match[2].length === 11) ? match[2] : null
+}
+
+function getVideoFileExtension(file: File) {
+    return file.name.split('.').pop()?.toLowerCase() || ''
+}
+
+function isSupportedVideoFile(file: File) {
+    const fileExt = getVideoFileExtension(file)
+    return ALLOWED_VIDEO_EXTENSIONS.has(fileExt) || ALLOWED_VIDEO_MIME_TYPES.has(file.type)
+}
+
+function getVideoContentType(file: File) {
+    if (ALLOWED_VIDEO_MIME_TYPES.has(file.type)) return file.type
+
+    const fileExt = getVideoFileExtension(file)
+    if (fileExt === 'mov') return 'video/quicktime'
+    if (fileExt === 'm4v') return 'video/x-m4v'
+    if (fileExt === 'webm') return 'video/webm'
+    return 'video/mp4'
 }
 
 // Formata data local para YYYY-MM-DD sem problemas de fuso horário
@@ -285,6 +307,11 @@ export default function WorkoutCreate() {
 
   const handleUpload = async (idx: number, file?: File) => {
     if (!file) return
+
+    if (!isSupportedVideoFile(file)) {
+        alert('Formato de vídeo não suportado. Use MP4, MOV, M4V ou WEBM.')
+        return
+    }
     
     if (file.size > 50 * 1024 * 1024) {
         alert('O vídeo deve ter no máximo 50MB.')
@@ -293,13 +320,15 @@ export default function WorkoutCreate() {
 
     try {
         setUploadingIdx(idx)
-        const fileExt = file.name.split('.').pop()
+        const fileExt = getVideoFileExtension(file) || 'mp4'
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
         const filePath = `exercises/${fileName}`
 
         const { error: uploadError } = await supabase.storage
             .from('videos')
-            .upload(filePath, file)
+            .upload(filePath, file, {
+                contentType: getVideoContentType(file),
+            })
 
         if (uploadError) throw uploadError
 
@@ -710,7 +739,7 @@ export default function WorkoutCreate() {
                                                     {uploadingIdx === idx ? '⏳...' : '📁 Upload'}
                                                     <input 
                                                         type="file" 
-                                                        accept="video/*" 
+                                                        accept=".mp4,.mov,.m4v,.webm,video/mp4,video/quicktime,video/x-m4v,video/webm" 
                                                         style={{ display: 'none' }} 
                                                         onChange={(e) => handleUpload(idx, e.target.files?.[0])}
                                                         disabled={uploadingIdx !== null}
@@ -745,7 +774,7 @@ export default function WorkoutCreate() {
                                                                 allowFullScreen
                                                             ></iframe>
                                                         </div>
-                                                    ) : ex.videoUrl.match(/\.(mp4|mov|webm)$/i) || ex.videoUrl.includes('supabase.co') ? (
+                                                    ) : ex.videoUrl.match(/\.(mp4|mov|m4v|webm)$/i) || ex.videoUrl.includes('supabase.co') ? (
                                                         <video 
                                                             src={ex.videoUrl} 
                                                             controls 

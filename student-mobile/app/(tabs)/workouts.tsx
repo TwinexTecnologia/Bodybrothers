@@ -19,6 +19,7 @@ import {
   Platform,
   Animated,
   useWindowDimensions,
+  TextInput,
 } from "react-native";
 import { useAuth } from "../../lib/auth";
 import { supabase } from "../../lib/supabase";
@@ -40,6 +41,10 @@ import {
   startSession,
   getWeeklyActivity,
   getTrainingIsFinished,
+  saveSessionExerciseLogs,
+  getSessionExerciseLogs,
+  getLatestExerciseLogs,
+  type WorkoutSetLog,
 } from "../../lib/history";
 import { LinearGradient } from "expo-linear-gradient";
 import ActiveWorkoutHeroActions from "../../components/ActiveWorkoutHeroActions";
@@ -59,6 +64,12 @@ import { useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { getStartWorkoutBlockReason } from "../../lib/workoutStartGuard";
 import { Skeleton } from "../../components/ui/skeleton";
+import {
+  clearWorkoutSessionDrafts,
+  loadWorkoutSessionDrafts,
+  saveWorkoutSessionDrafts,
+  type SessionSetDraft,
+} from "../../lib/workoutSessionDrafts";
 
 // Tipos
 type ExerciseSet = {
@@ -144,6 +155,122 @@ function getPrimaryExerciseTypeLabel(ex: Exercise): string {
   return "Série principal";
 }
 
+function buildSessionSetKey(exerciseIndex: number, setIndex: number) {
+  return `${exerciseIndex}-${setIndex}`;
+}
+
+function normalizeExerciseSets(ex: Exercise): ExerciseSet[] {
+  const base: ExerciseSet[] = ex.sets ? [...ex.sets] : [];
+  if (base.length > 0) return base;
+
+  const derived: ExerciseSet[] = [];
+  if (ex.warmupSeries || ex.warmupReps) {
+    derived.push({
+      type: "warmup",
+      series: ex.warmupSeries || "",
+      reps: ex.warmupReps || "",
+      load: ex.warmupLoad || "",
+      rest: ex.warmupRest || "",
+    });
+  }
+  if (ex.feederSeries || ex.feederReps) {
+    derived.push({
+      type: "feeder",
+      series: ex.feederSeries || "",
+      reps: ex.feederReps || "",
+      load: ex.feederLoad || "",
+      rest: ex.feederRest || "",
+    });
+  }
+  if (ex.series || ex.reps) {
+    derived.push({
+      type: "working",
+      series: ex.series || "",
+      reps: ex.reps || "",
+      load: ex.load || "",
+      rest: ex.rest || "",
+    });
+  }
+  return derived;
+}
+
+function getSetVisuals(set: ExerciseSet) {
+  if (set.type === "warmup") {
+    return {
+      color: "#ea580c",
+      bg: "#fff7ed",
+      borderColor: "#fed7aa",
+      label: "AQUECIMENTO",
+    };
+  }
+  if (set.type === "working") {
+    return {
+      color: "#16a34a",
+      bg: "#f0fdf4",
+      borderColor: "#bbf7d0",
+      label: "TRABALHO",
+    };
+  }
+  if (set.type === "feeder") {
+    return {
+      color: "#0284c7",
+      bg: "#f0f9ff",
+      borderColor: "#bae6fd",
+      label: "PREPARAÇÃO",
+    };
+  }
+  if (set.type === "topset") {
+    return {
+      color: "#4f46e5",
+      bg: "#eef2ff",
+      borderColor: "#c7d2fe",
+      label: "TOP SET",
+    };
+  }
+  return {
+    color: "#475569",
+    bg: "#f8fafc",
+    borderColor: "#e2e8f0",
+    label: set.customLabel?.trim() || "OUTRO",
+  };
+}
+
+function parseDecimalInput(value: string) {
+  if (!value.trim()) return null;
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatLoadLabel(value?: string | number | null) {
+  if (value === undefined || value === null || value === "") return "";
+  return `${String(value).replace(".", ",")} kg`;
+}
+
+function formatLoadInputValue(value: number) {
+  return Number.isInteger(value) ? String(value) : String(value).replace(".", ",");
+}
+
+function sanitizeDecimalDraftValue(value: string) {
+  return value.replace(/[^0-9,.\-]/g, "");
+}
+
+function normalizeLoadDraftValue(value: string) {
+  const parsed = parseDecimalInput(value);
+  if (parsed === null) return "";
+  const normalized = Math.max(0, Math.min(1000, Number(parsed.toFixed(2))));
+  return formatLoadInputValue(normalized);
+}
+
+function normalizePerformedRepsDraftValue(value: string) {
+  const onlyDigits = value.replace(/\D/g, "");
+  if (!onlyDigits) return "";
+  return String(Math.max(0, Math.min(100, Number(onlyDigits))));
+}
+
+function canCompleteSessionSet(draft: SessionSetDraft) {
+  return Boolean(draft.load.trim() && draft.performedReps.trim());
+}
+
 const DAYS_MAP: Record<string, string> = {
   seg: "Segunda-feira",
   ter: "Terça-feira",
@@ -202,6 +329,209 @@ export default function Workouts() {
   const previewPlayer = useVideoPlayer("");
   const previewFullscreenPlayer = useVideoPlayer("");
   const previewFullscreenLoadedUrlRef = useRef<string | null>(null);
+  const [sessionSetDrafts, setSessionSetDrafts] = useState<
+    Record<string, SessionSetDraft>
+  >({});
+  const initializedDraftSessionRef = useRef<string | null>(null);
+  const activeWorkoutSession =
+    activeSession &&
+    selectedWorkout &&
+    activeSession.workoutId === selectedWorkout.id
+      ? activeSession
+      : null;
+
+  const initializeSessionDrafts = useCallback(
+    async (sessionId: string, workout: Workout, studentId: string) => {
+      const exerciseNames = (workout.data.exercises || [])
+        .map((exercise) => exercise.name)
+        .filter(Boolean);
+
+      const [savedLogs, latestLogs, localDrafts] = await Promise.all([
+        getSessionExerciseLogs(sessionId),
+        getLatestExerciseLogs(studentId, exerciseNames),
+        loadWorkoutSessionDrafts(sessionId),
+      ]);
+
+      const savedLogMap = new Map(
+        savedLogs.map((log) => [
+          buildSessionSetKey(log.exerciseIndex, log.setIndex),
+          log,
+        ]),
+      );
+      const nextDrafts: Record<string, SessionSetDraft> = {};
+
+      (workout.data.exercises || []).forEach((exercise, exerciseIndex) => {
+        const sets = normalizeExerciseSets(exercise);
+        const latestBySet = latestLogs[exercise.name] || {};
+
+        sets.forEach((set, setIndex) => {
+          const key = buildSessionSetKey(exerciseIndex, setIndex);
+          const savedLog = savedLogMap.get(key);
+          const localDraft = localDrafts[key];
+          const latest = latestBySet[setIndex];
+          const latestLoad = latest?.load ?? null;
+          const initialLoad =
+            localDraft?.load ??
+            (savedLog?.load != null
+              ? String(savedLog.load)
+              : latestLoad != null
+                ? String(latestLoad)
+                : "");
+
+          nextDrafts[key] = {
+            load: initialLoad,
+            performedReps:
+              localDraft?.performedReps ??
+              (savedLog?.performedReps != null
+                ? String(savedLog.performedReps)
+                : ""),
+            completed: localDraft?.completed ?? savedLog?.completed ?? false,
+            lastLoad: latestLoad != null ? String(latestLoad) : undefined,
+          };
+        });
+      });
+
+      initializedDraftSessionRef.current = sessionId;
+      setSessionSetDrafts(nextDrafts);
+    },
+    [],
+  );
+
+  const updateSessionSetDraft = useCallback(
+    (exerciseIndex: number, setIndex: number, patch: Partial<SessionSetDraft>) => {
+      const key = buildSessionSetKey(exerciseIndex, setIndex);
+      setSessionSetDrafts((prev) => {
+        const currentDraft = prev[key] || {
+          load: "",
+          performedReps: "",
+          completed: false,
+        };
+        const nextDraft: SessionSetDraft = {
+          ...currentDraft,
+          ...patch,
+        };
+
+        if (
+          patch.load !== undefined ||
+          patch.performedReps !== undefined ||
+          patch.completed !== undefined
+        ) {
+          if (!canCompleteSessionSet(nextDraft)) {
+            nextDraft.completed = false;
+          }
+        }
+
+        return {
+          ...prev,
+          [key]: nextDraft,
+        };
+      });
+    },
+    [],
+  );
+
+  const getSessionSetDraft = useCallback(
+    (exerciseIndex: number, setIndex: number) =>
+      sessionSetDrafts[buildSessionSetKey(exerciseIndex, setIndex)] || {
+        load: "",
+        performedReps: "",
+        completed: false,
+      },
+    [sessionSetDrafts],
+  );
+
+  const copyPreviousLoad = useCallback(
+    (exerciseIndex: number, setIndex: number) => {
+      if (setIndex <= 0) return;
+      const previous = getSessionSetDraft(exerciseIndex, setIndex - 1);
+      if (!previous.load) return;
+      updateSessionSetDraft(exerciseIndex, setIndex, { load: previous.load });
+    },
+    [getSessionSetDraft, updateSessionSetDraft],
+  );
+
+  const copyPreviousReps = useCallback(
+    (exerciseIndex: number, setIndex: number) => {
+      if (setIndex <= 0) return;
+      const previous = getSessionSetDraft(exerciseIndex, setIndex - 1);
+      if (!previous.performedReps) return;
+      updateSessionSetDraft(exerciseIndex, setIndex, {
+        performedReps: previous.performedReps,
+      });
+    },
+    [getSessionSetDraft, updateSessionSetDraft],
+  );
+
+  const adjustLoad = useCallback(
+    (exerciseIndex: number, setIndex: number, delta: number) => {
+      const current = parseDecimalInput(
+        getSessionSetDraft(exerciseIndex, setIndex).load || "",
+      );
+      const nextValue = Math.max(
+        0,
+        Number(((current || 0) + delta).toFixed(2)),
+      );
+      updateSessionSetDraft(exerciseIndex, setIndex, {
+        load: normalizeLoadDraftValue(String(nextValue)),
+      });
+    },
+    [getSessionSetDraft, updateSessionSetDraft],
+  );
+
+  const buildSessionLogPayload = useCallback(() => {
+    if (!activeWorkoutSession || !selectedWorkout || !user) return [];
+
+    const payload: WorkoutSetLog[] = [];
+
+    (selectedWorkout.data.exercises || []).forEach((exercise, exerciseIndex) => {
+      const sets = normalizeExerciseSets(exercise);
+
+      sets.forEach((set, setIndex) => {
+        const draft = getSessionSetDraft(exerciseIndex, setIndex);
+        const hasMeaningfulData = Boolean(
+          draft.load || draft.performedReps || draft.completed,
+        );
+
+        if (!hasMeaningfulData) return;
+
+        const visuals = getSetVisuals(set);
+
+        payload.push({
+          workoutHistoryId: activeWorkoutSession.id,
+          studentId: user.id,
+          workoutId: selectedWorkout.id,
+          exerciseIndex,
+          exerciseName: exercise.name,
+          setIndex,
+          setType: set.type,
+          setLabel: visuals.label,
+          targetReps: set.reps,
+          prescribedLoad: set.load,
+          performedReps:
+            draft.performedReps !== "" ? Number(draft.performedReps) : null,
+          load: parseDecimalInput(draft.load),
+          completed: draft.completed,
+        });
+      });
+    });
+
+    return payload;
+  }, [activeWorkoutSession, getSessionSetDraft, selectedWorkout, user]);
+
+  const persistCurrentSessionLogs = useCallback(async () => {
+    const payload = buildSessionLogPayload();
+    if (!payload.length) return;
+    await saveSessionExerciseLogs(payload);
+  }, [buildSessionLogPayload]);
+
+  const clearCurrentSessionDraftState = useCallback(async () => {
+    const sessionId = activeWorkoutSession?.id;
+    initializedDraftSessionRef.current = null;
+    setSessionSetDrafts({});
+    if (sessionId) {
+      await clearWorkoutSessionDrafts(sessionId);
+    }
+  }, [activeWorkoutSession?.id]);
 
   const clearPreviewPlayer = useCallback(async () => {
     previewPlayer.pause();
@@ -228,6 +558,27 @@ export default function Workouts() {
       setPreviewFullscreenLayout(null);
     }
   }, [previewFullscreenIndex]);
+
+  useEffect(() => {
+    if (!user || !activeWorkoutSession || !selectedWorkout) {
+      initializedDraftSessionRef.current = null;
+      setSessionSetDrafts({});
+      return;
+    }
+
+    if (initializedDraftSessionRef.current === activeWorkoutSession.id) return;
+
+    void initializeSessionDrafts(
+      activeWorkoutSession.id,
+      selectedWorkout,
+      user.id,
+    );
+  }, [activeWorkoutSession, initializeSessionDrafts, selectedWorkout, user]);
+
+  useEffect(() => {
+    if (!activeWorkoutSession) return;
+    void saveWorkoutSessionDrafts(activeWorkoutSession.id, sessionSetDrafts);
+  }, [activeWorkoutSession, sessionSetDrafts]);
 
   const isWide = viewportWidth >= 720;
   const workoutModalScrollY = useRef(new Animated.Value(0)).current;
@@ -1020,7 +1371,9 @@ export default function Workouts() {
                           session={activeSession}
                           elapsedSeconds={elapsedSeconds}
                           isPaused={isPaused}
+                          beforeFinish={persistCurrentSessionLogs}
                           onFinished={async () => {
+                            await clearCurrentSessionDraftState();
                             await clearActiveSession();
                           }}
                           onRequestRefreshDays={async () => {
@@ -1092,46 +1445,12 @@ export default function Workouts() {
                 const playing = previewActiveVideoIndex === i;
                 const youtubeId = video ? getYoutubeId(video) : null;
                 const suppressInlineVideo = previewFullscreenIndex === i;
-                // Thumbnail/mini player: ~30% da largura (cap), formato retrato 9:16
                 const videoBoxWidth = Math.max(
-                  100,
-                  Math.min(128, Math.round(viewportWidth * 0.3)),
+                  220,
+                  Math.min(Math.round(viewportWidth - 64), isWide ? 520 : 420),
                 );
-                const videoBoxHeight = Math.round((videoBoxWidth * 16) / 9);
-
-                const setsToRender: ExerciseSet[] = (() => {
-                  const base: ExerciseSet[] = ex.sets ? [...ex.sets] : [];
-                  if (base.length > 0) return base;
-                  const derived: ExerciseSet[] = [];
-                  if (ex.warmupSeries || ex.warmupReps) {
-                    derived.push({
-                      type: "warmup",
-                      series: ex.warmupSeries || "",
-                      reps: ex.warmupReps || "",
-                      load: ex.warmupLoad || "",
-                      rest: ex.warmupRest || "",
-                    });
-                  }
-                  if (ex.feederSeries || ex.feederReps) {
-                    derived.push({
-                      type: "feeder",
-                      series: ex.feederSeries || "",
-                      reps: ex.feederReps || "",
-                      load: ex.feederLoad || "",
-                      rest: ex.feederRest || "",
-                    });
-                  }
-                  if (ex.series || ex.reps) {
-                    derived.push({
-                      type: "working",
-                      series: ex.series || "",
-                      reps: ex.reps || "",
-                      load: ex.load || "",
-                      rest: ex.rest || "",
-                    });
-                  }
-                  return derived;
-                })();
+                const videoBoxHeight = Math.round((videoBoxWidth * 9) / 16);
+                const setsToRender = normalizeExerciseSets(ex);
 
                 return (
                   <View>
@@ -1139,70 +1458,16 @@ export default function Workouts() {
                       {ex.name}
                     </Text>
                     <View style={styles.exerciseCard}>
-                      <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
-                        <View style={{ gap: 6 }}>
-                          {setsToRender.map((set, idx) => {
-                            let color = "#334155";
-                            let bg = "transparent";
-                            let borderColor = "transparent";
-                            let label = "";
-
-                            if (set.type === "warmup") {
-                              color = "#ea580c";
-                              bg = "#fff7ed";
-                              borderColor = "#ffedd5";
-                              label = "AQUECIMENTO";
-                            } else if (set.type === "working") {
-                              color = "#16a34a";
-                              bg = "#f0fdf4";
-                              borderColor = "#dcfce7";
-                              label = "TRABALHO";
-                            } else if (set.type === "feeder") {
-                              color = "#0284c7";
-                              bg = "#f0f9ff";
-                              borderColor = "#e0f2fe";
-                              label = "PREPARAÇÃO";
-                            } else if (set.type === "topset") {
-                              color = "#4f46e5";
-                              bg = "#eef2ff";
-                              borderColor = "#e0e7ff";
-                              label = "TOP SET";
-                            } else {
-                              color = "#475569";
-                              bg = "#f8fafc";
-                              borderColor = "#e2e8f0";
-                              label = set.customLabel || "OUTRO";
-                            }
-
-                            return (
-                              <ExerciseSetCard
-                                key={`${i}-${idx}`}
-                                variant={video ? "stacked" : "horizontal"}
-                                label={label}
-                                accentColor={color}
-                                backgroundColor={bg}
-                                borderColor={borderColor}
-                                series={set.series}
-                                reps={set.reps}
-                                load={set.load}
-                                rest={set.rest}
-                                testIDPrefix={`workouts-exercise-${i}-set-${idx}`}
-                              />
-                            );
-                          })}
+                      {ex.notes && (
+                        <View style={styles.exNoteSimple}>
+                          <Text style={styles.exNoteText}>{ex.notes}</Text>
                         </View>
-
-                        {ex.notes && (
-                          <View style={styles.exNoteSimple}>
-                            <Text style={styles.exNoteText}>{ex.notes}</Text>
-                          </View>
-                        )}
-                      </View>
+                      )}
 
                       {!!video && !playing && (
                         <TouchableOpacity
                           style={[
-                            styles.thumbBoxSmall,
+                            styles.exerciseVideoBox,
                             { width: videoBoxWidth, height: videoBoxHeight },
                           ]}
                           onPress={() => setPreviewActiveVideoIndex(i)}
@@ -1216,13 +1481,7 @@ export default function Workouts() {
                               resizeMode="cover"
                             />
                           ) : (
-                            <View
-                              style={{
-                                flex: 1,
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
+                            <View style={styles.exerciseVideoLoadingBox}>
                               <ActivityIndicator color="#fff" />
                             </View>
                           )}
@@ -1235,7 +1494,7 @@ export default function Workouts() {
                       {!!video && playing && (
                         <View
                           style={[
-                            styles.inlineThumbBox,
+                            styles.exerciseVideoBox,
                             { width: videoBoxWidth, height: videoBoxHeight },
                           ]}
                         >
@@ -1278,6 +1537,245 @@ export default function Workouts() {
                             <View style={styles.inlineThumbBody} />
                           )}
                         </View>
+                      )}
+
+                      {setsToRender.length > 0 ? (
+                        <View style={{ gap: 10 }}>
+                          {setsToRender.map((set, idx) => {
+                            const visuals = getSetVisuals(set);
+                            const draft = getSessionSetDraft(i, idx);
+                            const canCompleteSet = canCompleteSessionSet(draft);
+
+                            if (!activeWorkoutSession) {
+                              return (
+                                <ExerciseSetCard
+                                  key={`${i}-${idx}`}
+                                  variant="horizontal"
+                                  label={visuals.label}
+                                  accentColor={visuals.color}
+                                  backgroundColor={visuals.bg}
+                                  borderColor={visuals.borderColor}
+                                  series={set.series}
+                                  reps={set.reps}
+                                  load={set.load}
+                                  rest={set.rest}
+                                  testIDPrefix={`workouts-exercise-${i}-set-${idx}`}
+                                />
+                              );
+                            }
+
+                            return (
+                              <View
+                                key={`${i}-${idx}`}
+                                style={[
+                                  styles.sessionSetCard,
+                                  {
+                                    backgroundColor: visuals.bg,
+                                    borderColor: visuals.borderColor,
+                                  },
+                                ]}
+                              >
+                                <View style={styles.sessionSetHeader}>
+                                  <View style={styles.sessionSetHeaderLeft}>
+                                    <View
+                                      style={[
+                                        styles.sessionSetBadge,
+                                        { borderColor: `${visuals.color}33` },
+                                      ]}
+                                    >
+                                      <Text
+                                        style={[
+                                          styles.sessionSetBadgeText,
+                                          { color: visuals.color },
+                                        ]}
+                                      >
+                                        {visuals.label}
+                                      </Text>
+                                    </View>
+                                    <Text style={styles.sessionSetTitle}>
+                                      {set.series} x {set.reps}
+                                    </Text>
+                                  </View>
+
+                                  <TouchableOpacity
+                                    onPress={() =>
+                                      updateSessionSetDraft(i, idx, {
+                                        completed: !draft.completed,
+                                      })
+                                    }
+                                    disabled={!draft.completed && !canCompleteSet}
+                                    style={[
+                                      styles.sessionCompletePill,
+                                      draft.completed
+                                        ? styles.sessionCompletePillDone
+                                        : styles.sessionCompletePillIdle,
+                                      !draft.completed &&
+                                      !canCompleteSet &&
+                                      styles.sessionCompletePillDisabled,
+                                    ]}
+                                  >
+                                    <CheckCircle
+                                      size={15}
+                                      color={
+                                        draft.completed ? "#15803d" : "#64748b"
+                                      }
+                                    />
+                                    <Text
+                                      style={[
+                                        styles.sessionCompletePillText,
+                                        draft.completed &&
+                                          styles.sessionCompletePillTextDone,
+                                      ]}
+                                    >
+                                      {draft.completed ? "Concluída" : "Concluir"}
+                                    </Text>
+                                  </TouchableOpacity>
+                                </View>
+
+                                {set.load ? (
+                                  <Text style={styles.sessionSuggestedText}>
+                                    Sugerido: {formatLoadLabel(set.load)}
+                                  </Text>
+                                ) : null}
+
+                                {draft.lastLoad ? (
+                                  <Text style={styles.sessionLastLoadText}>
+                                    Última carga: {formatLoadLabel(draft.lastLoad)}
+                                  </Text>
+                                ) : null}
+
+                                <View
+                                  style={[
+                                    styles.sessionInputGrid,
+                                    !isWide && styles.sessionInputGridStacked,
+                                  ]}
+                                >
+                                  <View style={styles.sessionInputBlock}>
+                                    <Text style={styles.sessionInputLabel}>
+                                      Carga (kg)
+                                    </Text>
+                                    <View style={styles.sessionInputShell}>
+                                      <TextInput
+                                        value={draft.load}
+                                        onChangeText={(value) =>
+                                          updateSessionSetDraft(i, idx, {
+                                            load: sanitizeDecimalDraftValue(value),
+                                          })
+                                        }
+                                        onBlur={() =>
+                                          updateSessionSetDraft(i, idx, {
+                                            load: normalizeLoadDraftValue(
+                                              draft.load,
+                                            ),
+                                          })
+                                        }
+                                        placeholder={set.load ? String(set.load).replace(".", ",") : "20"}
+                                        placeholderTextColor="#94a3b8"
+                                        keyboardType={
+                                          Platform.OS === "ios"
+                                            ? "decimal-pad"
+                                            : "numeric"
+                                        }
+                                        style={styles.sessionInputField}
+                                      />
+                                      <Text style={styles.sessionInputSuffix}>
+                                        kg
+                                      </Text>
+                                    </View>
+                                    <View style={styles.sessionQuickActionsRow}>
+                                      {[-2.5, 2.5, 5].map((delta) => (
+                                        <TouchableOpacity
+                                          key={delta}
+                                          onPress={() => adjustLoad(i, idx, delta)}
+                                          style={styles.sessionQuickActionButton}
+                                        >
+                                          <Text
+                                            style={styles.sessionQuickActionText}
+                                          >
+                                            {delta > 0
+                                              ? `+${String(delta).replace(".", ",")}`
+                                              : String(delta).replace(".", ",")}{" "}
+                                            kg
+                                          </Text>
+                                        </TouchableOpacity>
+                                      ))}
+                                    </View>
+                                  </View>
+
+                                  <View style={styles.sessionInputBlock}>
+                                    <Text style={styles.sessionInputLabel}>
+                                      Reps feitas
+                                    </Text>
+                                    <TextInput
+                                      value={draft.performedReps}
+                                      onChangeText={(value) =>
+                                        updateSessionSetDraft(i, idx, {
+                                          performedReps: value.replace(/\D/g, ""),
+                                        })
+                                      }
+                                      onBlur={() =>
+                                        updateSessionSetDraft(i, idx, {
+                                          performedReps:
+                                            normalizePerformedRepsDraftValue(
+                                              draft.performedReps,
+                                            ),
+                                        })
+                                      }
+                                      placeholder={set.reps ? `Meta: ${set.reps}` : "Ex: 12"}
+                                      placeholderTextColor="#94a3b8"
+                                      keyboardType="number-pad"
+                                      style={styles.sessionInputFieldSolo}
+                                    />
+                                  </View>
+                                </View>
+
+                                {!canCompleteSet ? (
+                                  <Text style={styles.sessionWarningText}>
+                                    Preencha carga e reps para concluir a série.
+                                  </Text>
+                                ) : null}
+
+                                <View style={styles.sessionActionRow}>
+                                  {idx > 0 ? (
+                                    <>
+                                      <TouchableOpacity
+                                        onPress={() => copyPreviousLoad(i, idx)}
+                                        style={styles.sessionSecondaryButton}
+                                      >
+                                        <Text
+                                          style={styles.sessionSecondaryButtonText}
+                                        >
+                                          Copiar carga anterior
+                                        </Text>
+                                      </TouchableOpacity>
+                                      <TouchableOpacity
+                                        onPress={() => copyPreviousReps(i, idx)}
+                                        style={styles.sessionSecondaryButton}
+                                      >
+                                        <Text
+                                          style={styles.sessionSecondaryButtonText}
+                                        >
+                                          Copiar reps anterior
+                                        </Text>
+                                      </TouchableOpacity>
+                                    </>
+                                  ) : null}
+                                </View>
+
+                                {set.rest ? (
+                                  <View style={styles.sessionRestRow}>
+                                    <Clock size={12} color="#64748b" />
+                                    <Text style={styles.sessionRestText}>
+                                      Descanso: {set.rest}
+                                    </Text>
+                                  </View>
+                                ) : null}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      ) : (
+                        <Text style={styles.emptySetsText}>Sem séries definidas.</Text>
                       )}
                     </View>
                   </View>
@@ -1654,11 +2152,10 @@ const styles = StyleSheet.create({
 
   exerciseCard: {
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
-    flexDirection: "row",
-    gap: 8,
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 12,
+    gap: 10,
     borderWidth: 1,
     borderColor: "#f1f5f9",
     shadowColor: "#000",
@@ -1667,14 +2164,17 @@ const styles = StyleSheet.create({
     elevation: 1,
     alignItems: "stretch",
   },
-  // Thumb Pequena Direita
-  thumbBoxSmall: {
-    width: 120,
-    height: 214,
-    borderRadius: 12,
+  exerciseVideoBox: {
+    borderRadius: 14,
     overflow: "hidden",
     position: "relative",
     backgroundColor: "#000",
+    alignSelf: "center",
+  },
+  exerciseVideoLoadingBox: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   playOverlaySmall: {
     position: "absolute",
@@ -1686,31 +2186,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  inlineThumbBox: {
-    width: 120,
-    height: 214,
-    backgroundColor: "#000",
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  inlineThumbHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 6,
-    paddingVertical: 0,
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-  inlineThumbButton: {
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-  },
-  inlineThumbButtonText: { color: "#fff", fontWeight: "800", fontSize: 10 },
   inlineThumbBody: { flex: 1, position: "relative" },
-  inlineThumbVideo: { width: "100%", height: "100%" },
   inlineThumbLoading: {
     position: "absolute",
     top: 0,
@@ -1721,6 +2197,192 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.35)",
     zIndex: 2,
+  },
+  sessionSetCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
+  },
+  sessionSetHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  sessionSetHeaderLeft: {
+    flex: 1,
+    minWidth: 0,
+    gap: 6,
+  },
+  sessionSetBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#fff",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  sessionSetBadgeText: {
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+  },
+  sessionSetTitle: {
+    color: "#0f172a",
+    fontWeight: "900",
+    fontSize: 15,
+  },
+  sessionCompletePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+  },
+  sessionCompletePillIdle: {
+    backgroundColor: "rgba(255,255,255,0.76)",
+    borderColor: "#cbd5e1",
+  },
+  sessionCompletePillDone: {
+    backgroundColor: "#dcfce7",
+    borderColor: "#86efac",
+  },
+  sessionCompletePillDisabled: {
+    opacity: 0.55,
+  },
+  sessionCompletePillText: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  sessionCompletePillTextDone: {
+    color: "#166534",
+  },
+  sessionSuggestedText: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  sessionLastLoadText: {
+    color: "#1d4ed8",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  sessionInputGrid: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  sessionInputGridStacked: {
+    flexDirection: "column",
+  },
+  sessionInputBlock: {
+    flex: 1,
+    minWidth: 0,
+    gap: 6,
+  },
+  sessionInputLabel: {
+    fontSize: 11,
+    color: "#475569",
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  sessionInputShell: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    backgroundColor: "#fff",
+    overflow: "hidden",
+    minWidth: 0,
+  },
+  sessionInputField: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  sessionInputSuffix: {
+    paddingHorizontal: 12,
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "800",
+    borderLeftWidth: 1,
+    borderLeftColor: "#e2e8f0",
+  },
+  sessionInputFieldSolo: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0f172a",
+    minWidth: 0,
+  },
+  sessionQuickActionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  sessionQuickActionButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    backgroundColor: "#eff6ff",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  sessionQuickActionText: {
+    color: "#1d4ed8",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  sessionWarningText: {
+    color: "#b45309",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  sessionActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  sessionSecondaryButton: {
+    borderRadius: 999,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#dbeafe",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  sessionSecondaryButtonText: {
+    color: "#1e3a8a",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  sessionRestRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  sessionRestText: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  emptySetsText: {
+    color: "#94a3b8",
+    fontStyle: "italic",
   },
   previewFullscreenOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1760,11 +2422,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   exNoteSimple: {
-    marginTop: 8,
     backgroundColor: "#fff7ed",
-    padding: 8,
-    borderRadius: 8,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ffedd5",
   },
-  exNoteText: { fontSize: 12, color: "#c2410c" },
+  exNoteText: { fontSize: 12, color: "#c2410c", lineHeight: 18 },
 
 });

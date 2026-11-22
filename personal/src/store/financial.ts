@@ -80,7 +80,7 @@ export async function registerPayment(data: {
             payer_id: data.studentId,
             receiver_id: data.personalId,
             amount: data.amount,
-            description: data.description || 'Mensalidade Personal',
+            description: data.description || 'Cobranca Personal',
             due_date: data.dueDate, // Data de vencimento correta
             paid_at: new Date().toISOString(), // Pago agora
             status: 'paid',

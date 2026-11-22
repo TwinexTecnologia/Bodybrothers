@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { listPlans, deletePlan, type PlanRecord } from '../../store/plans'
-import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { getPlanBillingLabel, getPlanPriceSuffix } from '../../lib/planBilling'
+import { getCurrentPersonalAccountId } from '../../lib/currentPersonalAccount'
 
 export default function Plans() {
   const navigate = useNavigate()
@@ -10,10 +11,14 @@ export default function Plans() {
 
   async function load() {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-        const list = await listPlans(user.id)
+    try {
+      const personalAccountId = await getCurrentPersonalAccountId()
+      if (personalAccountId) {
+        const list = await listPlans(personalAccountId)
         setPlans(list)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar planos da conta principal do personal:', error)
     }
     setLoading(false)
   }
@@ -29,15 +34,6 @@ export default function Plans() {
   }
 
   if (loading) return <div>Carregando...</div>
-
-  const frequencyMap: Record<string, string> = {
-      weekly: 'Semanal',
-      monthly: 'Mensal',
-      bimonthly: 'Bimestral',
-      quarterly: 'Trimestral',
-      semiannual: 'Semestral',
-      annual: 'Anual'
-  }
 
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
@@ -57,8 +53,8 @@ export default function Plans() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 24 }}>
         {plans.map(p => {
-          const freqLabel = frequencyMap[p.frequency || 'monthly']
-          const suffix = p.frequency === 'weekly' ? '/sem' : p.frequency === 'annual' ? '/ano' : '/mês'
+          const cycleLabel = getPlanBillingLabel(p)
+          const suffix = getPlanPriceSuffix(p)
           
           return (
           <div key={p.id} style={{ 
@@ -76,7 +72,7 @@ export default function Plans() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                     <h3 style={{ margin: 0, fontSize: '1.25em', color: '#1e293b' }}>{p.name}</h3>
                     <span style={{ fontSize: '0.75em', background: '#f1f5f9', padding: '4px 8px', borderRadius: 12, color: '#64748b', fontWeight: 600 }}>
-                        {freqLabel}
+                        {cycleLabel}
                     </span>
                 </div>
                 <div style={{ fontSize: '2em', fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>

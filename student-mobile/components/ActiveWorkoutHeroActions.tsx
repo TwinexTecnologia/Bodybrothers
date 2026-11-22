@@ -35,6 +35,7 @@ export default function ActiveWorkoutHeroActions({
   session,
   elapsedSeconds,
   isPaused,
+  beforeFinish,
   onFinished,
   onRequestRefreshDays,
   onPause,
@@ -44,6 +45,7 @@ export default function ActiveWorkoutHeroActions({
   session: ActiveTrainingSession;
   elapsedSeconds: number;
   isPaused: boolean;
+  beforeFinish?: () => Promise<void>;
   onFinished: () => Promise<void>;
   onRequestRefreshDays: () => Promise<void>;
   onPause: () => void;
@@ -65,6 +67,9 @@ export default function ActiveWorkoutHeroActions({
         elapsedSeconds,
         notesLength: sessionNotes.trim().length,
       });
+      if (beforeFinish) {
+        await beforeFinish();
+      }
       await finishSession(session.id, elapsedSeconds, sessionNotes);
       await onFinished();
       await onRequestRefreshDays();
@@ -85,6 +90,7 @@ export default function ActiveWorkoutHeroActions({
   }, [
     elapsedSeconds,
     isFinishing,
+    beforeFinish,
     onFinished,
     onRequestRefreshDays,
     session.id,

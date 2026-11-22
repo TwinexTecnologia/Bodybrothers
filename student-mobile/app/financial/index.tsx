@@ -7,19 +7,11 @@ import { ChevronLeft, CreditCard, AlertCircle, CheckCircle, Clock, Calendar, Dow
 import { useFinancialStatus } from '../../hooks/useFinancialStatus';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-
-const frequencyMap: Record<string, string> = {
-    weekly: 'Semanal',
-    monthly: 'Mensal',
-    bimonthly: 'Bimestral',
-    quarterly: 'Trimestral',
-    semiannual: 'Semestral',
-    annual: 'Anual'
-};
+import { getPlanBillingLabel, getPlanPriceSuffix } from '../../lib/planBilling';
 
 export default function Financial() {
   const { user } = useAuth();
-  const { loading, plan, financialInfo, chargesList, overdueCount } = useFinancialStatus();
+  const { loading, plan, chargesList, overdueCount } = useFinancialStatus();
 
   const displayList = chargesList.filter(c => {
       if (c.status === 'overdue') return true;
@@ -30,8 +22,8 @@ export default function Financial() {
   }).slice(0, 5); // Show top 5 on mobile
 
   const nextCharge = chargesList.find(c => c.date >= new Date(new Date().setHours(0,0,0,0)));
-  const freqLabel = plan?.frequency ? frequencyMap[plan.frequency] : 'Mensal';
-  const suffix = plan?.frequency === 'weekly' ? '/sem' : plan?.frequency === 'annual' ? '/ano' : '/mês';
+  const billingLabel = plan ? getPlanBillingLabel({ billingCycleDays: plan.billing_cycle_days, frequency: plan.frequency }) : '30 dias';
+  const suffix = plan ? getPlanPriceSuffix({ billingCycleDays: plan.billing_cycle_days, frequency: plan.frequency }) : '/30 dias';
 
   const handleExportPDF = async () => {
       if (!chargesList.length || !user || !plan) return;
@@ -54,7 +46,7 @@ export default function Financial() {
             <body>
               <h1>Extrato Financeiro</h1>
               <p>Aluno: ${user.user_metadata?.full_name || user.email}</p>
-              <p>Plano: ${plan.title} (R$ ${plan.price.toFixed(2)})</p>
+              <p>Plano: ${plan.title} (R$ ${plan.price.toFixed(2)}${suffix})</p>
               
               <table>
                 <thead>
@@ -130,7 +122,7 @@ export default function Financial() {
                 
                 <View style={styles.cardBody}>
                     <Text style={styles.planTitle}>{plan.title}</Text>
-                    <Text style={styles.planSub}>Cobrança {freqLabel.toLowerCase()}</Text>
+                    <Text style={styles.planSub}>Cobrança a cada {billingLabel}</Text>
                     
                     <View style={styles.priceContainer}>
                         <Text style={styles.price}>R$ {plan.price.toFixed(2)}</Text>
@@ -141,10 +133,10 @@ export default function Financial() {
 
                     <View style={styles.infoGrid}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.label}>Dia de Vencimento</Text>
+                            <Text style={styles.label}>Ciclo de Cobrança</Text>
                             <View style={styles.row}>
                                 <Calendar size={16} color="#0f172a" />
-                                <Text style={styles.value}>Dia {financialInfo.dueDay || plan.due_day}</Text>
+                                <Text style={styles.value}>{billingLabel}</Text>
                             </View>
                         </View>
                         <View style={{ flex: 1, alignItems: 'flex-end' }}>
@@ -166,7 +158,7 @@ export default function Financial() {
                     <View style={{ flex: 1 }}>
                         <Text style={[styles.alertTitle, { color: '#991b1b' }]}>Pendência Identificada</Text>
                         <Text style={[styles.alertText, { color: '#b91c1c' }]}>
-                            Você possui {overdueCount} mensalidade(s) em aberto.
+                            Você possui {overdueCount} cobranca(s) em aberto.
                         </Text>
                     </View>
                 </View>
@@ -178,7 +170,7 @@ export default function Financial() {
                     <View style={{ flex: 1 }}>
                         <Text style={[styles.alertTitle, { color: '#166534' }]}>Situação Regular</Text>
                         <Text style={[styles.alertText, { color: '#15803d' }]}>
-                            Suas mensalidades estão em dia.
+                            Seus pagamentos estao em dia.
                         </Text>
                     </View>
                 </View>
@@ -199,7 +191,7 @@ export default function Financial() {
                                     {item.status === 'paid' ? <CheckCircle size={16} color="#16a34a" /> : <Clock size={16} color="#64748b" />}
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.listTitle} numberOfLines={1} ellipsizeMode="tail">Mensalidade</Text>
+                                    <Text style={styles.listTitle} numberOfLines={1} ellipsizeMode="tail">Cobrança</Text>
                                     <Text style={[styles.listSub, item.status === 'overdue' && { color: '#ef4444' }]} numberOfLines={1} ellipsizeMode="tail">
                                         {item.status === 'paid' ? `Pago em ${new Date(item.payment.paidAt).toLocaleDateString('pt-BR')}` : `Vence em ${item.date.toLocaleDateString('pt-BR')}`}
                                     </Text>

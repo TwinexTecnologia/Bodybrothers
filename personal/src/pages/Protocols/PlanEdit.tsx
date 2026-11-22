@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getPlan, updatePlan, type PlanFrequency } from '../../store/plans'
+import { getPlan, updatePlan } from '../../store/plans'
 import { supabase } from '../../lib/supabase'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
@@ -11,8 +11,7 @@ export default function PlanEdit() {
   
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
-  const [dueDay, setDueDay] = useState('')
-  const [frequency, setFrequency] = useState<PlanFrequency>('monthly')
+  const [billingCycleDays, setBillingCycleDays] = useState('30')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -27,8 +26,7 @@ export default function PlanEdit() {
         if (p) {
             setName(p.name)
             setPrice(String(p.price))
-            setDueDay(String(p.dueDay))
-            setFrequency(p.frequency || 'monthly')
+            setBillingCycleDays(String(p.billingCycleDays || 30))
         }
         setLoading(false)
     }
@@ -39,11 +37,13 @@ export default function PlanEdit() {
     if (!id) return
     const n = name.trim()
     const v = Number(price)
+    const cycleDays = Number(billingCycleDays)
     
     if (!n || !isFinite(v) || v < 0) { setMsg('Informe nome e preço válido'); return }
+    if (!Number.isInteger(cycleDays) || cycleDays <= 0) { setMsg('Informe uma quantidade de dias válida'); return }
     
     setLoading(true)
-    const ok = await updatePlan(id, { name: n, price: v, frequency })
+    const ok = await updatePlan(id, { name: n, price: v, billingCycleDays: cycleDays, frequency: null })
     setLoading(false)
     
     if (ok) {
@@ -109,19 +109,16 @@ export default function PlanEdit() {
                 </label>
 
                 <label className="label">
-                    Periodicidade (Cobrança)
-                    <select 
-                        className="select" 
-                        value={frequency} 
-                        onChange={(e) => setFrequency(e.target.value as PlanFrequency)}
-                    >
-                        <option value="weekly">Semanal</option>
-                        <option value="monthly">Mensal</option>
-                        <option value="bimonthly">Bimestral</option>
-                        <option value="quarterly">Trimestral</option>
-                        <option value="semiannual">Semestral</option>
-                        <option value="annual">Anual</option>
-                    </select>
+                    Cobrança em Dias
+                    <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        className="input"
+                        value={billingCycleDays}
+                        onChange={(e) => setBillingCycleDays(e.target.value)}
+                        placeholder="Ex: 30"
+                    />
                 </label>
             </div>
 

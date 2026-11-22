@@ -4,6 +4,8 @@ import { addStudent } from '../../store/students'
 import { listPlans, type PlanRecord } from '../../store/plans'
 import { supabase } from '../../lib/supabase'
 import { createStudentAuthUser } from '../../lib/studentAuth'
+import { getPlanBillingLabel } from '../../lib/planBilling'
+import { getCurrentPersonalAccountId } from '../../lib/currentPersonalAccount'
 
 export default function CreateStudent() {
   const [searchParams] = useSearchParams()
@@ -28,8 +30,10 @@ export default function CreateStudent() {
     // Carrega Personal e Planos
     supabase.auth.getUser().then(async ({ data: { user } }) => {
         if (user) {
-            setPersonalId(user.id)
-            const p = await listPlans(user.id)
+            const resolvedPersonalId = await getCurrentPersonalAccountId()
+            const accountId = resolvedPersonalId || user.id
+            setPersonalId(accountId)
+            const p = await listPlans(accountId)
             setPlans(p)
         }
     })
@@ -214,7 +218,7 @@ export default function CreateStudent() {
             Plano contratado
             <select className="select" value={planId} onChange={(e) => setPlanId(e.target.value)}>
               <option value="">Selecione um plano</option>
-              {plans.map(p => <option key={p.id} value={p.id}>{p.name} • R$ {p.price.toFixed(2)} • Venc. dia {p.dueDay}</option>)}
+              {plans.map(p => <option key={p.id} value={p.id}>{p.name} • R$ {p.price.toFixed(2)} • {getPlanBillingLabel(p)}</option>)}
             </select>
           </label>
         </div>
